@@ -1,0 +1,40 @@
+# Maven
+cdiom_backend/target/
+**/target/
+**/.classpath
+**/.project
+**/.settings/
+**/.idea/
+
+# Node
+cdiom_frontend/node_modules/
+**/node_modules/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/package-lock.json
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+**/logs/
+*.log
+
+# Build
+**/dist/
+**/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+

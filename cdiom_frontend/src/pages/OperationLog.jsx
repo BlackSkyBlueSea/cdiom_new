@@ -1,0 +1,160 @@
+import { useState, useEffect } from 'react'
+import { Table, Input, Select, Space, Button } from 'antd'
+import request from '../utils/request'
+
+const OperationLog = () => {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  })
+  const [filters, setFilters] = useState({
+    keyword: '',
+    module: '',
+    operationType: '',
+    status: undefined,
+  })
+
+  useEffect(() => {
+    fetchLogs()
+  }, [pagination.current, pagination.pageSize, filters])
+
+  const fetchLogs = async () => {
+    setLoading(true)
+    try {
+      const res = await request.get('/operation-logs', {
+        params: {
+          page: pagination.current,
+          size: pagination.pageSize,
+          ...filters,
+        },
+      })
+      if (res.code === 200) {
+        setLogs(res.data.records)
+        setPagination({
+          ...pagination,
+          total: res.data.total,
+        })
+      }
+    } catch (error) {
+      console.error('获取操作日志失败', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReset = () => {
+    setFilters({
+      keyword: '',
+      module: '',
+      operationType: '',
+      status: undefined,
+    })
+  }
+
+  const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+    },
+    {
+      title: '操作人',
+      dataIndex: 'username',
+      key: 'username',
+    },
+    {
+      title: '操作模块',
+      dataIndex: 'module',
+      key: 'module',
+    },
+    {
+      title: '操作类型',
+      dataIndex: 'operationType',
+      key: 'operationType',
+    },
+    {
+      title: '操作内容',
+      dataIndex: 'operationContent',
+      key: 'operationContent',
+      ellipsis: true,
+    },
+    {
+      title: 'IP地址',
+      dataIndex: 'ip',
+      key: 'ip',
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (status === 1 ? '成功' : '失败'),
+    },
+    {
+      title: '操作时间',
+      dataIndex: 'operationTime',
+      key: 'operationTime',
+    },
+  ]
+
+  return (
+    <div>
+      <h2>操作日志</h2>
+      <Space style={{ marginBottom: 16 }}>
+        <Input
+          placeholder="搜索关键词"
+          value={filters.keyword}
+          onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+          style={{ width: 200 }}
+        />
+        <Input
+          placeholder="操作模块"
+          value={filters.module}
+          onChange={(e) => setFilters({ ...filters, module: e.target.value })}
+          style={{ width: 150 }}
+        />
+        <Select
+          placeholder="操作类型"
+          value={filters.operationType}
+          onChange={(value) => setFilters({ ...filters, operationType: value })}
+          style={{ width: 150 }}
+          allowClear
+        >
+          <Select.Option value="INSERT">新增</Select.Option>
+          <Select.Option value="UPDATE">更新</Select.Option>
+          <Select.Option value="DELETE">删除</Select.Option>
+          <Select.Option value="SELECT">查询</Select.Option>
+        </Select>
+        <Select
+          placeholder="状态"
+          value={filters.status}
+          onChange={(value) => setFilters({ ...filters, status: value })}
+          style={{ width: 120 }}
+          allowClear
+        >
+          <Select.Option value={1}>成功</Select.Option>
+          <Select.Option value={0}>失败</Select.Option>
+        </Select>
+        <Button onClick={handleReset}>重置</Button>
+      </Space>
+      <Table
+        columns={columns}
+        dataSource={logs}
+        loading={loading}
+        rowKey="id"
+        pagination={{
+          ...pagination,
+          onChange: (page, pageSize) => {
+            setPagination({ ...pagination, current: page, pageSize })
+          },
+        }}
+      />
+    </div>
+  )
+}
+
+export default OperationLog
+
+
