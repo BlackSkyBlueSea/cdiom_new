@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.service.DrugInfoService;
+import com.cdiom.backend.service.JisuApiService;
+import com.cdiom.backend.service.YuanyanyaoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,8 @@ import java.time.LocalDateTime;
 public class DrugInfoServiceImpl implements DrugInfoService {
 
     private final DrugInfoMapper drugInfoMapper;
+    private final YuanyanyaoService yuanyanyaoService;
+    private final JisuApiService jisuApiService;
 
     @Override
     public Page<DrugInfo> getDrugInfoList(Integer page, Integer size, String keyword, Integer isSpecial) {
@@ -121,6 +125,111 @@ public class DrugInfoServiceImpl implements DrugInfoService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteDrugInfo(Long id) {
         drugInfoMapper.deleteById(id);
+    }
+
+    @Override
+    public DrugInfo searchDrugByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
+        }
+
+        // 先查询本地数据库
+        LambdaQueryWrapper<DrugInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.and(w -> w.eq(DrugInfo::getProductCode, code)
+                .or().eq(DrugInfo::getNationalCode, code)
+                .or().eq(DrugInfo::getTraceCode, code)
+                .or().like(DrugInfo::getApprovalNumber, code));
+        DrugInfo localDrug = drugInfoMapper.selectOne(wrapper);
+        
+        if (localDrug != null) {
+            return localDrug;
+        }
+
+        // 如果本地数据库未找到，调用极速数据API（根据商品码查询）
+        DrugInfo jisuDrug = jisuApiService.searchByProductCode(code);
+        if (jisuDrug != null) {
+            return jisuDrug;
+        }
+        
+        return null;
+    }
+
+    @Override
+    public DrugInfo searchDrugByName(String drugName) {
+        if (!StringUtils.hasText(drugName)) {
+            return null;
+        }
+        
+        // 先调用万维易源API获取基本信息
+        DrugInfo drugInfo = yuanyanyaoService.searchByDrugName(drugName.trim());
+        if (drugInfo == null) {
+            return null;
+        }
+        
+        // 如果获取到了批准文号，再调用极速数据API补充信息
+        if (StringUtils.hasText(drugInfo.getApprovalNumber())) {
+            DrugInfo jisuDrugInfo = jisuApiService.searchByApprovalNumber(drugInfo.getApprovalNumber());
+            if (jisuDrugInfo != null) {
+                // 合并信息：极速数据API补充的信息优先
+                mergeDrugInfo(drugInfo, jisuDrugInfo);
+            }
+        }
+        
+        return drugInfo;
+    }
+
+    @Override
+    public DrugInfo searchDrugByApprovalNumber(String approvalNumber) {
+        if (!StringUtils.hasText(approvalNumber)) {
+            return null;
+        }
+        
+        // 先调用万维易源API获取基本信息
+        DrugInfo drugInfo = yuanyanyaoService.searchByApprovalNumber(approvalNumber.trim());
+        if (drugInfo == null) {
+            return null;
+        }
+        
+        // 再调用极速数据API补充信息
+        DrugInfo jisuDrugInfo = jisuApiService.searchByApprovalNumber(approvalNumber.trim());
+        if (jisuDrugInfo != null) {
+            // 合并信息：极速数据API补充的信息优先
+            mergeDrugInfo(drugInfo, jisuDrugInfo);
+        }
+        
+        return drugInfo;
+    }
+
+    /**
+     * 合并药品信息
+     * 将极速数据API返回的信息合并到万维易源API返回的信息中
+     * 极速数据API的字段优先（用于补充国家本位码、条形码、描述、规格）
+     */
+    private void mergeDrugInfo(DrugInfo target, DrugInfo source) {
+        // 补充国家本位码（如果万维易源API没有）
+        if (!StringUtils.hasText(target.getNationalCode()) && StringUtils.hasText(source.getNationalCode())) {
+            target.setNationalCode(source.getNationalCode());
+        }
+        
+        // 补充描述/说明书（如果万维易源API没有）
+        if (!StringUtils.hasText(target.getDescription()) && StringUtils.hasText(source.getDescription())) {
+            target.setDescription(source.getDescription());
+        }
+        
+        // 用极速数据API的规格替换（根据用户需求）
+        if (StringUtils.hasText(source.getSpecification())) {
+            target.setSpecification(source.getSpecification());
+        }
+        
+        // 补充商品码/条形码（如果万维易源API没有）
+        if (!StringUtils.hasText(target.getProductCode()) && StringUtils.hasText(source.getProductCode())) {
+            target.setProductCode(source.getProductCode());
+        }
+        
+        // 如果万维易源API没有剂型，使用极速数据API的剂型
+        if (!StringUtils.hasText(target.getDosageForm()) && StringUtils.hasText(source.getDosageForm())) {
+            target.setDosageForm(source.getDosageForm());
+        }
     }
 }
 

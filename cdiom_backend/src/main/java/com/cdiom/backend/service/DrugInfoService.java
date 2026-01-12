@@ -34,5 +34,31 @@ public interface DrugInfoService {
      * 删除药品信息
      */
     void deleteDrugInfo(Long id);
+
+    /**
+     * 根据商品码或本位码查询药品信息
+     * 先查询本地数据库，如果未找到则查询极速数据API
+     * 
+     * @param code 商品码或本位码
+     * @return 药品信息，如果未找到返回null
+     */
+    DrugInfo searchDrugByCode(String code);
+
+    /**
+     * 根据药品名称查询药品信息（调用万维易源API）
+     * 
+     * @param drugName 药品名称
+     * @return 药品信息，如果未找到返回null
+     */
+    DrugInfo searchDrugByName(String drugName);
+
+    /**
+     * 根据批准文号查询药品信息（调用万维易源API）
+     * 
+     * @param approvalNumber 批准文号
+     * @return 药品信息，如果未找到返回null
+     */
+    DrugInfo searchDrugByApprovalNumber(String approvalNumber);
 }
+
 

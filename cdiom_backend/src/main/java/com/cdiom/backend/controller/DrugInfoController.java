@@ -1,6 +1,7 @@
 package com.cdiom.backend.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.service.DrugInfoService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/drugs")
 @RequiredArgsConstructor
+@RequiresPermission({"drug:view", "drug:manage"})
 public class DrugInfoController {
 
     private final DrugInfoService drugInfoService;
@@ -80,5 +82,58 @@ public class DrugInfoController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 根据商品码或本位码查询药品信息
+     * 先查询本地数据库，如果未找到则查询极速数据API
+     */
+    @GetMapping("/search")
+    public Result<DrugInfo> searchDrugByCode(@RequestParam String code) {
+        try {
+            DrugInfo drugInfo = drugInfoService.searchDrugByCode(code);
+            if (drugInfo != null) {
+                return Result.success("查询成功", drugInfo);
+            } else {
+                return Result.error("未找到药品信息");
+            }
+        } catch (Exception e) {
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据药品名称查询药品信息（调用万维易源API）
+     */
+    @GetMapping("/search/name")
+    public Result<DrugInfo> searchDrugByName(@RequestParam String drugName) {
+        try {
+            DrugInfo drugInfo = drugInfoService.searchDrugByName(drugName);
+            if (drugInfo != null) {
+                return Result.success("查询成功", drugInfo);
+            } else {
+                return Result.error("未找到药品信息");
+            }
+        } catch (Exception e) {
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据批准文号查询药品信息（调用万维易源API）
+     */
+    @GetMapping("/search/approval")
+    public Result<DrugInfo> searchDrugByApprovalNumber(@RequestParam String approvalNumber) {
+        try {
+            DrugInfo drugInfo = drugInfoService.searchDrugByApprovalNumber(approvalNumber);
+            if (drugInfo != null) {
+                return Result.success("查询成功", drugInfo);
+            } else {
+                return Result.error("未找到药品信息");
+            }
+        } catch (Exception e) {
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
 }
+
 

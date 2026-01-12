@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 
 const UserManagement = () => {
   const [users, setUsers] = useState([])
@@ -155,22 +156,26 @@ const UserManagement = () => {
       key: 'action',
       render: (_, record) => (
         <Space>
-          <Tooltip title="编辑">
-            <Button
-              type="link"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title={record.status === 1 ? '禁用' : '启用'}>
-            <Button
-              type="link"
-              danger={record.status === 1}
-              icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-              onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
-            />
-          </Tooltip>
-          {record.lockTime && (
+          {hasPermission(PERMISSIONS.USER_UPDATE) && (
+            <Tooltip title="编辑">
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+              />
+            </Tooltip>
+          )}
+          {hasPermission(PERMISSIONS.USER_UPDATE) && (
+            <Tooltip title={record.status === 1 ? '禁用' : '启用'}>
+              <Button
+                type="link"
+                danger={record.status === 1}
+                icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+                onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
+              />
+            </Tooltip>
+          )}
+          {record.lockTime && hasPermission(PERMISSIONS.USER_UPDATE) && (
             <Tooltip title="解锁">
               <Button
                 type="link"
@@ -179,14 +184,16 @@ const UserManagement = () => {
               />
             </Tooltip>
           )}
-          <Popconfirm
-            title="确定要删除吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Tooltip title="删除">
-              <Button type="link" danger icon={<DeleteOutlined />} />
-            </Tooltip>
-          </Popconfirm>
+          {hasPermission(PERMISSIONS.USER_DELETE) && (
+            <Popconfirm
+              title="确定要删除吗？"
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Tooltip title="删除">
+                <Button type="link" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -196,9 +203,11 @@ const UserManagement = () => {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <h2>用户管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增用户
-        </Button>
+        <PermissionWrapper permission={PERMISSIONS.USER_CREATE}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增用户
+          </Button>
+        </PermissionWrapper>
       </div>
       <Table
         columns={columns}

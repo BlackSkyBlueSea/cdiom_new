@@ -1,6 +1,7 @@
 package com.cdiom.backend.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.SysUserService;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
+@RequiresPermission("user:manage")
 public class SysUserController {
 
     private final SysUserService sysUserService;

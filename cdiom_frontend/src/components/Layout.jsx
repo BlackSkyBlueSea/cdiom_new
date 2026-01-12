@@ -75,7 +75,7 @@ const Layout = () => {
         key: '/operation-logs',
         icon: <FileTextOutlined />,
         label: '操作日志',
-        roles: [1, 2], // 系统管理员和仓库管理员可见
+        roles: [1], // 仅系统管理员可见
       },
       {
         key: '/login-logs',

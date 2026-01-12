@@ -1,0 +1,38 @@
+/* 仓库管理员统计卡片响应式布局 */
+.warehouse-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/* 中等屏幕（md）及以上：5个卡片一行 */
+@media (min-width: 768px) {
+  .warehouse-stats-row .ant-col {
+    flex: 1 1 0;
+    min-width: 180px;
+    max-width: none;
+  }
+}
+
+/* 小屏幕（sm）：2个卡片一行 */
+@media (min-width: 576px) and (max-width: 767px) {
+  .warehouse-stats-row .ant-col {
+    flex: 0 0 calc(50% - 8px);
+    max-width: calc(50% - 8px);
+  }
+}
+
+/* 超小屏幕（xs）：1个卡片一行 */
+@media (max-width: 575px) {
+  .warehouse-stats-row .ant-col {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* 覆盖Ant Design Card的默认padding - 仅针对统计卡片 */
+.warehouse-stats-row .ant-card .ant-card-body {
+  padding: 0 !important;
+}
+
+/* 如果需要为Card内容添加自定义padding，可以在Card组件上使用bodyStyle属性 */
+

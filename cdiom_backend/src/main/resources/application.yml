@@ -5,6 +5,15 @@ server:
       charset: UTF-8
       enabled: true
       force: true
+  tomcat:
+    # Tomcat线程池配置（支持多用户并发访问）
+    threads:
+      max: 200          # 最大工作线程数（默认200）
+      min-spare: 10     # 最小空闲线程数（默认10）
+    # 连接器配置
+    max-connections: 10000  # 最大连接数
+    accept-count: 100       # 等待队列长度
+    connection-timeout: 20000  # 连接超时时间（毫秒）
 
 spring:
   application:
@@ -18,11 +27,19 @@ spring:
     username: root
     password: 12345
     hikari:
-      minimum-idle: 5
-      maximum-pool-size: 20
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      # 数据库连接池配置（支持多用户并发访问）
+      minimum-idle: 10              # 最小空闲连接数（建议设置为最大连接数的50%）
+      maximum-pool-size: 50          # 最大连接池大小（根据并发用户数调整）
+      connection-timeout: 30000      # 连接超时时间（30秒）
+      idle-timeout: 600000           # 空闲连接超时时间（10分钟）
+      max-lifetime: 1800000          # 连接最大生命周期（30分钟）
+      leak-detection-threshold: 60000 # 连接泄漏检测阈值（60秒）
+      # 连接池性能优化
+      pool-name: CDIOM-HikariPool
+      register-mbeans: true          # 启用JMX监控
+      # 连接验证
+      connection-test-query: SELECT 1
+      validation-timeout: 5000       # 验证超时时间（5秒）
 
 mybatis-plus:
   configuration:
@@ -53,4 +70,17 @@ logging:
     name: logs/cdiom_backend.log
     max-size: 10MB
     max-history: 30
+
+# 万维易源药品信息API配置
+yuanyanyao:
+  api:
+    base-url: https://route.showapi.com/1468-4
+    app-key: 54A4f73B557144aEB53EFCB7a4bC7d01
+    default-classify-id: 599ad2a0600b2149d689b75a
+
+# 极速数据药品信息API配置
+jisuapi:
+  api:
+    base-url: https://api.jisuapi.com/medicine/detail
+    app-key: c82aac95b1d2a0d2
 

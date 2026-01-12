@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Table, Input, Select, Space, Button } from 'antd'
+import { Table, Input, Select, Space, Button, message } from 'antd'
 import request from '../utils/request'
+import { hasPermission, PERMISSIONS } from '../utils/permission'
+import { Navigate } from 'react-router-dom'
 
 const OperationLog = () => {
+  // 权限检查：只有系统管理员可以查看操作日志
+  if (!hasPermission(PERMISSIONS.LOG_OPERATION_VIEW)) {
+    message.error('您没有权限访问此页面')
+    return <Navigate to="/dashboard" replace />
+  }
+
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({
@@ -156,5 +164,7 @@ const OperationLog = () => {
 }
 
 export default OperationLog
+
+
 
 

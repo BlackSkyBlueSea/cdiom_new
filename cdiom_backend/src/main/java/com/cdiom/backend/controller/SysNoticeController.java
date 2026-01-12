@@ -1,6 +1,7 @@
 package com.cdiom.backend.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysNotice;
 import com.cdiom.backend.service.SysNoticeService;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/notices")
 @RequiredArgsConstructor
+@RequiresPermission({"notice:view", "notice:manage"})
 public class SysNoticeController {
 
     private final SysNoticeService sysNoticeService;
