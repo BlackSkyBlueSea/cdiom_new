@@ -10,6 +10,7 @@ import ConfigManagement from './pages/ConfigManagement'
 import NoticeManagement from './pages/NoticeManagement'
 import OperationLog from './pages/OperationLog'
 import LoginLog from './pages/LoginLog'
+import DrugManagement from './pages/DrugManagement'
 import PrivateRoute from './components/PrivateRoute'
 import './App.css'
 
@@ -29,6 +30,7 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="drugs" element={<DrugManagement />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="roles" element={<RoleManagement />} />
             <Route path="configs" element={<ConfigManagement />} />

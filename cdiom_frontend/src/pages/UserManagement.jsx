@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 
 const UserManagement = () => {
@@ -155,36 +155,37 @@ const UserManagement = () => {
       key: 'action',
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            danger
-            onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
-          >
-            {record.status === 1 ? '禁用' : '启用'}
-          </Button>
-          {record.lockTime && (
+          <Tooltip title="编辑">
             <Button
               type="link"
-              icon={<UnlockOutlined />}
-              onClick={() => handleUnlock(record.id)}
-            >
-              解锁
-            </Button>
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title={record.status === 1 ? '禁用' : '启用'}>
+            <Button
+              type="link"
+              danger={record.status === 1}
+              icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+              onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
+            />
+          </Tooltip>
+          {record.lockTime && (
+            <Tooltip title="解锁">
+              <Button
+                type="link"
+                icon={<UnlockOutlined />}
+                onClick={() => handleUnlock(record.id)}
+              />
+            </Tooltip>
           )}
           <Popconfirm
             title="确定要删除吗？"
             onConfirm={() => handleDelete(record.id)}
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
+            <Tooltip title="删除">
+              <Button type="link" danger icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),

@@ -3,7 +3,7 @@ import { Form, Input, Button, Card, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import request from '../utils/request'
-import { setToken } from '../utils/auth'
+import { setToken, setUser } from '../utils/auth'
 import './Login.css'
 
 const Login = () => {
@@ -19,6 +19,9 @@ const Login = () => {
       })
       if (res.code === 200) {
         setToken(res.data.token)
+        if (res.data.user) {
+          setUser(res.data.user)
+        }
         message.success('登录成功')
         navigate('/dashboard')
       }

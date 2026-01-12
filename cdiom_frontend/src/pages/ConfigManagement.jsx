@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 
@@ -106,7 +106,7 @@ const ConfigManagement = () => {
       key: 'configValue',
     },
     {
-      title: '参数类型',
+      title: <span style={{ whiteSpace: 'nowrap' }}>参数类型</span>,
       dataIndex: 'configType',
       key: 'configType',
       render: (type) => (type === 1 ? '系统参数' : '业务参数'),
@@ -121,20 +121,20 @@ const ConfigManagement = () => {
       key: 'action',
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
+          <Tooltip title="编辑">
+            <Button
+              type="link"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
           <Popconfirm
             title="确定要删除吗？"
             onConfirm={() => handleDelete(record.id)}
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
+            <Tooltip title="删除">
+              <Button type="link" danger icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
