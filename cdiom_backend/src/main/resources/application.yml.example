@@ -1,0 +1,31 @@
+# 配置文件示例
+# 复制此文件为 application-local.yml 并填入实际配置值
+# application-local.yml 不会被提交到 Git
+
+spring:
+  # 163邮箱配置（用于发送验证码）
+  # 获取授权码：登录163邮箱 -> 设置 -> POP3/SMTP/IMAP -> 开启SMTP服务 -> 获取授权码
+  mail:
+    username: your-email@163.com  # 请替换为实际的163邮箱地址
+    password: your-smtp-auth-code  # 请替换为163邮箱的授权码（不是登录密码，是SMTP授权码）
+  
+  # 数据库配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: your-db-username
+    password: your-db-password  # 请替换为实际的数据库密码
+
+# JWT配置
+jwt:
+  secret: your-jwt-secret-key-minimum-32-characters  # 生产环境请使用强密钥（至少32字符）
+
+# 万维易源药品信息API配置
+yuanyanyao:
+  api:
+    app-key: your-yuanyanyao-api-key  # 请替换为实际的API密钥
+
+# 极速数据药品信息API配置
+jisuapi:
+  api:
+    app-key: your-jisuapi-key  # 请替换为实际的API密钥
+

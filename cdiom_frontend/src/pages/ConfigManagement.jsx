@@ -89,6 +89,8 @@ const ConfigManagement = () => {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
+      sorter: (a, b) => a.id - b.id,
+      defaultSortOrder: 'ascend',
     },
     {
       title: '参数名称',

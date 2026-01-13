@@ -191,11 +191,23 @@ const Dashboard = () => {
   // 最近操作日志表格列
   const logColumns = [
     {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+    },
+    {
       title: '操作时间',
       dataIndex: 'operationTime',
       key: 'operationTime',
       width: 180,
       render: (text) => text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-',
+      sorter: (a, b) => {
+        const timeA = a.operationTime ? dayjs(a.operationTime).valueOf() : 0
+        const timeB = b.operationTime ? dayjs(b.operationTime).valueOf() : 0
+        return timeB - timeA // 降序：最新的在上
+      },
+      defaultSortOrder: 'descend',
     },
     {
       title: '操作人',

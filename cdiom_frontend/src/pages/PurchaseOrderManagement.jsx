@@ -218,6 +218,14 @@ const PurchaseOrderManagement = () => {
 
   const columns = [
     {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      sorter: (a, b) => a.id - b.id,
+      defaultSortOrder: 'ascend',
+    },
+    {
       title: '订单编号',
       dataIndex: 'orderNumber',
       key: 'orderNumber',

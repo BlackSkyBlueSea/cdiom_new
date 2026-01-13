@@ -148,6 +148,14 @@ const SupplierManagement = () => {
 
   const columns = [
     {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      sorter: (a, b) => a.id - b.id,
+      defaultSortOrder: 'ascend',
+    },
+    {
       title: '供应商名称',
       dataIndex: 'name',
       key: 'name',

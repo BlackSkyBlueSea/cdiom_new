@@ -104,6 +104,12 @@ const OperationLog = () => {
       title: '操作时间',
       dataIndex: 'operationTime',
       key: 'operationTime',
+      sorter: (a, b) => {
+        const timeA = a.operationTime ? new Date(a.operationTime).getTime() : 0
+        const timeB = b.operationTime ? new Date(b.operationTime).getTime() : 0
+        return timeB - timeA // 降序：最新的在上
+      },
+      defaultSortOrder: 'descend',
     },
   ]
 

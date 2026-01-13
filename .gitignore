@@ -38,3 +38,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# 敏感配置文件（包含密码、密钥等）
+**/application-local.yml
+**/application-*.yml
+!**/application.yml.example
+**/application-prod.yml
+**/application-dev.yml
+**/application-test.yml
+

@@ -18,17 +18,22 @@ server:
 spring:
   application:
     name: cdiom_backend
+  # 激活本地配置（开发环境）
+  # 如果存在 application-local.yml，可以通过设置 spring.profiles.active=local 来激活
+  # 或者直接使用环境变量配置敏感信息
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration
   # 163邮箱配置（用于发送验证码）
-  # 注意：需要配置实际的163邮箱地址和授权码
+  # 注意：敏感信息请使用环境变量或 application-local.yml 配置
   # 获取授权码：登录163邮箱 -> 设置 -> POP3/SMTP/IMAP -> 开启SMTP服务 -> 获取授权码
   mail:
-    host: smtp.163.com
-    port: 465
-    username: yin1773330363@163.com  # 请替换为实际的163邮箱地址
-    password: SMVYbRqdBUJDjxMt  # 请替换为163邮箱的授权码（不是登录密码，是SMTP授权码）
+    host: ${MAIL_HOST:smtp.163.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}  # 请通过环境变量 MAIL_USERNAME 配置
+    password: ${MAIL_PASSWORD:}  # 请通过环境变量 MAIL_PASSWORD 配置（不是登录密码，是SMTP授权码）
     default-encoding: UTF-8
     properties:
       mail:
@@ -43,9 +48,9 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
-    username: root
-    password: 12345
+    url: ${DB_URL:jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}  # 请通过环境变量 DB_PASSWORD 配置
     hikari:
       # 数据库连接池配置（支持多用户并发访问）
       minimum-idle: 10              # 最小空闲连接数（建议设置为最大连接数的50%）
@@ -76,8 +81,8 @@ mybatis-plus:
 
 # JWT配置
 jwt:
-  secret: cdiom-secret-key-for-jwt-token-generation-minimum-32-characters
-  expiration: 28800000  # 8小时（毫秒）
+  secret: ${JWT_SECRET:cdiom-secret-key-for-jwt-token-generation-minimum-32-characters}  # 生产环境请使用环境变量配置强密钥
+  expiration: ${JWT_EXPIRATION:28800000}  # 8小时（毫秒）
 
 logging:
   level:
@@ -94,15 +99,15 @@ logging:
 # 万维易源药品信息API配置
 yuanyanyao:
   api:
-    base-url: https://route.showapi.com/1468-4
-    app-key: 54A4f73B557144aEB53EFCB7a4bC7d01
-    default-classify-id: 599ad2a0600b2149d689b75a
+    base-url: ${YUANYANYAO_BASE_URL:https://route.showapi.com/1468-4}
+    app-key: ${YUANYANYAO_APP_KEY:}  # 请通过环境变量 YUANYANYAO_APP_KEY 配置
+    default-classify-id: ${YUANYANYAO_CLASSIFY_ID:599ad2a0600b2149d689b75a}
 
 # 极速数据药品信息API配置
 jisuapi:
   api:
-    base-url: https://api.jisuapi.com/medicine/detail
-    app-key: c82aac95b1d2a0d2
+    base-url: ${JISUAPI_BASE_URL:https://api.jisuapi.com/medicine/detail}
+    app-key: ${JISUAPI_APP_KEY:}  # 请通过环境变量 JISUAPI_APP_KEY 配置
 
 # 邮箱验证码配置
 email:
