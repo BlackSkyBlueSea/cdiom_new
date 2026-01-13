@@ -7,6 +7,7 @@ import com.cdiom.backend.model.LoginLog;
 import com.cdiom.backend.model.SysRole;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
+import com.cdiom.backend.service.IpLocationService;
 import com.cdiom.backend.service.LoginLogService;
 import com.cdiom.backend.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
     private final LoginLogService loginLogService;
+    private final IpLocationService ipLocationService;
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -49,6 +51,14 @@ public class AuthServiceImpl implements AuthService {
         loginLog.setIp(ip);
         loginLog.setBrowser(browser);
         loginLog.setOs(os);
+        // 获取并设置登录地点（异步处理，避免影响登录速度）
+        try {
+            String location = ipLocationService.getLocationByIp(ip);
+            loginLog.setLocation(location);
+        } catch (Exception e) {
+            // 如果获取地理位置失败，不影响登录流程，设置为IP地址
+            loginLog.setLocation(ip);
+        }
 
         // 用户不存在或密码错误
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {

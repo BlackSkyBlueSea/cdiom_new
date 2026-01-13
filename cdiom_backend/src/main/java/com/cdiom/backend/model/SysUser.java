@@ -31,6 +31,11 @@ public class SysUser {
     private String phone;
 
     /**
+     * 邮箱地址
+     */
+    private String email;
+
+    /**
      * 密码（BCrypt加密）
      */
     private String password;

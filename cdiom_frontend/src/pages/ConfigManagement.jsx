@@ -86,41 +86,53 @@ const ConfigManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
+      width: 80,
       sorter: (a, b) => a.id - b.id,
       defaultSortOrder: 'ascend',
     },
     {
-      title: '参数名称',
+      title: <span style={{ whiteSpace: 'nowrap' }}>参数名称</span>,
       dataIndex: 'configName',
       key: 'configName',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '参数键名',
+      title: <span style={{ whiteSpace: 'nowrap' }}>参数键名</span>,
       dataIndex: 'configKey',
       key: 'configKey',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '参数值',
+      title: <span style={{ whiteSpace: 'nowrap' }}>参数值</span>,
       dataIndex: 'configValue',
       key: 'configValue',
+      width: 200,
+      ellipsis: true,
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>参数类型</span>,
       dataIndex: 'configType',
       key: 'configType',
+      width: 100,
       render: (type) => (type === 1 ? '系统参数' : '业务参数'),
     },
     {
-      title: '备注',
+      title: <span style={{ whiteSpace: 'nowrap' }}>备注</span>,
       dataIndex: 'remark',
       key: 'remark',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
+      width: 120,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           <Tooltip title="编辑">
@@ -145,8 +157,8 @@ const ConfigManagement = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>参数配置</h2>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <h2 style={{ margin: 0 }}>参数配置</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
           新增配置
         </Button>
@@ -156,6 +168,8 @@ const ConfigManagement = () => {
         dataSource={configs}
         loading={loading}
         rowKey="id"
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 200px)' }}
         pagination={{
           ...pagination,
           onChange: (page, pageSize) => {

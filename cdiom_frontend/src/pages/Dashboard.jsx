@@ -191,13 +191,13 @@ const Dashboard = () => {
   // 最近操作日志表格列
   const logColumns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
       width: 80,
     },
     {
-      title: '操作时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作时间</span>,
       dataIndex: 'operationTime',
       key: 'operationTime',
       width: 180,
@@ -210,19 +210,21 @@ const Dashboard = () => {
       defaultSortOrder: 'descend',
     },
     {
-      title: '操作人',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作人</span>,
       dataIndex: 'username',
       key: 'username',
       width: 120,
+      ellipsis: true,
     },
     {
-      title: '操作模块',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作模块</span>,
       dataIndex: 'module',
       key: 'module',
       width: 120,
+      ellipsis: true,
     },
     {
-      title: '操作类型',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作类型</span>,
       dataIndex: 'operationType',
       key: 'operationType',
       width: 100,
@@ -238,13 +240,14 @@ const Dashboard = () => {
       },
     },
     {
-      title: '操作内容',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作内容</span>,
       dataIndex: 'operationContent',
       key: 'operationContent',
+      width: 200,
       ellipsis: true,
     },
     {
-      title: '状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
       width: 80,
@@ -281,7 +284,7 @@ const Dashboard = () => {
   // 仓库管理员专用仪表盘
   if (roleId === 2) {
     return (
-      <div style={{ padding: 0 }}>
+      <div>
         {/* 统计卡片 - 一行显示5个 */}
         <Row 
           gutter={[16, 16]} 
@@ -455,8 +458,8 @@ const Dashboard = () => {
 
   // 系统管理员仪表盘
   return (
-    <div style={{ padding: 0 }}>
-      <h2 style={{ marginBottom: '24px' }}>系统仪表盘</h2>
+    <div>
+      <h2 style={{ marginBottom: '24px', margin: 0 }}>系统仪表盘</h2>
 
       {/* 统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
@@ -613,8 +616,8 @@ const Dashboard = () => {
             dataSource={recentLogs}
             rowKey="id"
             pagination={false}
-            size="small"
-            scroll={{ x: 'max-content' }}
+            size="middle"
+            scroll={{ x: 'max-content', y: 400 }}
           />
         </Card>
       )}

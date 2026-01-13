@@ -1,0 +1,49 @@
+# Spring Boot 主配置文件
+# 此文件会被提交到 Git，不包含敏感信息
+# 敏感配置请放在 application-local.yml 中
+
+spring:
+  profiles:
+    active: local  # 激活本地开发环境配置
+  
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration
+  
+  # 163邮箱配置（用于发送验证码）
+  # 注意：邮箱用户名和密码在 application-local.yml 中配置
+  # 获取授权码：登录163邮箱 -> 设置 -> POP3/SMTP/IMAP -> 开启SMTP服务 -> 获取授权码
+  mail:
+    host: smtp.163.com
+    port: 465
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  
+  # 数据库配置
+  # 注意：数据库用户名和密码在 application-local.yml 中配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+
+# 邮箱验证码配置（非敏感配置）
+email:
+  verification:
+    code-length: 6  # 验证码长度
+    expire-minutes: 5  # 验证码有效期（分钟）
+
+# 注意：以下敏感配置在 application-local.yml 中：
+# - spring.mail.username 和 password
+# - spring.datasource.username 和 password
+# - jwt.secret 和 jwt.expiration
+# - yuanyanyao.api.app-key
+# - jisuapi.api.app-key
+# - email.verification.super-admin-username

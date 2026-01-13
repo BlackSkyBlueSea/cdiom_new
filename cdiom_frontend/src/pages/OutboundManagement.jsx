@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Card, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
@@ -307,7 +307,7 @@ const OutboundManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
       width: 80,
@@ -315,60 +315,66 @@ const OutboundManagement = () => {
       defaultSortOrder: 'ascend',
     },
     {
-      title: '申领单号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>申领单号</span>,
       dataIndex: 'applyNumber',
       key: 'applyNumber',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '申请人',
+      title: <span style={{ whiteSpace: 'nowrap' }}>申请人</span>,
       dataIndex: 'applicantName',
       key: 'applicantName',
       width: 100,
+      ellipsis: true,
     },
     {
-      title: '所属科室',
+      title: <span style={{ whiteSpace: 'nowrap' }}>所属科室</span>,
       dataIndex: 'department',
       key: 'department',
       width: 120,
+      ellipsis: true,
     },
     {
-      title: '用途',
+      title: <span style={{ whiteSpace: 'nowrap' }}>用途</span>,
       dataIndex: 'purpose',
       key: 'purpose',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '申请状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>申请状态</span>,
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status) => getStatusTag(status),
     },
     {
-      title: '审批人',
+      title: <span style={{ whiteSpace: 'nowrap' }}>审批人</span>,
       dataIndex: 'approverName',
       key: 'approverName',
       width: 100,
+      ellipsis: true,
     },
     {
-      title: '审批时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>审批时间</span>,
       dataIndex: 'approveTime',
       key: 'approveTime',
       width: 180,
       render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '出库时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>出库时间</span>,
       dataIndex: 'outboundTime',
       key: 'outboundTime',
       width: 180,
       render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
       width: 200,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           {record.status === 'PENDING' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
@@ -425,89 +431,90 @@ const OutboundManagement = () => {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Space wrap>
-            <Input
-              placeholder="搜索申领单号、申请人"
-              value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-              style={{ width: 200 }}
-              allowClear
-            />
-            <Input
-              placeholder="所属科室"
-              value={filters.department}
-              onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-              style={{ width: 150 }}
-              allowClear
-            />
-            <Select
-              placeholder="申请状态"
-              value={filters.status}
-              onChange={(value) => setFilters({ ...filters, status: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value="PENDING">待审批</Select.Option>
-              <Select.Option value="APPROVED">已通过</Select.Option>
-              <Select.Option value="REJECTED">已驳回</Select.Option>
-              <Select.Option value="OUTBOUND">已出库</Select.Option>
-              <Select.Option value="CANCELLED">已取消</Select.Option>
-            </Select>
-            <RangePicker
-              placeholder={['开始日期', '结束日期']}
-              value={filters.startDate && filters.endDate 
-                ? [filters.startDate, filters.endDate] 
-                : null}
-              onChange={(dates) => {
-                setFilters({
-                  ...filters,
-                  startDate: dates ? dates[0] : undefined,
-                  endDate: dates ? dates[1] : undefined,
-                })
-              }}
-            />
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>出库管理</h2>
+        <Space wrap>
+          <Input
+            placeholder="搜索申领单号、申请人"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            style={{ width: 200 }}
+            allowClear
+          />
+          <Input
+            placeholder="所属科室"
+            value={filters.department}
+            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            style={{ width: 150 }}
+            allowClear
+          />
+          <Select
+            placeholder="申请状态"
+            value={filters.status}
+            onChange={(value) => setFilters({ ...filters, status: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value="PENDING">待审批</Select.Option>
+            <Select.Option value="APPROVED">已通过</Select.Option>
+            <Select.Option value="REJECTED">已驳回</Select.Option>
+            <Select.Option value="OUTBOUND">已出库</Select.Option>
+            <Select.Option value="CANCELLED">已取消</Select.Option>
+          </Select>
+          <RangePicker
+            placeholder={['开始日期', '结束日期']}
+            value={filters.startDate && filters.endDate 
+              ? [filters.startDate, filters.endDate] 
+              : null}
+            onChange={(dates) => {
+              setFilters({
+                ...filters,
+                startDate: dates ? dates[0] : undefined,
+                endDate: dates ? dates[1] : undefined,
+              })
+            }}
+          />
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={fetchOutboundApplies}
+          >
+            查询
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>
+            重置
+          </Button>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <Button
               type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchOutboundApplies}
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalVisible(true)
+                form.resetFields()
+                setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+              }}
             >
-              查询
+              新建出库申请
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
-            </Button>
-            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  form.resetFields()
-                  setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
-                }}
-              >
-                新建出库申请
-              </Button>
-            )}
-          </Space>
-
-          <Table
-            columns={columns}
-            dataSource={outboundApplies}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              ...pagination,
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            onChange={handleTableChange}
-          />
+          )}
         </Space>
-      </Card>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={outboundApplies}
+        rowKey="id"
+        loading={loading}
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+        onChange={handleTableChange}
+      />
 
       {/* 新建出库申请模态框 */}
       <Modal

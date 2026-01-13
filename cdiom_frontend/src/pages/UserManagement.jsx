@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, 
 import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
+import SuperAdminModal from '../components/SuperAdminModal'
 
 const UserManagement = () => {
   const [users, setUsers] = useState([])
@@ -11,6 +12,7 @@ const UserManagement = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [form] = Form.useForm()
+  const [superAdminModalVisible, setSuperAdminModalVisible] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -91,12 +93,21 @@ const UserManagement = () => {
   }
 
   const handleStatusChange = async (id, status) => {
+    // 检查是否是超级管理员用户（username=super_admin 或 roleId=6）
+    const user = users.find(u => u.id === id)
+    if (user && (user.username === 'super_admin' || user.roleId === 6)) {
+      // 超级管理员需要通过验证码验证
+      setSuperAdminModalVisible(true)
+      return
+    }
+    
     try {
       await request.put(`/users/${id}/status`, { status })
       message.success('状态更新成功')
       fetchUsers()
     } catch (error) {
-      message.error('状态更新失败')
+      const errorMsg = error.response?.data?.msg || error.message || '状态更新失败'
+      message.error(errorMsg)
     }
   }
 
@@ -122,40 +133,56 @@ const UserManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
+      width: 80,
       sorter: (a, b) => a.id - b.id,
       defaultSortOrder: 'ascend',
     },
     {
-      title: '用户名',
+      title: <span style={{ whiteSpace: 'nowrap' }}>用户名</span>,
       dataIndex: 'username',
       key: 'username',
+      width: 120,
+      ellipsis: true,
     },
     {
-      title: '手机号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>手机号</span>,
       dataIndex: 'phone',
       key: 'phone',
+      width: 120,
     },
     {
-      title: '角色',
+      title: <span style={{ whiteSpace: 'nowrap' }}>邮箱</span>,
+      dataIndex: 'email',
+      key: 'email',
+      width: 180,
+      ellipsis: true,
+      render: (email) => email || '-',
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>角色</span>,
       dataIndex: 'roleId',
       key: 'roleId',
+      width: 120,
       render: (roleId) => {
         const role = roles.find((r) => r.id === roleId)
         return role ? role.roleName : '-'
       },
     },
     {
-      title: '状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
+      width: 80,
       render: (status) => (status === 1 ? '正常' : '禁用'),
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
+      width: 150,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           {hasPermission(PERMISSIONS.USER_UPDATE) && (
@@ -203,8 +230,8 @@ const UserManagement = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>用户管理</h2>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <h2 style={{ margin: 0 }}>用户管理</h2>
         <PermissionWrapper permission={PERMISSIONS.USER_CREATE}>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             新增用户
@@ -216,6 +243,8 @@ const UserManagement = () => {
         dataSource={users}
         loading={loading}
         rowKey="id"
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 200px)' }}
         pagination={{
           ...pagination,
           onChange: (page, pageSize) => {
@@ -243,6 +272,15 @@ const UserManagement = () => {
             rules={[{ required: true, message: '请输入手机号' }]}
           >
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="email"
+            label="邮箱"
+            rules={[
+              { type: 'email', message: '请输入有效的邮箱地址' },
+            ]}
+          >
+            <Input placeholder="请输入邮箱地址（可选，但超级管理员必须填写）" />
           </Form.Item>
           <Form.Item
             name="password"
@@ -276,6 +314,14 @@ const UserManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+      <SuperAdminModal
+        open={superAdminModalVisible}
+        onCancel={() => setSuperAdminModalVisible(false)}
+        onSuccess={() => {
+          setSuperAdminModalVisible(false)
+          fetchUsers()
+        }}
+      />
     </div>
   )
 }

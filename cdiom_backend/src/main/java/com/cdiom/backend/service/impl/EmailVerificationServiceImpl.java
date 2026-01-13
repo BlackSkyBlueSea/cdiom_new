@@ -140,11 +140,12 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
      */
     private String buildEmailContent(String code) {
         return "<html><body style='font-family: Arial, sans-serif;'>" +
-                "<h2 style='color: #1890ff;'>CDIOM系统 - 超级管理员操作验证码</h2>" +
-                "<p>您正在进行超级管理员启用/停用操作，验证码为：</p>" +
+                "<h2 style='color: #1890ff;'>CDIOM系统--超级管理员操作</h2>" +
+                "<h3>尊敬的超级管理员，您好！</h3>" + 
+                "<p>您正在执行【用户启用/禁用】操作，验证码为：</p>" +
                 "<p style='font-size: 24px; font-weight: bold; color: #ff4d4f; letter-spacing: 5px;'>" + code + "</p>" +
-                "<p>验证码有效期为 " + expireMinutes + " 分钟，请勿泄露给他人。</p>" +
-                "<p style='color: #999; font-size: 12px;'>如非本人操作，请忽略此邮件。</p>" +
+                "<p>验证码有效期为 " + expireMinutes + " 分钟，仅用于本次用户操作，请勿泄露给他人。</p>" +
+                "<p style='color: #999; font-size: 12px;'>若非您本人操作，请忽略此邮件。</p>" +
                 "</body></html>";
     }
 

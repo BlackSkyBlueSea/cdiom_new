@@ -63,6 +63,15 @@ public class SysUserServiceImpl implements SysUserService {
             throw new RuntimeException("用户名已存在");
         }
         
+        // 检查邮箱是否已存在（如果提供了邮箱）
+        if (StringUtils.hasText(user.getEmail())) {
+            LambdaQueryWrapper<SysUser> emailWrapper = new LambdaQueryWrapper<>();
+            emailWrapper.eq(SysUser::getEmail, user.getEmail());
+            if (sysUserMapper.selectOne(emailWrapper) != null) {
+                throw new RuntimeException("邮箱已被使用");
+            }
+        }
+        
         // 加密密码
         if (StringUtils.hasText(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -97,6 +106,17 @@ public class SysUserServiceImpl implements SysUserService {
             }
         }
         
+        // 如果修改了邮箱，检查是否重复（如果提供了邮箱）
+        if (StringUtils.hasText(user.getEmail()) && 
+            !user.getEmail().equals(existUser.getEmail())) {
+            LambdaQueryWrapper<SysUser> emailWrapper = new LambdaQueryWrapper<>();
+            emailWrapper.eq(SysUser::getEmail, user.getEmail());
+            SysUser emailUser = sysUserMapper.selectOne(emailWrapper);
+            if (emailUser != null && !emailUser.getId().equals(user.getId())) {
+                throw new RuntimeException("邮箱已被使用");
+            }
+        }
+        
         // 如果修改了密码，需要加密
         if (StringUtils.hasText(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -123,6 +143,13 @@ public class SysUserServiceImpl implements SysUserService {
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
+        
+        // 超级管理员的状态修改必须通过专门的接口（需要验证码验证）
+        // 这里只允许通过 /super-admin/enable 或 /super-admin/disable 接口修改
+        if ("super_admin".equals(user.getUsername())) {
+            throw new RuntimeException("超级管理员的状态修改需要通过专门的接口，并需要邮箱验证码验证");
+        }
+        
         user.setStatus(status);
         user.setUpdateTime(LocalDateTime.now());
         sysUserMapper.updateById(user);

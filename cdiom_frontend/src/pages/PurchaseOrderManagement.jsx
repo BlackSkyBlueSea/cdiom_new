@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, Card, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete } from 'antd'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
@@ -218,7 +218,7 @@ const PurchaseOrderManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
       width: 80,
@@ -226,39 +226,42 @@ const PurchaseOrderManagement = () => {
       defaultSortOrder: 'ascend',
     },
     {
-      title: '订单编号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>订单编号</span>,
       dataIndex: 'orderNumber',
       key: 'orderNumber',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '供应商',
+      title: <span style={{ whiteSpace: 'nowrap' }}>供应商</span>,
       dataIndex: 'supplierName',
       key: 'supplierName',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '订单状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>订单状态</span>,
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status) => getStatusTag(status),
     },
     {
-      title: '预计交货日期',
+      title: <span style={{ whiteSpace: 'nowrap' }}>预计交货日期</span>,
       dataIndex: 'expectedDeliveryDate',
       key: 'expectedDeliveryDate',
       width: 120,
       render: (date) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
     },
     {
-      title: '物流单号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>物流单号</span>,
       dataIndex: 'logisticsNumber',
       key: 'logisticsNumber',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '订单总金额',
+      title: <span style={{ whiteSpace: 'nowrap' }}>订单总金额</span>,
       dataIndex: 'totalAmount',
       key: 'totalAmount',
       width: 120,
@@ -266,16 +269,17 @@ const PurchaseOrderManagement = () => {
       render: (amount) => amount ? `¥${amount.toFixed(2)}` : '-',
     },
     {
-      title: '创建时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>创建时间</span>,
       dataIndex: 'createTime',
       key: 'createTime',
       width: 180,
       render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
       width: 150,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           <Button
@@ -302,70 +306,71 @@ const PurchaseOrderManagement = () => {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Space wrap>
-            <Input
-              placeholder="搜索订单编号、供应商"
-              value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-              style={{ width: 200 }}
-              allowClear
-            />
-            <Select
-              placeholder="订单状态"
-              value={filters.status}
-              onChange={(value) => setFilters({ ...filters, status: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value="PENDING">待确认</Select.Option>
-              <Select.Option value="REJECTED">已拒绝</Select.Option>
-              <Select.Option value="CONFIRMED">待发货</Select.Option>
-              <Select.Option value="SHIPPED">已发货</Select.Option>
-              <Select.Option value="RECEIVED">已入库</Select.Option>
-              <Select.Option value="CANCELLED">已取消</Select.Option>
-            </Select>
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>采购订单管理</h2>
+        <Space wrap>
+          <Input
+            placeholder="搜索订单编号、供应商"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            style={{ width: 200 }}
+            allowClear
+          />
+          <Select
+            placeholder="订单状态"
+            value={filters.status}
+            onChange={(value) => setFilters({ ...filters, status: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value="PENDING">待确认</Select.Option>
+            <Select.Option value="REJECTED">已拒绝</Select.Option>
+            <Select.Option value="CONFIRMED">待发货</Select.Option>
+            <Select.Option value="SHIPPED">已发货</Select.Option>
+            <Select.Option value="RECEIVED">已入库</Select.Option>
+            <Select.Option value="CANCELLED">已取消</Select.Option>
+          </Select>
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={fetchOrders}
+          >
+            查询
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>
+            重置
+          </Button>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <Button
               type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchOrders}
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalVisible(true)
+                form.resetFields()
+                setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+              }}
             >
-              查询
+              新建采购订单
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
-            </Button>
-            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  form.resetFields()
-                  setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
-                }}
-              >
-                新建采购订单
-              </Button>
-            )}
-          </Space>
-
-          <Table
-            columns={columns}
-            dataSource={orders}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              ...pagination,
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            onChange={handleTableChange}
-          />
+          )}
         </Space>
-      </Card>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={orders}
+        rowKey="id"
+        loading={loading}
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+        onChange={handleTableChange}
+      />
 
       {/* 新建采购订单模态框 */}
       <Modal

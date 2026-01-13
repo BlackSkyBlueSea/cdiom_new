@@ -4,6 +4,7 @@ import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     public Result<LoginResponse> login(@RequestBody LoginRequest request, 
+                                       HttpServletRequest httpRequest,
                                        HttpServletResponse response,
                                        @RequestHeader(value = "User-Agent", defaultValue = "") String userAgent) {
         try {
@@ -33,8 +35,8 @@ public class AuthController {
             String browser = parseBrowser(userAgent);
             String os = parseOS(userAgent);
             
-            // 获取客户端IP（简化处理，实际应从请求头获取）
-            String ip = "127.0.0.1";
+            // 获取客户端真实IP地址
+            String ip = getClientIp(httpRequest);
             
             Object[] loginResult = authService.login(request.getUsername(), request.getPassword(), ip, browser, os);
             String token = (String) loginResult[0];
@@ -119,6 +121,33 @@ public class AuthController {
             return "iOS";
         }
         return "Unknown";
+    }
+
+    /**
+     * 获取客户端真实IP地址
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // 处理多个IP的情况，取第一个IP
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 
     @Data

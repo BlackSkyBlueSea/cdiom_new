@@ -104,36 +104,46 @@ const RoleManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
+      width: 80,
       sorter: (a, b) => a.id - b.id,
       defaultSortOrder: 'ascend',
     },
     {
-      title: '角色名称',
+      title: <span style={{ whiteSpace: 'nowrap' }}>角色名称</span>,
       dataIndex: 'roleName',
       key: 'roleName',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '角色代码',
+      title: <span style={{ whiteSpace: 'nowrap' }}>角色代码</span>,
       dataIndex: 'roleCode',
       key: 'roleCode',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '描述',
+      title: <span style={{ whiteSpace: 'nowrap' }}>描述</span>,
       dataIndex: 'description',
       key: 'description',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
+      width: 80,
       render: (status) => (status === 1 ? '正常' : '禁用'),
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
+      width: 200,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           <Tooltip title="编辑">
@@ -185,8 +195,8 @@ const RoleManagement = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>角色管理</h2>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <h2 style={{ margin: 0 }}>角色管理</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
           新增角色
         </Button>
@@ -196,6 +206,8 @@ const RoleManagement = () => {
         dataSource={roles}
         loading={loading}
         rowKey="id"
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 200px)' }}
         pagination={{
           ...pagination,
           onChange: (page, pageSize) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Card, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
@@ -278,7 +278,7 @@ const InboundManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
       width: 80,
@@ -286,32 +286,35 @@ const InboundManagement = () => {
       defaultSortOrder: 'ascend',
     },
     {
-      title: '入库单号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>入库单号</span>,
       dataIndex: 'recordNumber',
       key: 'recordNumber',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '药品名称',
+      title: <span style={{ whiteSpace: 'nowrap' }}>药品名称</span>,
       dataIndex: 'drugName',
       key: 'drugName',
       width: 150,
+      ellipsis: true,
     },
     {
-      title: '批次号',
+      title: <span style={{ whiteSpace: 'nowrap' }}>批次号</span>,
       dataIndex: 'batchNumber',
       key: 'batchNumber',
       width: 120,
+      ellipsis: true,
     },
     {
-      title: '入库数量',
+      title: <span style={{ whiteSpace: 'nowrap' }}>入库数量</span>,
       dataIndex: 'quantity',
       key: 'quantity',
       width: 100,
       align: 'right',
     },
     {
-      title: '验收状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>验收状态</span>,
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -325,7 +328,7 @@ const InboundManagement = () => {
       },
     },
     {
-      title: '效期校验',
+      title: <span style={{ whiteSpace: 'nowrap' }}>效期校验</span>,
       dataIndex: 'expiryCheckStatus',
       key: 'expiryCheckStatus',
       width: 100,
@@ -341,21 +344,21 @@ const InboundManagement = () => {
       },
     },
     {
-      title: '有效期至',
+      title: <span style={{ whiteSpace: 'nowrap' }}>有效期至</span>,
       dataIndex: 'expiryDate',
       key: 'expiryDate',
       width: 120,
       render: (date) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
     },
     {
-      title: '到货日期',
+      title: <span style={{ whiteSpace: 'nowrap' }}>到货日期</span>,
       dataIndex: 'arrivalDate',
       key: 'arrivalDate',
       width: 120,
       render: (date) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
     },
     {
-      title: '创建时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>创建时间</span>,
       dataIndex: 'createTime',
       key: 'createTime',
       width: 180,
@@ -364,108 +367,109 @@ const InboundManagement = () => {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Space wrap>
-            <Input
-              placeholder="搜索入库单号、药品名称"
-              value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-              style={{ width: 200 }}
-              allowClear
-            />
-            <Input
-              placeholder="批次号"
-              value={filters.batchNumber}
-              onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
-              style={{ width: 150 }}
-              allowClear
-            />
-            <Select
-              placeholder="验收状态"
-              value={filters.status}
-              onChange={(value) => setFilters({ ...filters, status: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value="QUALIFIED">合格</Select.Option>
-              <Select.Option value="UNQUALIFIED">不合格</Select.Option>
-            </Select>
-            <Select
-              placeholder="效期校验"
-              value={filters.expiryCheckStatus}
-              onChange={(value) => setFilters({ ...filters, expiryCheckStatus: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value="PASS">通过</Select.Option>
-              <Select.Option value="WARNING">警告</Select.Option>
-              <Select.Option value="FORCE">强制入库</Select.Option>
-            </Select>
-            <RangePicker
-              placeholder={['开始日期', '结束日期']}
-              value={filters.startDate && filters.endDate 
-                ? [filters.startDate, filters.endDate] 
-                : null}
-              onChange={(dates) => {
-                setFilters({
-                  ...filters,
-                  startDate: dates ? dates[0] : undefined,
-                  endDate: dates ? dates[1] : undefined,
-                })
-              }}
-            />
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>入库管理</h2>
+        <Space wrap>
+          <Input
+            placeholder="搜索入库单号、药品名称"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            style={{ width: 200 }}
+            allowClear
+          />
+          <Input
+            placeholder="批次号"
+            value={filters.batchNumber}
+            onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
+            style={{ width: 150 }}
+            allowClear
+          />
+          <Select
+            placeholder="验收状态"
+            value={filters.status}
+            onChange={(value) => setFilters({ ...filters, status: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value="QUALIFIED">合格</Select.Option>
+            <Select.Option value="UNQUALIFIED">不合格</Select.Option>
+          </Select>
+          <Select
+            placeholder="效期校验"
+            value={filters.expiryCheckStatus}
+            onChange={(value) => setFilters({ ...filters, expiryCheckStatus: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value="PASS">通过</Select.Option>
+            <Select.Option value="WARNING">警告</Select.Option>
+            <Select.Option value="FORCE">强制入库</Select.Option>
+          </Select>
+          <RangePicker
+            placeholder={['开始日期', '结束日期']}
+            value={filters.startDate && filters.endDate 
+              ? [filters.startDate, filters.endDate] 
+              : null}
+            onChange={(dates) => {
+              setFilters({
+                ...filters,
+                startDate: dates ? dates[0] : undefined,
+                endDate: dates ? dates[1] : undefined,
+              })
+            }}
+          />
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={fetchInboundRecords}
+          >
+            查询
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>
+            重置
+          </Button>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <Button
               type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchInboundRecords}
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalVisible(true)
+                setInboundType('order')
+              }}
             >
-              查询
+              采购订单入库
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
+          )}
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setModalVisible(true)
+                setInboundType('temporary')
+              }}
+            >
+              临时入库
             </Button>
-            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  setInboundType('order')
-                }}
-              >
-                采购订单入库
-              </Button>
-            )}
-            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  setInboundType('temporary')
-                }}
-              >
-                临时入库
-              </Button>
-            )}
-          </Space>
-
-          <Table
-            columns={columns}
-            dataSource={inboundRecords}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              ...pagination,
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            onChange={handleTableChange}
-          />
+          )}
         </Space>
-      </Card>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={inboundRecords}
+        rowKey="id"
+        loading={loading}
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+        onChange={handleTableChange}
+      />
 
       <Modal
         title={inboundType === 'order' ? '采购订单入库' : '临时入库'}

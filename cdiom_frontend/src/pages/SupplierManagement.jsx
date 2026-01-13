@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, Card, Tag, Modal, Form, message } from 'antd'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
@@ -148,7 +148,7 @@ const SupplierManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
       width: 80,
@@ -156,54 +156,58 @@ const SupplierManagement = () => {
       defaultSortOrder: 'ascend',
     },
     {
-      title: '供应商名称',
+      title: <span style={{ whiteSpace: 'nowrap' }}>供应商名称</span>,
       dataIndex: 'name',
       key: 'name',
       width: 200,
+      ellipsis: true,
     },
     {
-      title: '联系人',
+      title: <span style={{ whiteSpace: 'nowrap' }}>联系人</span>,
       dataIndex: 'contactPerson',
       key: 'contactPerson',
       width: 120,
+      ellipsis: true,
     },
     {
-      title: '联系电话',
+      title: <span style={{ whiteSpace: 'nowrap' }}>联系电话</span>,
       dataIndex: 'phone',
       key: 'phone',
       width: 150,
     },
     {
-      title: '状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status) => getStatusTag(status),
     },
     {
-      title: '审核状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>审核状态</span>,
       dataIndex: 'auditStatus',
       key: 'auditStatus',
       width: 100,
       render: (auditStatus) => getAuditStatusTag(auditStatus),
     },
     {
-      title: '统一社会信用代码',
+      title: <span style={{ whiteSpace: 'nowrap' }}>统一社会信用代码</span>,
       dataIndex: 'creditCode',
       key: 'creditCode',
       width: 180,
+      ellipsis: true,
     },
     {
-      title: '创建时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>创建时间</span>,
       dataIndex: 'createTime',
       key: 'createTime',
       width: 180,
       render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
       width: 250,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
@@ -273,78 +277,79 @@ const SupplierManagement = () => {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Space wrap>
-            <Input
-              placeholder="搜索供应商名称、联系人"
-              value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-              style={{ width: 200 }}
-              allowClear
-            />
-            <Select
-              placeholder="状态"
-              value={filters.status}
-              onChange={(value) => setFilters({ ...filters, status: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value={0}>禁用</Select.Option>
-              <Select.Option value={1}>启用</Select.Option>
-              <Select.Option value={2}>待审核</Select.Option>
-            </Select>
-            <Select
-              placeholder="审核状态"
-              value={filters.auditStatus}
-              onChange={(value) => setFilters({ ...filters, auditStatus: value })}
-              style={{ width: 120 }}
-              allowClear
-            >
-              <Select.Option value={0}>待审核</Select.Option>
-              <Select.Option value={1}>已通过</Select.Option>
-              <Select.Option value={2}>已驳回</Select.Option>
-            </Select>
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>供应商管理</h2>
+        <Space wrap>
+          <Input
+            placeholder="搜索供应商名称、联系人"
+            value={filters.keyword}
+            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            style={{ width: 200 }}
+            allowClear
+          />
+          <Select
+            placeholder="状态"
+            value={filters.status}
+            onChange={(value) => setFilters({ ...filters, status: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value={0}>禁用</Select.Option>
+            <Select.Option value={1}>启用</Select.Option>
+            <Select.Option value={2}>待审核</Select.Option>
+          </Select>
+          <Select
+            placeholder="审核状态"
+            value={filters.auditStatus}
+            onChange={(value) => setFilters({ ...filters, auditStatus: value })}
+            style={{ width: 120 }}
+            allowClear
+          >
+            <Select.Option value={0}>待审核</Select.Option>
+            <Select.Option value={1}>已通过</Select.Option>
+            <Select.Option value={2}>已驳回</Select.Option>
+          </Select>
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            onClick={fetchSuppliers}
+          >
+            查询
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>
+            重置
+          </Button>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <Button
               type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchSuppliers}
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setEditingSupplier(null)
+                form.resetFields()
+                setModalVisible(true)
+              }}
             >
-              查询
+              新建供应商
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
-            </Button>
-            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setEditingSupplier(null)
-                  form.resetFields()
-                  setModalVisible(true)
-                }}
-              >
-                新建供应商
-              </Button>
-            )}
-          </Space>
-
-          <Table
-            columns={columns}
-            dataSource={suppliers}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              ...pagination,
-              showSizeChanger: true,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            onChange={handleTableChange}
-          />
+          )}
         </Space>
-      </Card>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={suppliers}
+        rowKey="id"
+        loading={loading}
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+        onChange={handleTableChange}
+      />
 
       <Modal
         title={editingSupplier ? '编辑供应商' : '新建供应商'}

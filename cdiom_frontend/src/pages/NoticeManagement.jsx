@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import { getUser, getUserRoleId } from '../utils/auth'
+import { hasPermission, PERMISSIONS } from '../utils/permission'
 
 const NoticeManagement = () => {
   const [notices, setNotices] = useState([])
@@ -14,6 +16,13 @@ const NoticeManagement = () => {
     pageSize: 10,
     total: 0,
   })
+  const [currentUser, setCurrentUser] = useState(null)
+
+  // 获取当前用户信息
+  useEffect(() => {
+    const user = getUser()
+    setCurrentUser(user)
+  }, [])
 
   useEffect(() => {
     fetchNotices()
@@ -96,80 +105,108 @@ const NoticeManagement = () => {
 
   const columns = [
     {
-      title: 'ID',
+      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
       dataIndex: 'id',
       key: 'id',
+      width: 80,
       sorter: (a, b) => a.id - b.id,
       defaultSortOrder: 'ascend',
     },
     {
-      title: '标题',
+      title: <span style={{ whiteSpace: 'nowrap' }}>标题</span>,
       dataIndex: 'noticeTitle',
       key: 'noticeTitle',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '类型',
+      title: <span style={{ whiteSpace: 'nowrap' }}>类型</span>,
       dataIndex: 'noticeType',
       key: 'noticeType',
+      width: 100,
       render: (type) => (type === 1 ? '通知' : '公告'),
     },
     {
-      title: '状态',
+      title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
+      width: 80,
       render: (status) => (status === 1 ? '正常' : '关闭'),
     },
     {
-      title: '创建时间',
+      title: <span style={{ whiteSpace: 'nowrap' }}>创建时间</span>,
       dataIndex: 'createTime',
       key: 'createTime',
+      width: 180,
+      ellipsis: true,
     },
     {
-      title: '操作',
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="编辑">
-            <Button
-              type="link"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title={record.status === 1 ? '关闭' : '开启'}>
-            <Button
-              type="link"
-              danger={record.status === 1}
-              icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-              onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="确定要删除吗？"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Tooltip title="删除">
-              <Button type="link" danger icon={<DeleteOutlined />} />
+      width: 150,
+      fixed: 'right',
+      render: (_, record) => {
+        // 检查是否有权限操作：系统管理员（roleId=1）和超级管理员（roleId=6）可以操作所有，其他用户只能操作自己创建的
+        const roleId = getUserRoleId()
+        const currentUserId = currentUser?.id
+        const isAdmin = roleId === 1 || roleId === 6
+        const canOperate = isAdmin || (currentUserId && record.createBy === currentUserId)
+        
+        if (!canOperate) {
+          return <span style={{ color: '#999' }}>仅查看</span>
+        }
+        
+        return (
+          <Space>
+            <Tooltip title="编辑">
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+              />
             </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
+            <Tooltip title={record.status === 1 ? '关闭' : '开启'}>
+              <Button
+                type="link"
+                danger={record.status === 1}
+                icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+                onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
+              />
+            </Tooltip>
+            <Popconfirm
+              title="确定要删除吗？"
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Tooltip title="删除">
+                <Button type="link" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          </Space>
+        )
+      },
     },
   ]
 
+  // 检查是否有创建权限（所有有查看权限的用户都可以创建）
+  const canCreate = hasPermission([PERMISSIONS.NOTICE_VIEW, PERMISSIONS.NOTICE_MANAGE])
+
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>通知公告</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增公告
-        </Button>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <h2 style={{ margin: 0 }}>通知公告</h2>
+        {canCreate && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            新增公告
+          </Button>
+        )}
       </div>
       <Table
         columns={columns}
         dataSource={notices}
         loading={loading}
         rowKey="id"
+        size="middle"
+        scroll={{ x: 'max-content', y: 'calc(100vh - 200px)' }}
         pagination={{
           ...pagination,
           onChange: (page, pageSize) => {

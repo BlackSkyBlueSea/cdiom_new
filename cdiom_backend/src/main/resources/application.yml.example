@@ -11,21 +11,27 @@ spring:
   
   # 数据库配置
   datasource:
-    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: your-db-username
     password: your-db-password  # 请替换为实际的数据库密码
 
 # JWT配置
 jwt:
   secret: your-jwt-secret-key-minimum-32-characters  # 生产环境请使用强密钥（至少32字符）
+  expiration: 28800000  # JWT Token过期时间（毫秒），默认8小时（28800000毫秒）
 
 # 万维易源药品信息API配置
 yuanyanyao:
   api:
     app-key: your-yuanyanyao-api-key  # 请替换为实际的API密钥
+    base-url: https://api.yuanyanyao.com/medicine/detail
 
 # 极速数据药品信息API配置
 jisuapi:
   api:
+    base-url: https://api.jisuapi.com/medicine/detail
     app-key: your-jisuapi-key  # 请替换为实际的API密钥
 
+# 邮箱验证码配置
+email:
+  verification:
+    super-admin-username: super_admin  # 超级管理员用户名

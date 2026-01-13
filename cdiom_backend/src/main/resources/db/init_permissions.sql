@@ -76,31 +76,31 @@ WHERE permission_code IN (
 )
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 仓库管理员（角色ID=2）：药品管理和通知查看
+-- 仓库管理员（角色ID=2）：药品管理和通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 2, id FROM sys_permission 
 WHERE permission_code IN (
     'drug:view', 'drug:manage', 'drug:create', 'drug:update', 'drug:delete',
-    'notice:view'
+    'notice:view', 'notice:create'
 )
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 采购专员（角色ID=3）：通知查看
+-- 采购专员（角色ID=3）：通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 3, id FROM sys_permission 
-WHERE permission_code IN ('notice:view')
+WHERE permission_code IN ('notice:view', 'notice:create')
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 医护人员（角色ID=4）：通知查看
+-- 医护人员（角色ID=4）：通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 4, id FROM sys_permission 
-WHERE permission_code IN ('notice:view')
+WHERE permission_code IN ('notice:view', 'notice:create')
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 供应商（角色ID=5）：通知查看
+-- 供应商（角色ID=5）：通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 5, id FROM sys_permission 
-WHERE permission_code IN ('notice:view')
+WHERE permission_code IN ('notice:view', 'notice:create')
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
 -- ============================================

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Button, message, Space, Tag, Alert } from 'antd'
 import { MailOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import request from '../utils/request'
+import { getUser, removeToken } from '../utils/auth'
 import dayjs from 'dayjs'
 
 const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
@@ -10,11 +12,31 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
   const [sendingCode, setSendingCode] = useState(false)
   const [status, setStatus] = useState(null)
   const [countdown, setCountdown] = useState(0)
+  const navigate = useNavigate()
+
+  // 隐藏邮箱中间部分，只显示前3个字符和@后面的部分
+  const maskEmail = (email) => {
+    if (!email) return ''
+    const [localPart, domain] = email.split('@')
+    if (!domain) return email // 如果格式不正确，返回原邮箱
+    
+    // 显示前3个字符（如果少于3个字符，显示所有字符）
+    const visiblePart = localPart.substring(0, Math.min(3, localPart.length))
+    const maskedPart = '***'
+    
+    return `${visiblePart}${maskedPart}@${domain}`
+  }
 
   useEffect(() => {
     if (open) {
       fetchStatus()
-      form.resetFields()
+      // 自动填充当前登录用户的邮箱
+      const currentUser = getUser()
+      if (currentUser && currentUser.email) {
+        form.setFieldsValue({ email: currentUser.email })
+      } else {
+        form.resetFields()
+      }
       setCountdown(0)
     }
   }, [open])
@@ -101,11 +123,28 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         code: values.code,
       })
       if (res.code === 200) {
-        message.success('超级管理员已停用')
-        form.resetFields()
-        setCountdown(0)
-        fetchStatus()
-        onSuccess?.()
+        // 检查是否是当前登录用户被禁用
+        const currentUser = getUser()
+        const isCurrentUser = currentUser && 
+                            (currentUser.username === 'super_admin' || currentUser.roleId === 6)
+        
+        // 如果后端返回标识，或者前端判断是当前用户，则自动退出登录
+        if (res.data?.currentUserDisabled || isCurrentUser) {
+          message.success('超级管理员已停用，您将被退出登录')
+          // 清除token和用户信息
+          removeToken()
+          // 延迟跳转，让用户看到提示信息
+          setTimeout(() => {
+            navigate('/login')
+            window.location.reload() // 刷新页面确保完全清除状态
+          }, 1000)
+        } else {
+          message.success('超级管理员已停用')
+          form.resetFields()
+          setCountdown(0)
+          fetchStatus()
+          onSuccess?.()
+        }
       } else {
         message.error(res.msg || '停用失败')
       }
@@ -148,7 +187,9 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
                   </Tag>
                 )}
                 <span style={{ color: '#999', fontSize: '12px' }}>
-                  （用户名：{status.username}，创建时间：{status.createTime ? dayjs(status.createTime).format('YYYY-MM-DD HH:mm:ss') : '-'}）
+                  （用户名：{status.username}
+                  {status.email && `，绑定邮箱：${maskEmail(status.email)}`}
+                  ，创建时间：{status.createTime ? dayjs(status.createTime).format('YYYY-MM-DD HH:mm:ss') : '-'}）
                 </span>
               </Space>
             }
@@ -164,8 +205,8 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
             <div>
               <p>• 超级管理员（super_admin）拥有所有系统功能和业务功能的权限，主要用于系统测试和维护。</p>
               <p>• 系统投入使用后应停用该用户，后期维护更新测试时可以重新启用。</p>
-              <p>• 启用/停用操作需要通过邮箱验证码验证，验证码将发送到您输入的邮箱地址。</p>
-              <p>• 验证码有效期为5分钟，请及时使用。</p>
+              <p>• 启用/停用操作需要通过邮箱验证码验证，<strong>必须使用当前登录、执行该操作的用户的邮箱</strong>。</p>
+              <p>• 验证码将发送到您输入的邮箱地址，验证码有效期为5分钟，请及时使用。</p>
             </div>
           }
           type="info"
@@ -185,10 +226,17 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
               { required: true, message: '请输入邮箱地址' },
               { type: 'email', message: '请输入有效的邮箱地址' },
             ]}
+            help={(() => {
+              const currentUser = getUser()
+              if (currentUser && currentUser.email) {
+                return `请填写当前登录用户的个人完整邮箱：${maskEmail(currentUser.email)}`
+              }
+              return '请填写当前登录用户的个人完整邮箱'
+            })()}
           >
             <Input
               prefix={<MailOutlined />}
-              placeholder="请输入您的邮箱地址（验证码将发送到此邮箱）"
+              placeholder="请填写当前登录用户的个人完整邮箱"
             />
           </Form.Item>
 
