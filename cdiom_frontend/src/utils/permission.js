@@ -48,9 +48,35 @@ export const PERMISSIONS = {
 /**
  * 角色权限映射
  * 定义每个角色拥有的权限代码
+ * 系统管理员只负责系统功能，不涉及业务功能
+ * 超级管理员（roleId=6）拥有所有权限，通过代码判断，不需要在此配置
  */
 const ROLE_PERMISSIONS = {
-  1: [ // 系统管理员 - 拥有所有权限
+  1: [ // 系统管理员 - 只拥有系统功能权限
+    PERMISSIONS.USER_MANAGE,
+    PERMISSIONS.USER_VIEW,
+    PERMISSIONS.USER_CREATE,
+    PERMISSIONS.USER_UPDATE,
+    PERMISSIONS.USER_DELETE,
+    PERMISSIONS.ROLE_MANAGE,
+    PERMISSIONS.ROLE_VIEW,
+    PERMISSIONS.ROLE_CREATE,
+    PERMISSIONS.ROLE_UPDATE,
+    PERMISSIONS.ROLE_DELETE,
+    PERMISSIONS.CONFIG_MANAGE,
+    PERMISSIONS.CONFIG_VIEW,
+    PERMISSIONS.CONFIG_CREATE,
+    PERMISSIONS.CONFIG_UPDATE,
+    PERMISSIONS.CONFIG_DELETE,
+    PERMISSIONS.NOTICE_VIEW,
+    PERMISSIONS.NOTICE_MANAGE,
+    PERMISSIONS.NOTICE_CREATE,
+    PERMISSIONS.NOTICE_UPDATE,
+    PERMISSIONS.NOTICE_DELETE,
+    PERMISSIONS.LOG_OPERATION_VIEW,
+    PERMISSIONS.LOG_LOGIN_VIEW,
+  ],
+  6: [ // 超级管理员 - 拥有所有权限（通过代码判断，这里配置所有权限代码）
     PERMISSIONS.USER_MANAGE,
     PERMISSIONS.USER_VIEW,
     PERMISSIONS.USER_CREATE,
@@ -118,8 +144,8 @@ export const hasPermission = (permissionCodes) => {
   const userPermissions = getUserPermissions()
   const roleId = getUserRoleId()
   
-  // 系统管理员拥有所有权限
-  if (roleId === 1) {
+  // 超级管理员（roleId=6）拥有所有权限
+  if (roleId === 6) {
     return true
   }
   
@@ -136,8 +162,8 @@ export const hasAllPermissions = (permissionCodes) => {
   const userPermissions = getUserPermissions()
   const roleId = getUserRoleId()
   
-  // 系统管理员拥有所有权限
-  if (roleId === 1) {
+  // 超级管理员（roleId=6）拥有所有权限
+  if (roleId === 6) {
     return true
   }
   

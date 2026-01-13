@@ -21,6 +21,26 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration
+  # 163邮箱配置（用于发送验证码）
+  # 注意：需要配置实际的163邮箱地址和授权码
+  # 获取授权码：登录163邮箱 -> 设置 -> POP3/SMTP/IMAP -> 开启SMTP服务 -> 获取授权码
+  mail:
+    host: smtp.163.com
+    port: 465
+    username: yin1773330363@163.com  # 请替换为实际的163邮箱地址
+    password: SMVYbRqdBUJDjxMt  # 请替换为163邮箱的授权码（不是登录密码，是SMTP授权码）
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
@@ -83,4 +103,11 @@ jisuapi:
   api:
     base-url: https://api.jisuapi.com/medicine/detail
     app-key: c82aac95b1d2a0d2
+
+# 邮箱验证码配置
+email:
+  verification:
+    code-length: 6  # 验证码长度
+    expire-minutes: 5  # 验证码有效期（分钟）
+    super-admin-username: super_admin  # 超级管理员用户名
 

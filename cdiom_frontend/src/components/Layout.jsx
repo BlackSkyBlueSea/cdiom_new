@@ -13,6 +13,11 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   MedicineBoxOutlined,
+  InboxOutlined,
+  ExportOutlined,
+  ShoppingCartOutlined,
+  ShopOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import request from '../utils/request'
 import { removeToken, getUser, getUserRoleId } from '../utils/auth'
@@ -33,7 +38,9 @@ const Layout = () => {
     const roleId = getUserRoleId()
     
     // 根据角色显示不同菜单
-    // 角色ID: 1-系统管理员, 2-仓库管理员, 3-采购专员, 4-医护人员, 5-供应商
+    // 角色ID: 1-系统管理员, 2-仓库管理员, 3-采购专员, 4-医护人员, 5-供应商, 6-超级管理员
+    // 系统管理员只负责系统功能，不涉及业务功能
+    // 超级管理员拥有所有功能，主要用于系统测试和维护
     const allMenuItems = [
       {
         key: '/dashboard',
@@ -45,25 +52,55 @@ const Layout = () => {
         key: '/drugs',
         icon: <MedicineBoxOutlined />,
         label: '药品信息管理',
-        roles: [1, 2], // 系统管理员和仓库管理员可见
+        roles: [2, 6], // 仓库管理员、超级管理员可见
+      },
+      {
+        key: '/inventory',
+        icon: <DatabaseOutlined />,
+        label: '库存管理',
+        roles: [2, 6], // 仓库管理员、超级管理员可见
+      },
+      {
+        key: '/inbound',
+        icon: <InboxOutlined />,
+        label: '入库管理',
+        roles: [2, 6], // 仓库管理员、超级管理员可见
+      },
+      {
+        key: '/outbound',
+        icon: <ExportOutlined />,
+        label: '出库管理',
+        roles: [2, 4, 6], // 仓库管理员、医护人员、超级管理员可见
+      },
+      {
+        key: '/purchase-orders',
+        icon: <ShoppingCartOutlined />,
+        label: '采购订单',
+        roles: [3, 6], // 采购专员、超级管理员可见
+      },
+      {
+        key: '/suppliers',
+        icon: <ShopOutlined />,
+        label: '供应商管理',
+        roles: [3, 6], // 采购专员、超级管理员可见
       },
       {
         key: '/users',
         icon: <UserOutlined />,
         label: '用户管理',
-        roles: [1], // 仅系统管理员可见
+        roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
         key: '/roles',
         icon: <TeamOutlined />,
         label: '角色管理',
-        roles: [1], // 仅系统管理员可见
+        roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
         key: '/configs',
         icon: <SettingOutlined />,
         label: '参数配置',
-        roles: [1], // 仅系统管理员可见
+        roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
         key: '/notices',
@@ -75,19 +112,19 @@ const Layout = () => {
         key: '/operation-logs',
         icon: <FileTextOutlined />,
         label: '操作日志',
-        roles: [1], // 仅系统管理员可见
+        roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
         key: '/login-logs',
         icon: <LoginOutlined />,
         label: '登录日志',
-        roles: [1], // 仅系统管理员可见
+        roles: [1, 6], // 系统管理员、超级管理员可见
       },
     ]
     
     // 根据角色过滤菜单
     const filteredMenuItems = allMenuItems.filter(item => 
-      item.roles.includes(roleId) || roleId === 1 // 系统管理员可以看到所有菜单
+      item.roles.includes(roleId)
     )
     
     setMenuItems(filteredMenuItems)

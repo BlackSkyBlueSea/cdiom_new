@@ -11,6 +11,11 @@ import NoticeManagement from './pages/NoticeManagement'
 import OperationLog from './pages/OperationLog'
 import LoginLog from './pages/LoginLog'
 import DrugManagement from './pages/DrugManagement'
+import InventoryManagement from './pages/InventoryManagement'
+import InboundManagement from './pages/InboundManagement'
+import OutboundManagement from './pages/OutboundManagement'
+import PurchaseOrderManagement from './pages/PurchaseOrderManagement'
+import SupplierManagement from './pages/SupplierManagement'
 import PrivateRoute from './components/PrivateRoute'
 import './App.css'
 
@@ -31,6 +36,11 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="drugs" element={<DrugManagement />} />
+            <Route path="inventory" element={<InventoryManagement />} />
+            <Route path="inbound" element={<InboundManagement />} />
+            <Route path="outbound" element={<OutboundManagement />} />
+            <Route path="purchase-orders" element={<PurchaseOrderManagement />} />
+            <Route path="suppliers" element={<SupplierManagement />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="roles" element={<RoleManagement />} />
             <Route path="configs" element={<ConfigManagement />} />

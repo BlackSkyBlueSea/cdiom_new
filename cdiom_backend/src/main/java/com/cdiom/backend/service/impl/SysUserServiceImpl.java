@@ -140,5 +140,15 @@ public class SysUserServiceImpl implements SysUserService {
         user.setUpdateTime(LocalDateTime.now());
         sysUserMapper.updateById(user);
     }
+
+    @Override
+    public SysUser getUserByUsername(String username) {
+        if (!StringUtils.hasText(username)) {
+            return null;
+        }
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getUsername, username);
+        return sysUserMapper.selectOne(wrapper);
+    }
 }
 

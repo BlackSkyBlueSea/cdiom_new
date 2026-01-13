@@ -44,5 +44,10 @@ public interface SysUserService {
      * 解锁用户
      */
     void unlockUser(Long id);
+
+    /**
+     * 根据用户名查询用户
+     */
+    SysUser getUserByUsername(String username);
 }
 

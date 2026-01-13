@@ -4,7 +4,7 @@
 
 基于 Spring Boot + React + MySQL 的医疗药品仓库管理系统，实现药品信息管理、库存监控、出入库审批、批次追溯及多角色权限管控等核心功能。
 
-> 📋 **核心业务需求分析**：详细的需求分析文档请参考 [核心业务需求分析.md](./核心业务需求分析.md)，包含库存管理、入库管理、出库管理的完整业务流程和处理流程。
+> 📋 **核心业务需求分析**：详细的需求分析文档请参考 [核心业务需求分析.md](./docs/核心业务需求分析.md)，包含库存管理、入库管理、出库管理的完整业务流程和处理流程。
 
 ## 技术栈
 
@@ -69,10 +69,19 @@ cdiom_new/
 │   │               └── ServiceException.java
 │   └── src/main/resources/
 │       ├── application.yml           # 应用配置
-│       └── db/                       # 数据库脚本
+│       └── db/                       # 数据库脚本目录
+│           ├── README.md            # 数据库脚本说明文档
+│           ├── init_simple.sql      # 简化初始化脚本（推荐）⭐
 │           ├── init.sql             # 完整初始化脚本（带注释）
-│           ├── init_simple.sql      # 简化初始化脚本（推荐）
-│           └── init_business_tables.sql # 业务表脚本
+│           ├── cdiom_db_complete.sql # 完整数据库脚本
+│           ├── init_business_tables.sql # 业务表脚本
+│           ├── init_permissions.sql # 权限数据初始化脚本
+│           ├── fix_chinese_data.sql # 修复中文数据脚本
+│           ├── fix_chinese_utf8mb4.sql # 修复中文数据脚本（简化版）
+│           ├── fix_database_charset.sql # 修复数据库字符集脚本
+│           ├── fix_operation_log_permission.sql # 修复操作日志权限脚本
+│           ├── drug_info_insert.sql # 药品信息数据导入脚本
+│           └── update_admin_password.sql # 更新管理员密码脚本
 ├── cdiom_frontend/                   # 前端项目
 │   ├── src/
 │   │   ├── pages/                    # 页面组件
@@ -95,6 +104,14 @@ cdiom_new/
 │   ├── index.html                    # HTML模板
 │   ├── vite.config.js                # Vite配置
 │   └── package.json                  # 依赖配置
+├── docs/                              # 项目文档目录
+│   ├── README.md                     # 文档目录说明
+│   ├── 核心业务需求分析.md           # 核心业务需求分析
+│   ├── 订单与入库记录关系说明.md     # 订单与入库关系说明
+│   ├── 代码完整性检查报告.md         # 代码完整性检查报告
+│   ├── 权限问题修复说明.md           # 权限问题修复说明
+│   ├── 并发访问配置说明.md           # 并发访问配置说明
+│   └── 药品数据导入说明.md           # 药品数据导入说明
 └── README.md                          # 项目说明文档
 ```
 

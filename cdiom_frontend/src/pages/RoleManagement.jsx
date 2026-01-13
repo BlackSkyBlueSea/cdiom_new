@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import SuperAdminModal from '../components/SuperAdminModal'
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState([])
@@ -9,6 +10,7 @@ const RoleManagement = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRole, setEditingRole] = useState(null)
   const [form] = Form.useForm()
+  const [superAdminModalVisible, setSuperAdminModalVisible] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -65,6 +67,12 @@ const RoleManagement = () => {
   }
 
   const handleStatusChange = async (id, status) => {
+    // 超级管理员（roleId=6）需要通过邮箱验证码启用/停用
+    if (id === 6) {
+      setSuperAdminModalVisible(true)
+      return
+    }
+    
     try {
       await request.put(`/roles/${id}/status`, { status })
       message.success('状态更新成功')
@@ -131,22 +139,41 @@ const RoleManagement = () => {
               type="link"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              disabled={record.id === 6} // 超级管理员角色不允许编辑
             />
           </Tooltip>
-          <Tooltip title={record.status === 1 ? '禁用' : '启用'}>
-            <Button
-              type="link"
-              danger={record.status === 1}
-              icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-              onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
-            />
-          </Tooltip>
+          {record.id === 6 ? (
+            <Tooltip title="管理超级管理员">
+              <Button
+                type="link"
+                icon={<SettingOutlined />}
+                onClick={() => setSuperAdminModalVisible(true)}
+              >
+                管理
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip title={record.status === 1 ? '禁用' : '启用'}>
+              <Button
+                type="link"
+                danger={record.status === 1}
+                icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+                onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
+              />
+            </Tooltip>
+          )}
           <Popconfirm
             title="确定要删除吗？"
             onConfirm={() => handleDelete(record.id)}
+            disabled={record.id === 6} // 超级管理员角色不允许删除
           >
             <Tooltip title="删除">
-              <Button type="link" danger icon={<DeleteOutlined />} />
+              <Button 
+                type="link" 
+                danger 
+                icon={<DeleteOutlined />}
+                disabled={record.id === 6} // 超级管理员角色不允许删除
+              />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -213,6 +240,14 @@ const RoleManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+      <SuperAdminModal
+        open={superAdminModalVisible}
+        onCancel={() => setSuperAdminModalVisible(false)}
+        onSuccess={() => {
+          setSuperAdminModalVisible(false)
+          fetchRoles()
+        }}
+      />
     </div>
   )
 }

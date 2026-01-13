@@ -43,7 +43,7 @@ public class AuthController {
             // 将Token存储到Cookie
             Cookie cookie = new Cookie("cdiom_token", token);
             cookie.setPath("/");
-            cookie.setMaxAge(4 * 60 * 60); // 4小时
+            cookie.setMaxAge(8 * 60 * 60); // 8小时
             cookie.setHttpOnly(false); // 允许前端访问
             response.addCookie(cookie);
             

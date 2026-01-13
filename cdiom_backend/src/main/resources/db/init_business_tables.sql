@@ -319,3 +319,4 @@ CREATE TABLE IF NOT EXISTS favorite_drug (
 
 
 
+

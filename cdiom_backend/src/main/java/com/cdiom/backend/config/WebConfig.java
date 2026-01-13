@@ -1,12 +1,9 @@
 package com.cdiom.backend.config;
 
-import com.cdiom.backend.config.interceptor.PermissionInterceptor;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.lang.NonNull;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.charset.StandardCharsets;
@@ -15,16 +12,12 @@ import java.util.Objects;
 
 /**
  * Web配置类
- * 配置HTTP响应编码为UTF-8和拦截器
+ * 配置HTTP响应编码为UTF-8
  * 
  * @author cdiom
  */
 @Configuration
-@RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
-
-    @NonNull
-    private final PermissionInterceptor permissionInterceptor;
 
     @Override
     public void configureMessageConverters(@NonNull List<HttpMessageConverter<?>> converters) {
@@ -33,13 +26,6 @@ public class WebConfig implements WebMvcConfigurer {
             Objects.requireNonNull(StandardCharsets.UTF_8, "UTF-8 charset must not be null")
         );
         converters.add(0, stringConverter);
-    }
-
-    @Override
-    public void addInterceptors(@NonNull InterceptorRegistry registry) {
-        registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/v1/**")
-                .excludePathPatterns("/api/v1/auth/login");
     }
 }
 

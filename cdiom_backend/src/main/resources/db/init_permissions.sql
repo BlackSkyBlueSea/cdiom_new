@@ -64,8 +64,17 @@ ON DUPLICATE KEY UPDATE permission_name=VALUES(permission_name);
 -- 2. 插入角色权限关联数据
 -- ============================================
 
--- 系统管理员（角色ID=1）：拥有所有权限
--- 注意：系统管理员在代码中通过roleId=1判断，不需要在数据库中配置权限
+-- 系统管理员（角色ID=1）：只拥有系统功能权限（用户管理、角色管理、配置管理、通知管理、日志查看）
+INSERT INTO sys_role_permission (role_id, permission_id) 
+SELECT 1, id FROM sys_permission 
+WHERE permission_code IN (
+    'user:manage', 'user:view', 'user:create', 'user:update', 'user:delete',
+    'role:manage', 'role:view', 'role:create', 'role:update', 'role:delete',
+    'config:manage', 'config:view', 'config:create', 'config:update', 'config:delete',
+    'notice:view', 'notice:manage', 'notice:create', 'notice:update', 'notice:delete',
+    'log:operation:view', 'log:login:view'
+)
+ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
 -- 仓库管理员（角色ID=2）：药品管理和通知查看
 INSERT INTO sys_role_permission (role_id, permission_id) 

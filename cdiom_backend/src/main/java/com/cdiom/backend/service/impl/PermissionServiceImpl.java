@@ -60,11 +60,13 @@ public class PermissionServiceImpl implements PermissionService {
                 return new HashSet<>();
             }
             
-            // 系统管理员拥有所有权限
-            if (roleId == 1) {
+            // 超级管理员（角色ID=6）拥有所有权限
+            if (roleId == 6) {
                 return new HashSet<>(List.of("*")); // 通配符表示所有权限
             }
             
+            // 系统管理员只拥有系统功能权限，不再拥有所有权限
+            // 从数据库中查询系统管理员的权限配置
             List<String> permissionCodes = permissionMapper.selectPermissionCodesByRoleId(roleId);
             if (CollectionUtils.isEmpty(permissionCodes)) {
                 log.debug("角色 {} 没有配置权限，返回空权限集合", roleId);

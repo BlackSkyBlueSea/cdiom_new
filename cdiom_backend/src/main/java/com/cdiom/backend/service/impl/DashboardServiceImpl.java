@@ -31,6 +31,10 @@ public class DashboardServiceImpl implements DashboardService {
     private final DrugInfoMapper drugInfoMapper;
     private final LoginLogMapper loginLogMapper;
     private final OperationLogMapper operationLogMapper;
+    private final InventoryMapper inventoryMapper;
+    private final InboundRecordMapper inboundRecordMapper;
+    private final OutboundApplyMapper outboundApplyMapper;
+    private final PurchaseOrderMapper purchaseOrderMapper;
 
     @Override
     public Map<String, Object> getStatistics() {
@@ -204,49 +208,57 @@ public class DashboardServiceImpl implements DashboardService {
         try {
             Map<String, Object> result = new HashMap<>();
             
-            // 预警日期计算（待实现库存表查询时使用）
-            // LocalDate today = LocalDate.now();
-            // LocalDate yellowWarningDate = today.plusDays(180); // 180天后
-            // LocalDate redWarningDate = today.plusDays(90);   // 90天后
+            // 预警日期计算
+            LocalDate today = LocalDate.now();
+            LocalDate yellowWarningDate = today.plusDays(180); // 180天后
+            LocalDate redWarningDate = today.plusDays(90);   // 90天后
 
             // 近效期预警统计（基于药品有效期）
-            // 注意：这里需要查询inventory表，如果表不存在则返回0
             // 黄色预警：90-180天
-            long yellowWarningCount = 0;
+            Long yellowWarningCount = inventoryMapper.countYellowWarning(today, yellowWarningDate);
+            if (yellowWarningCount == null) {
+                yellowWarningCount = 0L;
+            }
+            
             // 红色预警：≤90天
-            long redWarningCount = 0;
-            
-            // TODO: 实现库存表查询逻辑
-            // 当inventory表和mapper实现后，取消以下注释并实现查询
-            // LambdaQueryWrapper<Inventory> yellowWrapper = new LambdaQueryWrapper<>();
-            // yellowWrapper.ge(Inventory::getExpiryDate, today);
-            // yellowWrapper.le(Inventory::getExpiryDate, yellowWarningDate);
-            // yellowWrapper.gt(Inventory::getQuantity, 0);
-            // yellowWarningCount = inventoryMapper.selectCount(yellowWrapper);
-            
-            // LambdaQueryWrapper<Inventory> redWrapper = new LambdaQueryWrapper<>();
-            // redWrapper.ge(Inventory::getExpiryDate, today);
-            // redWrapper.le(Inventory::getExpiryDate, redWarningDate);
-            // redWrapper.gt(Inventory::getQuantity, 0);
-            // redWarningCount = inventoryMapper.selectCount(redWrapper);
+            Long redWarningCount = inventoryMapper.countRedWarning(today, redWarningDate);
+            if (redWarningCount == null) {
+                redWarningCount = 0L;
+            }
 
             // 待办任务统计
-            // TODO: 实现待入库和待出库查询逻辑
-            long pendingInboundCount = 0;  // 待入库订单数
-            long pendingOutboundCount = 0; // 待审批出库数
+            // 待入库订单数：状态为SHIPPED（已发货）的订单
+            LambdaQueryWrapper<PurchaseOrder> pendingInboundWrapper = new LambdaQueryWrapper<>();
+            pendingInboundWrapper.eq(PurchaseOrder::getStatus, "SHIPPED");
+            long pendingInboundCount = purchaseOrderMapper.selectCount(pendingInboundWrapper);
+            
+            // 待审批出库数：状态为PENDING（待审批）的出库申请
+            Long pendingOutboundCount = outboundApplyMapper.countPendingOutbound();
+            if (pendingOutboundCount == null) {
+                pendingOutboundCount = 0L;
+            }
 
             // 今日出入库统计
-            // LocalDateTime todayStart = today.atStartOfDay();
-            // LocalDateTime todayEnd = today.plusDays(1).atStartOfDay();
+            LocalDateTime todayStart = today.atStartOfDay();
+            LocalDateTime todayEnd = today.plusDays(1).atStartOfDay();
             
-            // TODO: 实现今日出入库查询逻辑
-            // 当入库出库表和mapper实现后，使用todayStart和todayEnd进行查询
-            long todayInboundCount = 0;  // 今日入库数
-            long todayOutboundCount = 0; // 今日出库数
+            // 今日入库数
+            Long todayInboundCount = inboundRecordMapper.countTodayInbound(todayStart, todayEnd);
+            if (todayInboundCount == null) {
+                todayInboundCount = 0L;
+            }
+            
+            // 今日出库数
+            Long todayOutboundCount = outboundApplyMapper.countTodayOutbound(todayStart, todayEnd);
+            if (todayOutboundCount == null) {
+                todayOutboundCount = 0L;
+            }
 
             // 库存总量统计
-            // TODO: 实现库存总量查询逻辑
-            long totalInventory = 0;
+            Long totalInventory = inventoryMapper.getTotalInventory();
+            if (totalInventory == null) {
+                totalInventory = 0L;
+            }
 
             Map<String, Long> nearExpiryWarning = new HashMap<>();
             nearExpiryWarning.put("yellow", yellowWarningCount);
