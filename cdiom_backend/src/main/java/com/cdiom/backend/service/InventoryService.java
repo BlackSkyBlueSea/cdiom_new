@@ -59,3 +59,5 @@ public interface InventoryService {
     java.util.List<Inventory> getAvailableBatches(Long drugId, Integer requiredQuantity);
 }
 
+
+

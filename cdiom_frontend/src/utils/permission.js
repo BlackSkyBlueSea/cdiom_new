@@ -1,4 +1,5 @@
-import { getUserRoleId } from './auth'
+import { getUserRoleId, getUser } from './auth'
+import request from './request'
 
 /**
  * 权限代码定义
@@ -46,6 +47,25 @@ export const PERMISSIONS = {
   // 日志查看
   LOG_OPERATION_VIEW: 'log:operation:view',
   LOG_LOGIN_VIEW: 'log:login:view',
+  
+  // 出库管理权限
+  OUTBOUND_VIEW: 'outbound:view',
+  OUTBOUND_APPLY: 'outbound:apply',
+  OUTBOUND_APPROVE: 'outbound:approve',
+  OUTBOUND_APPROVE_SPECIAL: 'outbound:approve:special',
+  OUTBOUND_EXECUTE: 'outbound:execute',
+  OUTBOUND_REJECT: 'outbound:reject',
+  
+  // 入库管理权限
+  INBOUND_VIEW: 'inbound:view',
+  INBOUND_CREATE: 'inbound:create',
+  INBOUND_APPROVE: 'inbound:approve',
+  INBOUND_EXECUTE: 'inbound:execute',
+  
+  // 库存管理权限
+  INVENTORY_VIEW: 'inventory:view',
+  INVENTORY_ADJUST: 'inventory:adjust',
+  INVENTORY_ADJUST_APPROVE: 'inventory:adjust:approve',
 }
 
 /**
@@ -135,10 +155,62 @@ const ROLE_PERMISSIONS = {
   ],
 }
 
+// 缓存用户权限，避免频繁请求
+let cachedUserPermissions = null
+let cachedUserId = null
+
+/**
+ * 从后端获取当前用户的权限列表
+ */
+export const fetchUserPermissions = async () => {
+  try {
+    const user = getUser()
+    if (!user) {
+      return []
+    }
+    
+    // 如果用户ID没变，使用缓存
+    if (cachedUserPermissions && cachedUserId === user.id) {
+      return cachedUserPermissions
+    }
+    
+    const res = await request.get('/auth/permissions')
+    if (res.code === 200) {
+      cachedUserPermissions = res.data || []
+      cachedUserId = user.id
+      return cachedUserPermissions
+    }
+    return []
+  } catch (error) {
+    console.error('获取用户权限失败:', error)
+    // 如果后端请求失败，回退到基于角色的权限判断
+    const roleId = getUserRoleId()
+    if (!roleId) {
+      return []
+    }
+    return ROLE_PERMISSIONS[roleId] || []
+  }
+}
+
+/**
+ * 清除权限缓存（登录/登出时调用）
+ */
+export const clearPermissionCache = () => {
+  cachedUserPermissions = null
+  cachedUserId = null
+}
+
 /**
  * 获取当前用户的权限列表
+ * 优先从后端获取，失败则使用角色权限
  */
 export const getUserPermissions = () => {
+  // 如果已有缓存，直接返回
+  if (cachedUserPermissions) {
+    return cachedUserPermissions
+  }
+  
+  // 否则使用基于角色的权限（向后兼容）
   const roleId = getUserRoleId()
   if (!roleId) {
     return []
@@ -157,6 +229,11 @@ export const hasPermission = (permissionCodes) => {
   
   // 超级管理员（roleId=6）拥有所有权限
   if (roleId === 6) {
+    return true
+  }
+  
+  // 如果权限列表包含通配符，表示拥有所有权限
+  if (userPermissions.includes('*')) {
     return true
   }
   

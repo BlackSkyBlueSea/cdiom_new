@@ -73,5 +73,30 @@ public interface PurchaseOrderService {
      * 更新订单入库状态（自动判断是否全部入库）
      */
     void updateOrderInboundStatus(Long orderId);
+
+    /**
+     * 确认订单（PENDING -> CONFIRMED）
+     */
+    void confirmOrder(Long id);
+
+    /**
+     * 拒绝订单（PENDING -> REJECTED）
+     */
+    void rejectOrder(Long id, String reason);
+
+    /**
+     * 发货（CONFIRMED -> SHIPPED）
+     */
+    void shipOrder(Long id, String logisticsNumber);
+
+    /**
+     * 取消订单
+     */
+    void cancelOrder(Long id, String reason);
+
+    /**
+     * 更新物流单号
+     */
+    void updateLogisticsNumber(Long id, String logisticsNumber);
 }
 

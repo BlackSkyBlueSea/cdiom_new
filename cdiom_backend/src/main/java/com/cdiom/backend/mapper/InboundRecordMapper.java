@@ -28,3 +28,5 @@ public interface InboundRecordMapper extends BaseMapper<InboundRecord> {
     Long countTodayInbound(LocalDateTime todayStart, LocalDateTime todayEnd);
 }
 
+
+

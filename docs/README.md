@@ -6,14 +6,14 @@
 
 ### 📋 需求分析文档
 
-- **[核心业务需求分析.md](./核心业务需求分析.md)**
+- **[Core_Business_Requirements_Analysis.md](./Core_Business_Requirements_Analysis.md)**
   - 库存管理功能需求分析
   - 入库管理功能需求分析
   - 出库管理功能需求分析
   - 业务流程和处理流程说明
   - 数据模型和业务规则
 
-- **[订单与入库记录关系说明.md](./订单与入库记录关系说明.md)**
+- **[Order_Inbound_Record_Relationship_Guide.md](./Order_Inbound_Record_Relationship_Guide.md)**
   - 订单与入库记录的数据库关系
   - 订单条形码生成方案
   - 入库验收流程设计
@@ -21,26 +21,47 @@
 
 ### 📊 技术文档
 
-- **[代码完整性检查报告.md](./代码完整性检查报告.md)**
+- **[Code_Completeness_Report.md](./Code_Completeness_Report.md)**
   - 已实现功能模块检查
   - 缺失功能模块说明
   - 代码质量分析
   - 完成度统计
 
-- **[权限问题修复说明.md](./权限问题修复说明.md)**
+- **[Code_Logic_Vulnerability_Report.md](./Code_Logic_Vulnerability_Report.md)** ⚠️ **重要**
+  - 严重问题：登录锁定机制、库存并发安全、单号生成并发问题
+  - 中等问题：出库逻辑、入库验证、订单状态更新
+  - 轻微问题：异常信息暴露、数据验证
+  - 修复优先级和修复建议
+
+- **[Permission_Issue_Fix_Guide.md](./Permission_Issue_Fix_Guide.md)**
   - 权限问题发现和修复
   - 权限配置说明
   - 权限代码对照表
 
-- **[并发访问配置说明.md](./并发访问配置说明.md)**
+- **[Concurrency_Configuration_Guide.md](./Concurrency_Configuration_Guide.md)**
   - 系统并发支持原理
   - 配置优化说明
   - 性能优化建议
 
-- **[药品数据导入说明.md](./药品数据导入说明.md)**
+- **[Drug_Data_Import_Guide.md](./Drug_Data_Import_Guide.md)**
   - 药品数据导入方法
   - 数据格式说明
   - 注意事项
+
+- **[Drug_Data_Retrieval_Troubleshooting_Guide.md](./Drug_Data_Retrieval_Troubleshooting_Guide.md)**
+  - 药品数据获取问题排查指南
+  - 常见问题及解决方案
+  - 快速诊断命令
+
+- **[Fine_Grained_Permission_System_Guide.md](./Fine_Grained_Permission_System_Guide.md)**
+  - 细粒度权限系统说明
+  - 权限设计原理
+  - 权限配置指南
+
+- **[Form_Validation_Security_Report.md](./Form_Validation_Security_Report.md)**
+  - 表单验证和安全检查报告
+  - 安全漏洞分析
+  - 修复建议
 
 ## 文档更新说明
 
@@ -48,5 +69,28 @@
 
 ---
 
-**最后更新**：2026年1月14日
+## 文档信息
+
+**文档创建时间**：2026年1月13日 10:31:17  
+**最后修改时间**：2026年1月14日 18:25:25  
+**当前更新时间**：2026年1月14日 18:25:25  
+**文档版本**：v1.2
+
+---
+
+**最后更新**：2026年1月14日 18:25:25
+
+## 今日更新（2026-01-14）
+
+### 新增文档
+- ✅ **Form_Validation_Security_Report.md** - 表单验证和安全检查报告
+  - 详细分析了系统中的表单验证机制
+  - 识别了潜在的安全漏洞
+  - 提供了修复建议和最佳实践
+
+### 功能更新
+- ✅ 供应商-药品关联管理功能实现
+- ✅ 文件上传功能实现
+- ✅ 用户管理功能增强
+- ✅ 供应商管理功能增强
 

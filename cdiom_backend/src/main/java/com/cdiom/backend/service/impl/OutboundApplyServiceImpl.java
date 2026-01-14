@@ -137,6 +137,11 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             throw new RuntimeException("申请状态不是待审批，无法审批");
         }
         
+        // 验证：申请人和审批人不能是同一人
+        if (apply.getApplicantId() != null && apply.getApplicantId().equals(approverId)) {
+            throw new RuntimeException("申请人和审批人不能是同一人");
+        }
+        
         // 检查是否包含特殊药品，需要第二审批人
         List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(id);
         boolean hasSpecialDrug = false;
@@ -148,8 +153,18 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             }
         }
         
-        if (hasSpecialDrug && secondApproverId == null) {
-            throw new RuntimeException("申请包含特殊药品，需要第二审批人确认");
+        if (hasSpecialDrug) {
+            if (secondApproverId == null) {
+                throw new RuntimeException("申请包含特殊药品，需要第二审批人确认");
+            }
+            // 验证：特殊药品的申请人和第二审批人不能是同一人
+            if (apply.getApplicantId() != null && apply.getApplicantId().equals(secondApproverId)) {
+                throw new RuntimeException("特殊药品申请人和第二审批人不能是同一人");
+            }
+            // 验证：第一审批人和第二审批人不能是同一人
+            if (approverId.equals(secondApproverId)) {
+                throw new RuntimeException("第一审批人和第二审批人不能是同一人");
+            }
         }
         
         apply.setStatus("APPROVED");
@@ -159,7 +174,7 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         
         outboundApplyMapper.updateById(apply);
         
-        log.info("审批通过出库申请：申请ID={}, 审批人ID={}", id, approverId);
+        log.info("审批通过出库申请：申请ID={}, 审批人ID={}, 第二审批人ID={}", id, approverId, secondApproverId);
     }
 
     @Override

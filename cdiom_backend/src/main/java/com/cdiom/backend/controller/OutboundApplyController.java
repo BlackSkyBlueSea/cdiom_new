@@ -35,7 +35,7 @@ public class OutboundApplyController {
      * 分页查询出库申请列表
      */
     @GetMapping
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:approve", "outbound:execute"})
     public Result<Page<OutboundApply>> getOutboundApplyList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
@@ -75,7 +75,7 @@ public class OutboundApplyController {
      * 创建出库申请（医护人员申领）
      */
     @PostMapping
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"outbound:apply"})
     public Result<OutboundApply> createOutboundApply(
             @RequestBody OutboundApplyRequest request,
             HttpServletRequest httpRequest) {
@@ -99,7 +99,7 @@ public class OutboundApplyController {
      * 审批出库申请（通过）
      */
     @PostMapping("/{id}/approve")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"outbound:approve", "outbound:approve:special"})
     public Result<Void> approveOutboundApply(
             @PathVariable Long id,
             @RequestBody ApproveRequest request,
@@ -135,7 +135,7 @@ public class OutboundApplyController {
      * 执行出库
      */
     @PostMapping("/{id}/execute")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"outbound:execute"})
     public Result<Void> executeOutbound(
             @PathVariable Long id,
             @RequestBody ExecuteOutboundRequest request) {

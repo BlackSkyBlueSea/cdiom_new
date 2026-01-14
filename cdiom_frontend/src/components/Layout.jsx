@@ -41,12 +41,32 @@ const Layout = () => {
     // 角色ID: 1-系统管理员, 2-仓库管理员, 3-采购专员, 4-医护人员, 5-供应商, 6-超级管理员
     // 系统管理员只负责系统功能，不涉及业务功能
     // 超级管理员拥有所有功能，主要用于系统测试和维护
-    const allMenuItems = [
+    // 供应商使用专用菜单（轻量化操作风格）
+    const allMenuItems = roleId === 5 ? [
+      {
+        key: '/supplier-dashboard',
+        icon: <DashboardOutlined />,
+        label: '工作台',
+        roles: [5],
+      },
+      {
+        key: '/supplier-orders',
+        icon: <ShoppingCartOutlined />,
+        label: '订单管理',
+        roles: [5],
+      },
+      {
+        key: '/notices',
+        icon: <BellOutlined />,
+        label: '通知公告',
+        roles: [5],
+      },
+    ] : [
       {
         key: '/dashboard',
         icon: <DashboardOutlined />,
         label: '仪表盘',
-        roles: [1, 2, 3, 4, 5], // 所有角色可见
+        roles: [1, 2, 3, 4, 6], // 所有角色可见（除供应商）
       },
       {
         key: '/drugs',

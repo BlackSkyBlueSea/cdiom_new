@@ -13,3 +13,5 @@ import org.apache.ibatis.annotations.Mapper;
 public interface SupplierMapper extends BaseMapper<Supplier> {
 }
 
+
+

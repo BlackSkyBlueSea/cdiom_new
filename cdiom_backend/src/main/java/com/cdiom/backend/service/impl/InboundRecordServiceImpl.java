@@ -4,12 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.InboundRecordMapper;
+import com.cdiom.backend.mapper.PurchaseOrderItemMapper;
 import com.cdiom.backend.mapper.PurchaseOrderMapper;
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.InboundRecord;
 import com.cdiom.backend.model.PurchaseOrder;
+import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.service.InventoryService;
+import com.cdiom.backend.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +37,9 @@ public class InboundRecordServiceImpl implements InboundRecordService {
     private final InboundRecordMapper inboundRecordMapper;
     private final DrugInfoMapper drugInfoMapper;
     private final PurchaseOrderMapper purchaseOrderMapper;
+    private final PurchaseOrderItemMapper purchaseOrderItemMapper;
     private final InventoryService inventoryService;
+    private final PurchaseOrderService purchaseOrderService;
 
     @Value("${system.config.expiry-warning-days:180}")
     private Integer expiryWarningDays;
@@ -128,8 +133,30 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         }
         
         // 检查入库数量是否超过订单数量
-        // TODO: 需要查询订单明细的采购数量，这里暂时跳过检查
-        // Integer inboundQuantity = getInboundQuantityByOrderAndDrug(orderId, drugId);
+        // 查询订单明细的采购数量
+        LambdaQueryWrapper<PurchaseOrderItem> itemWrapper = new LambdaQueryWrapper<>();
+        itemWrapper.eq(PurchaseOrderItem::getOrderId, orderId)
+                   .eq(PurchaseOrderItem::getDrugId, drugId);
+        PurchaseOrderItem orderItem = purchaseOrderItemMapper.selectOne(itemWrapper);
+        
+        if (orderItem == null) {
+            throw new RuntimeException("订单中不存在该药品的明细信息");
+        }
+        
+        // 获取已入库数量（只统计验收合格的）
+        Integer existingInboundQuantity = getInboundQuantityByOrderAndDrug(orderId, drugId);
+        if (existingInboundQuantity == null) {
+            existingInboundQuantity = 0;
+        }
+        
+        // 检查本次入库数量加上已入库数量是否超过订单采购数量
+        Integer totalInboundQuantity = existingInboundQuantity + inboundRecord.getQuantity();
+        if (totalInboundQuantity > orderItem.getQuantity()) {
+            throw new RuntimeException(String.format(
+                "入库数量超过订单采购数量。订单采购数量：%d，已入库数量：%d，本次入库数量：%d，总计：%d",
+                orderItem.getQuantity(), existingInboundQuantity, inboundRecord.getQuantity(), totalInboundQuantity
+            ));
+        }
         
         // 生成入库单号
         String recordNumber = generateRecordNumber();
@@ -172,7 +199,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             );
             
             // 更新订单状态（检查是否全部入库）
-            // TODO: 实现订单状态更新逻辑
+            purchaseOrderService.updateOrderInboundStatus(orderId);
         }
         
         log.info("创建入库记录：入库单号={}, 订单ID={}, 药品ID={}, 数量={}", recordNumber, orderId, drugId, inboundRecord.getQuantity());

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete, Popconfirm, Image } from 'antd'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, SendOutlined, StopOutlined, EditOutlined, BarcodeOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
+import { getUserRoleId } from '../utils/auth'
 
 const PurchaseOrderManagement = () => {
   const [orders, setOrders] = useState([])
@@ -27,6 +28,18 @@ const PurchaseOrderManagement = () => {
   const [drugs, setDrugs] = useState([])
   const [selectedSupplierId, setSelectedSupplierId] = useState(undefined)
   const [orderFormItems, setOrderFormItems] = useState([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [shipModalVisible, setShipModalVisible] = useState(false)
+  const [cancelModalVisible, setCancelModalVisible] = useState(false)
+  const [logisticsModalVisible, setLogisticsModalVisible] = useState(false)
+  const [rejectForm] = Form.useForm()
+  const [shipForm] = Form.useForm()
+  const [cancelForm] = Form.useForm()
+  const [logisticsForm] = Form.useForm()
+  const [actionOrderId, setActionOrderId] = useState(null)
+  const [barcodeModalVisible, setBarcodeModalVisible] = useState(false)
+  const [currentBarcode, setCurrentBarcode] = useState(null)
+  const [currentBarcodeOrderId, setCurrentBarcodeOrderId] = useState(null)
 
   useEffect(() => {
     fetchOrders()
@@ -238,6 +251,101 @@ const PurchaseOrderManagement = () => {
     return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>
   }
 
+  // 确认订单
+  const handleConfirmOrder = async (orderId) => {
+    try {
+      const res = await request.post(`/purchase-orders/${orderId}/confirm`)
+      if (res.code === 200) {
+        message.success('订单确认成功')
+        fetchOrders()
+      } else {
+        message.error(res.msg || '确认订单失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '确认订单失败')
+    }
+  }
+
+  // 拒绝订单
+  const handleRejectOrder = async (values) => {
+    try {
+      const res = await request.post(`/purchase-orders/${actionOrderId}/reject`, {
+        reason: values.reason
+      })
+      if (res.code === 200) {
+        message.success('订单已拒绝')
+        setRejectModalVisible(false)
+        rejectForm.resetFields()
+        setActionOrderId(null)
+        fetchOrders()
+      } else {
+        message.error(res.msg || '拒绝订单失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '拒绝订单失败')
+    }
+  }
+
+  // 发货
+  const handleShipOrder = async (values) => {
+    try {
+      const res = await request.post(`/purchase-orders/${actionOrderId}/ship`, {
+        logisticsNumber: values.logisticsNumber
+      })
+      if (res.code === 200) {
+        message.success('订单发货成功')
+        setShipModalVisible(false)
+        shipForm.resetFields()
+        setActionOrderId(null)
+        fetchOrders()
+      } else {
+        message.error(res.msg || '发货失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '发货失败')
+    }
+  }
+
+  // 取消订单
+  const handleCancelOrder = async (values) => {
+    try {
+      const res = await request.post(`/purchase-orders/${actionOrderId}/cancel`, {
+        reason: values.reason
+      })
+      if (res.code === 200) {
+        message.success('订单已取消')
+        setCancelModalVisible(false)
+        cancelForm.resetFields()
+        setActionOrderId(null)
+        fetchOrders()
+      } else {
+        message.error(res.msg || '取消订单失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '取消订单失败')
+    }
+  }
+
+  // 更新物流单号
+  const handleUpdateLogistics = async (values) => {
+    try {
+      const res = await request.put(`/purchase-orders/${actionOrderId}/logistics`, {
+        logisticsNumber: values.logisticsNumber
+      })
+      if (res.code === 200) {
+        message.success('物流单号更新成功')
+        setLogisticsModalVisible(false)
+        logisticsForm.resetFields()
+        setActionOrderId(null)
+        fetchOrders()
+      } else {
+        message.error(res.msg || '更新物流单号失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '更新物流单号失败')
+    }
+  }
+
   const columns = [
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
@@ -253,6 +361,32 @@ const PurchaseOrderManagement = () => {
       key: 'orderNumber',
       width: 150,
       ellipsis: true,
+      render: (text, record) => (
+        <Space>
+          <span>{text}</span>
+          <Button
+            type="link"
+            size="small"
+            icon={<BarcodeOutlined />}
+            onClick={async () => {
+              try {
+                const res = await request.get(`/purchase-orders/${record.id}/barcode`)
+                if (res.code === 200) {
+                  setCurrentBarcode(res.data)
+                  setCurrentBarcodeOrderId(record.id)
+                  setBarcodeModalVisible(true)
+                } else {
+                  message.error(res.msg || '获取条形码失败')
+                }
+              } catch (error) {
+                message.error('获取条形码失败')
+              }
+            }}
+          >
+            条形码
+          </Button>
+        </Space>
+      ),
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>供应商</span>,
@@ -300,10 +434,10 @@ const PurchaseOrderManagement = () => {
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
-      width: 150,
+      width: 280,
       fixed: 'right',
       render: (_, record) => (
-        <Space>
+        <Space wrap>
           <Button
             type="link"
             size="small"
@@ -322,6 +456,131 @@ const PurchaseOrderManagement = () => {
           >
             查看明细
           </Button>
+          {record.status === 'PENDING' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <>
+              <Popconfirm
+                title="确认订单"
+                description="确定要确认此订单吗？"
+                onConfirm={() => handleConfirmOrder(record.id)}
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>
+                  确认
+                </Button>
+              </Popconfirm>
+              <Button
+                type="link"
+                size="small"
+                icon={<CloseOutlined />}
+                danger
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  setRejectModalVisible(true)
+                }}
+              >
+                拒绝
+              </Button>
+            </>
+          )}
+          {record.status === 'CONFIRMED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Button
+              type="link"
+              size="small"
+              icon={<SendOutlined />}
+              onClick={() => {
+                setActionOrderId(record.id)
+                shipForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                setShipModalVisible(true)
+              }}
+            >
+              发货
+            </Button>
+          )}
+          {(record.status === 'SHIPPED' || record.status === 'CONFIRMED') && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => {
+                setActionOrderId(record.id)
+                logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                setLogisticsModalVisible(true)
+              }}
+            >
+              物流
+            </Button>
+          )}
+          {record.status !== 'RECEIVED' && record.status !== 'CANCELLED' && record.status !== 'REJECTED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Button
+              type="link"
+              size="small"
+              icon={<StopOutlined />}
+              danger
+              onClick={() => {
+                setActionOrderId(record.id)
+                setCancelModalVisible(true)
+              }}
+            >
+              取消
+            </Button>
+          )}
+          {/* 供应商可以操作自己的订单 */}
+          {getUserRoleId() === 5 && record.status === 'PENDING' && (
+            <>
+              <Popconfirm
+                title="确认订单"
+                description="确定要确认此订单吗？"
+                onConfirm={() => handleConfirmOrder(record.id)}
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>
+                  确认
+                </Button>
+              </Popconfirm>
+              <Button
+                type="link"
+                size="small"
+                icon={<CloseOutlined />}
+                danger
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  setRejectModalVisible(true)
+                }}
+              >
+                拒绝
+              </Button>
+            </>
+          )}
+          {getUserRoleId() === 5 && record.status === 'CONFIRMED' && (
+            <Button
+              type="link"
+              size="small"
+              icon={<SendOutlined />}
+              onClick={() => {
+                setActionOrderId(record.id)
+                shipForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                setShipModalVisible(true)
+              }}
+            >
+              发货
+            </Button>
+          )}
+          {getUserRoleId() === 5 && (record.status === 'SHIPPED' || record.status === 'CONFIRMED') && (
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => {
+                setActionOrderId(record.id)
+                logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                setLogisticsModalVisible(true)
+              }}
+            >
+              物流
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -584,8 +843,19 @@ const PurchaseOrderManagement = () => {
       >
         {currentOrder && (
           <div>
-            <p><strong>订单编号：</strong>{currentOrder.orderNumber}</p>
-            <p><strong>订单状态：</strong>{getStatusTag(currentOrder.status)}</p>
+            <div style={{ marginBottom: 16 }}>
+              <p><strong>订单编号：</strong>{currentOrder.orderNumber}</p>
+              <p><strong>订单状态：</strong>{getStatusTag(currentOrder.status)}</p>
+              {currentOrder.logisticsNumber && (
+                <p><strong>物流单号：</strong>{currentOrder.logisticsNumber}</p>
+              )}
+              {currentOrder.shipDate && (
+                <p><strong>发货日期：</strong>{dayjs(currentOrder.shipDate).format('YYYY-MM-DD HH:mm:ss')}</p>
+              )}
+              {currentOrder.rejectReason && (
+                <p><strong>拒绝理由：</strong><span style={{ color: '#ff4d4f' }}>{currentOrder.rejectReason}</span></p>
+              )}
+            </div>
             <Table
               columns={[
                 { title: '药品名称', dataIndex: 'drugName', key: 'drugName' },
@@ -597,6 +867,206 @@ const PurchaseOrderManagement = () => {
               rowKey="id"
               pagination={false}
             />
+          </div>
+        )}
+      </Modal>
+
+      {/* 拒绝订单模态框 */}
+      <Modal
+        title="拒绝订单"
+        open={rejectModalVisible}
+        onCancel={() => {
+          setRejectModalVisible(false)
+          rejectForm.resetFields()
+          setActionOrderId(null)
+        }}
+        onOk={() => rejectForm.submit()}
+        okText="确认拒绝"
+        cancelText="取消"
+      >
+        <Form
+          form={rejectForm}
+          layout="vertical"
+          onFinish={handleRejectOrder}
+        >
+          <Form.Item
+            name="reason"
+            label="拒绝理由"
+            rules={[
+              { required: true, message: '请输入拒绝理由' },
+              { max: 500, message: '拒绝理由长度不能超过500个字符' },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="请输入拒绝理由"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 发货模态框 */}
+      <Modal
+        title="订单发货"
+        open={shipModalVisible}
+        onCancel={() => {
+          setShipModalVisible(false)
+          shipForm.resetFields()
+          setActionOrderId(null)
+        }}
+        onOk={() => shipForm.submit()}
+        okText="确认发货"
+        cancelText="取消"
+      >
+        <Form
+          form={shipForm}
+          layout="vertical"
+          onFinish={handleShipOrder}
+        >
+          <Form.Item
+            name="logisticsNumber"
+            label="物流单号"
+            rules={[
+              { required: true, message: '请输入物流单号' },
+              { max: 100, message: '物流单号长度不能超过100个字符' },
+            ]}
+          >
+            <Input
+              placeholder="请输入物流单号"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 取消订单模态框 */}
+      <Modal
+        title="取消订单"
+        open={cancelModalVisible}
+        onCancel={() => {
+          setCancelModalVisible(false)
+          cancelForm.resetFields()
+          setActionOrderId(null)
+        }}
+        onOk={() => cancelForm.submit()}
+        okText="确认取消"
+        cancelText="取消"
+      >
+        <Form
+          form={cancelForm}
+          layout="vertical"
+          onFinish={handleCancelOrder}
+        >
+          <Form.Item
+            name="reason"
+            label="取消原因"
+            rules={[
+              { max: 500, message: '取消原因长度不能超过500个字符' },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="请输入取消原因（可选）"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 更新物流单号模态框 */}
+      <Modal
+        title="更新物流单号"
+        open={logisticsModalVisible}
+        onCancel={() => {
+          setLogisticsModalVisible(false)
+          logisticsForm.resetFields()
+          setActionOrderId(null)
+        }}
+        onOk={() => logisticsForm.submit()}
+        okText="确认更新"
+        cancelText="取消"
+      >
+        <Form
+          form={logisticsForm}
+          layout="vertical"
+          onFinish={handleUpdateLogistics}
+        >
+          <Form.Item
+            name="logisticsNumber"
+            label="物流单号"
+            rules={[
+              { required: true, message: '请输入物流单号' },
+              { max: 100, message: '物流单号长度不能超过100个字符' },
+            ]}
+          >
+            <Input
+              placeholder="请输入物流单号"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 条形码显示模态框 */}
+      <Modal
+        title="订单条形码"
+        open={barcodeModalVisible}
+        onCancel={() => {
+          setBarcodeModalVisible(false)
+          setCurrentBarcode(null)
+          setCurrentBarcodeOrderId(null)
+        }}
+        footer={[
+          <Button key="download" type="primary" icon={<DownloadOutlined />} onClick={async () => {
+            if (currentBarcodeOrderId && currentBarcode && currentBarcode.orderNumber) {
+              try {
+                const response = await fetch(`/api/v1/purchase-orders/${currentBarcodeOrderId}/barcode/download`, {
+                  method: 'GET',
+                  credentials: 'include',
+                })
+                if (response.ok) {
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `barcode_${currentBarcode.orderNumber}.png`
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                  message.success('条形码下载成功')
+                } else {
+                  message.error('下载条形码失败')
+                }
+              } catch (error) {
+                message.error('下载条形码失败')
+              }
+            }
+          }}>
+            下载条形码
+          </Button>,
+          <Button key="close" onClick={() => {
+            setBarcodeModalVisible(false)
+            setCurrentBarcode(null)
+            setCurrentBarcodeOrderId(null)
+          }}>
+            关闭
+          </Button>,
+        ]}
+        width={500}
+      >
+        {currentBarcode && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ marginBottom: '20px', fontSize: '16px', fontWeight: 'bold' }}>
+              订单编号：{currentBarcode.orderNumber}
+            </p>
+            {currentBarcode.barcodeBase64 && (
+              <Image
+                src={currentBarcode.barcodeBase64}
+                alt="订单条形码"
+                style={{ maxWidth: '100%' }}
+              />
+            )}
+            <p style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+              符合GSP规范的Code128条形码，可用于扫码枪扫描
+            </p>
           </div>
         )}
       </Modal>

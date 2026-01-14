@@ -47,3 +47,5 @@ public interface SupplierDrugService {
     void batchAddSupplierDrugs(Long supplierId, List<Long> drugIds, Long createBy);
 }
 
+
+

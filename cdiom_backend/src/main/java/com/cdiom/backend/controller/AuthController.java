@@ -3,12 +3,15 @@ package com.cdiom.backend.controller;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
+import com.cdiom.backend.service.PermissionService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Set;
 
 /**
  * 认证控制器
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final PermissionService permissionService;
 
     /**
      * 用户登录
@@ -71,6 +75,19 @@ public class AuthController {
         // 不返回密码
         user.setPassword(null);
         return Result.success(user);
+    }
+
+    /**
+     * 获取当前用户的权限列表
+     */
+    @GetMapping("/permissions")
+    public Result<Set<String>> getCurrentUserPermissions() {
+        SysUser user = authService.getCurrentUser();
+        if (user == null) {
+            return Result.error(401, "未登录");
+        }
+        Set<String> permissions = permissionService.getPermissionCodesByUserId(user.getId());
+        return Result.success(permissions);
     }
 
     /**

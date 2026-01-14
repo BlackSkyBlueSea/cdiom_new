@@ -28,3 +28,5 @@ public interface InventoryAdjustmentService {
     InventoryAdjustment createInventoryAdjustment(InventoryAdjustment adjustment, Long secondOperatorId);
 }
 
+
+

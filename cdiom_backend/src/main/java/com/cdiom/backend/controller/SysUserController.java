@@ -7,6 +7,7 @@ import com.cdiom.backend.model.OperationLog;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.OperationLogService;
+import com.cdiom.backend.service.PermissionService;
 import com.cdiom.backend.service.SysUserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,9 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * 系统用户管理控制器
@@ -32,6 +36,7 @@ public class SysUserController {
     private final SysUserService sysUserService;
     private final AuthService authService;
     private final OperationLogService operationLogService;
+    private final PermissionService permissionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -427,6 +432,50 @@ public class SysUserController {
     public static class PermanentDeleteRequest {
         @NotBlank(message = "确认文本不能为空")
         private String confirmText;
+    }
+
+    /**
+     * 获取所有权限列表
+     */
+    @GetMapping("/permissions/all")
+    public Result<List<com.cdiom.backend.model.SysPermission>> getAllPermissions() {
+        try {
+            return Result.success(permissionService.getAllPermissions());
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 获取用户权限详情（区分角色权限和用户直接权限）
+     */
+    @GetMapping("/{id}/permissions")
+    public Result<Map<String, Object>> getUserPermissions(@PathVariable Long id) {
+        try {
+            return Result.success(permissionService.getUserPermissionDetails(id));
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 更新用户的直接权限
+     */
+    @PutMapping("/{id}/permissions")
+    public Result<Void> updateUserPermissions(
+            @PathVariable Long id,
+            @RequestBody UpdateUserPermissionsRequest request) {
+        try {
+            permissionService.updateUserPermissions(id, request.getPermissionIds());
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @Data
+    public static class UpdateUserPermissionsRequest {
+        private List<Long> permissionIds;
     }
 }
 

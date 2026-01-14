@@ -2,27 +2,40 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.mapper.SysPermissionMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
+import com.cdiom.backend.mapper.SysUserPermissionMapper;
+import com.cdiom.backend.model.SysPermission;
 import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.model.SysUserPermission;
+import com.cdiom.backend.service.PermissionService;
 import com.cdiom.backend.service.SysUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 系统用户服务实现类
  * 
  * @author cdiom
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysUserServiceImpl implements SysUserService {
 
     private final SysUserMapper sysUserMapper;
+    private final PermissionService permissionService;
+    private final SysPermissionMapper permissionMapper;
+    private final SysUserPermissionMapper userPermissionMapper;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
@@ -99,6 +112,32 @@ public class SysUserServiceImpl implements SysUserService {
         user.setUpdateTime(LocalDateTime.now());
         
         sysUserMapper.insert(user);
+        
+        // 创建用户后，自动分配该角色的所有权限作为用户的直接权限
+        if (user.getRoleId() != null && user.getRoleId() != 6) { // 超级管理员不需要分配
+            try {
+                Set<String> rolePermissionCodes = permissionService.getPermissionCodesByRoleId(user.getRoleId());
+                if (!CollectionUtils.isEmpty(rolePermissionCodes)) {
+                    // 根据权限代码查询权限ID
+                    LambdaQueryWrapper<SysPermission> permissionWrapper = new LambdaQueryWrapper<>();
+                    permissionWrapper.in(SysPermission::getPermissionCode, rolePermissionCodes);
+                    permissionWrapper.eq(SysPermission::getPermissionType, 3);
+                    List<SysPermission> permissions = permissionMapper.selectList(permissionWrapper);
+                    
+                    // 为用户分配这些权限
+                    for (SysPermission permission : permissions) {
+                        SysUserPermission userPermission = new SysUserPermission();
+                        userPermission.setUserId(user.getId());
+                        userPermission.setPermissionId(permission.getId());
+                        userPermissionMapper.insert(userPermission);
+                    }
+                }
+            } catch (Exception e) {
+                // 权限分配失败不影响用户创建，只记录日志
+                log.warn("为用户自动分配角色权限失败，userId: {}, roleId: {}", user.getId(), user.getRoleId(), e);
+            }
+        }
+        
         return user;
     }
 

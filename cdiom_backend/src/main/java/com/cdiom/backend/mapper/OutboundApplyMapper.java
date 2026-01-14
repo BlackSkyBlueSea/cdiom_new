@@ -28,3 +28,5 @@ public interface OutboundApplyMapper extends BaseMapper<OutboundApply> {
     Long countTodayOutbound(LocalDateTime todayStart, LocalDateTime todayEnd);
 }
 
+
+

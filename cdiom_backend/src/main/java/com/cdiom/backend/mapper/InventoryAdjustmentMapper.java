@@ -13,3 +13,5 @@ import org.apache.ibatis.annotations.Mapper;
 public interface InventoryAdjustmentMapper extends BaseMapper<InventoryAdjustment> {
 }
 
+
+

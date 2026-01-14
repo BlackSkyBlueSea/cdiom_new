@@ -16,13 +16,21 @@ import InboundManagement from './pages/InboundManagement'
 import OutboundManagement from './pages/OutboundManagement'
 import PurchaseOrderManagement from './pages/PurchaseOrderManagement'
 import SupplierManagement from './pages/SupplierManagement'
+import SupplierDashboard from './pages/SupplierDashboard'
+import SupplierOrderManagement from './pages/SupplierOrderManagement'
+import IndexRedirect from './components/IndexRedirect'
 import PrivateRoute from './components/PrivateRoute'
 import './App.css'
 
 function App() {
   return (
     <ConfigProvider locale={zhCN}>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -33,8 +41,10 @@ function App() {
               </PrivateRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<IndexRedirect />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="supplier-dashboard" element={<SupplierDashboard />} />
+            <Route path="supplier-orders" element={<SupplierOrderManagement />} />
             <Route path="drugs" element={<DrugManagement />} />
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="inbound" element={<InboundManagement />} />

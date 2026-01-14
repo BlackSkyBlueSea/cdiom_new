@@ -22,3 +22,5 @@ public interface OutboundApplyItemMapper extends BaseMapper<OutboundApplyItem> {
     List<OutboundApplyItem> selectByApplyId(Long applyId);
 }
 
+
+

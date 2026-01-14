@@ -260,6 +260,32 @@ public class DashboardServiceImpl implements DashboardService {
                 totalInventory = 0L;
             }
 
+            // 最近7天出入库趋势
+            List<String> dates = new ArrayList<>();
+            List<Long> inboundCounts = new ArrayList<>();
+            List<Long> outboundCounts = new ArrayList<>();
+            for (int i = 6; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+                
+                // 当日入库数
+                Long dayInboundCount = inboundRecordMapper.countTodayInbound(startOfDay, endOfDay);
+                if (dayInboundCount == null) {
+                    dayInboundCount = 0L;
+                }
+                
+                // 当日出库数
+                Long dayOutboundCount = outboundApplyMapper.countTodayOutbound(startOfDay, endOfDay);
+                if (dayOutboundCount == null) {
+                    dayOutboundCount = 0L;
+                }
+                
+                dates.add(date.format(DateTimeFormatter.ofPattern("MM-dd")));
+                inboundCounts.add(dayInboundCount);
+                outboundCounts.add(dayOutboundCount);
+            }
+
             Map<String, Long> nearExpiryWarning = new HashMap<>();
             nearExpiryWarning.put("yellow", yellowWarningCount);
             nearExpiryWarning.put("red", redWarningCount);
@@ -276,6 +302,9 @@ public class DashboardServiceImpl implements DashboardService {
             result.put("pendingTasks", pendingTasks);
             result.put("todayStats", todayStats);
             result.put("totalInventory", totalInventory);
+            result.put("dates", dates);
+            result.put("inboundCounts", inboundCounts);
+            result.put("outboundCounts", outboundCounts);
 
             return result;
         } catch (Exception e) {
@@ -295,8 +324,239 @@ public class DashboardServiceImpl implements DashboardService {
             result.put("pendingTasks", pendingTasks);
             result.put("todayStats", todayStats);
             result.put("totalInventory", 0L);
+            result.put("dates", new ArrayList<>());
+            result.put("inboundCounts", new ArrayList<>());
+            result.put("outboundCounts", new ArrayList<>());
             return result;
         }
+    }
+
+    @Override
+    public Map<String, Object> getPurchaserDashboard(Long purchaserId) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            
+            // 订单统计
+            LambdaQueryWrapper<PurchaseOrder> allWrapper = new LambdaQueryWrapper<>();
+            allWrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
+            long totalOrders = purchaseOrderMapper.selectCount(allWrapper);
+            
+            // 订单状态统计
+            Map<String, Long> statusStats = new HashMap<>();
+            String[] statuses = {"PENDING", "REJECTED", "CONFIRMED", "SHIPPED", "RECEIVED", "CANCELLED"};
+            for (String status : statuses) {
+                LambdaQueryWrapper<PurchaseOrder> statusWrapper = new LambdaQueryWrapper<>();
+                statusWrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
+                statusWrapper.eq(PurchaseOrder::getStatus, status);
+                long count = purchaseOrderMapper.selectCount(statusWrapper);
+                statusStats.put(status, count);
+            }
+            
+            // 订单金额统计
+            List<PurchaseOrder> orders = purchaseOrderMapper.selectList(allWrapper);
+            double totalAmount = orders.stream()
+                    .filter(o -> o.getTotalAmount() != null)
+                    .mapToDouble(o -> o.getTotalAmount().doubleValue())
+                    .sum();
+            
+            // 最近7天订单趋势
+            List<String> dates = new ArrayList<>();
+            List<Long> orderCounts = new ArrayList<>();
+            for (int i = 6; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+                
+                LambdaQueryWrapper<PurchaseOrder> trendWrapper = new LambdaQueryWrapper<>();
+                trendWrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
+                trendWrapper.ge(PurchaseOrder::getCreateTime, startOfDay);
+                trendWrapper.lt(PurchaseOrder::getCreateTime, endOfDay);
+                long count = purchaseOrderMapper.selectCount(trendWrapper);
+                
+                dates.add(date.format(DateTimeFormatter.ofPattern("MM-dd")));
+                orderCounts.add(count);
+            }
+            
+            // 供应商统计
+            LambdaQueryWrapper<PurchaseOrder> supplierWrapper = new LambdaQueryWrapper<>();
+            supplierWrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
+            supplierWrapper.select(PurchaseOrder::getSupplierId);
+            List<PurchaseOrder> supplierOrders = purchaseOrderMapper.selectList(supplierWrapper);
+            long uniqueSuppliers = supplierOrders.stream()
+                    .map(PurchaseOrder::getSupplierId)
+                    .distinct()
+                    .count();
+            
+            result.put("totalOrders", totalOrders);
+            result.put("statusStats", statusStats);
+            result.put("totalAmount", totalAmount);
+            result.put("dates", dates);
+            result.put("orderCounts", orderCounts);
+            result.put("uniqueSuppliers", uniqueSuppliers);
+            
+            return result;
+        } catch (Exception e) {
+            log.error("获取采购专员仪表盘数据异常", e);
+            return getEmptyPurchaserDashboard();
+        }
+    }
+
+    @Override
+    public Map<String, Object> getMedicalStaffDashboard(Long applicantId) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            
+            // 出库申请统计
+            LambdaQueryWrapper<OutboundApply> allWrapper = new LambdaQueryWrapper<>();
+            allWrapper.eq(OutboundApply::getApplicantId, applicantId);
+            long totalApplies = outboundApplyMapper.selectCount(allWrapper);
+            
+            // 申请状态统计
+            Map<String, Long> statusStats = new HashMap<>();
+            String[] statuses = {"PENDING", "APPROVED", "REJECTED", "OUTBOUND", "CANCELLED"};
+            for (String status : statuses) {
+                LambdaQueryWrapper<OutboundApply> statusWrapper = new LambdaQueryWrapper<>();
+                statusWrapper.eq(OutboundApply::getApplicantId, applicantId);
+                statusWrapper.eq(OutboundApply::getStatus, status);
+                long count = outboundApplyMapper.selectCount(statusWrapper);
+                statusStats.put(status, count);
+            }
+            
+            // 最近7天申请趋势
+            List<String> dates = new ArrayList<>();
+            List<Long> applyCounts = new ArrayList<>();
+            for (int i = 6; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+                
+                LambdaQueryWrapper<OutboundApply> trendWrapper = new LambdaQueryWrapper<>();
+                trendWrapper.eq(OutboundApply::getApplicantId, applicantId);
+                trendWrapper.ge(OutboundApply::getCreateTime, startOfDay);
+                trendWrapper.lt(OutboundApply::getCreateTime, endOfDay);
+                long count = outboundApplyMapper.selectCount(trendWrapper);
+                
+                dates.add(date.format(DateTimeFormatter.ofPattern("MM-dd")));
+                applyCounts.add(count);
+            }
+            
+            result.put("totalApplies", totalApplies);
+            result.put("statusStats", statusStats);
+            result.put("dates", dates);
+            result.put("applyCounts", applyCounts);
+            
+            return result;
+        } catch (Exception e) {
+            log.error("获取医护人员仪表盘数据异常", e);
+            return getEmptyMedicalStaffDashboard();
+        }
+    }
+
+    @Override
+    public Map<String, Object> getSupplierDashboard(Long supplierId) {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            
+            // 订单统计
+            LambdaQueryWrapper<PurchaseOrder> allWrapper = new LambdaQueryWrapper<>();
+            allWrapper.eq(PurchaseOrder::getSupplierId, supplierId);
+            long totalOrders = purchaseOrderMapper.selectCount(allWrapper);
+            
+            // 订单状态统计
+            Map<String, Long> statusStats = new HashMap<>();
+            String[] statuses = {"PENDING", "REJECTED", "CONFIRMED", "SHIPPED", "RECEIVED", "CANCELLED"};
+            for (String status : statuses) {
+                LambdaQueryWrapper<PurchaseOrder> statusWrapper = new LambdaQueryWrapper<>();
+                statusWrapper.eq(PurchaseOrder::getSupplierId, supplierId);
+                statusWrapper.eq(PurchaseOrder::getStatus, status);
+                long count = purchaseOrderMapper.selectCount(statusWrapper);
+                statusStats.put(status, count);
+            }
+            
+            // 订单金额统计
+            List<PurchaseOrder> orders = purchaseOrderMapper.selectList(allWrapper);
+            double totalAmount = orders.stream()
+                    .filter(o -> o.getTotalAmount() != null)
+                    .mapToDouble(o -> o.getTotalAmount().doubleValue())
+                    .sum();
+            
+            double pendingAmount = orders.stream()
+                    .filter(o -> o.getTotalAmount() != null && "PENDING".equals(o.getStatus()))
+                    .mapToDouble(o -> o.getTotalAmount().doubleValue())
+                    .sum();
+            
+            double confirmedAmount = orders.stream()
+                    .filter(o -> o.getTotalAmount() != null && "CONFIRMED".equals(o.getStatus()))
+                    .mapToDouble(o -> o.getTotalAmount().doubleValue())
+                    .sum();
+            
+            // 待处理订单数（PENDING状态）
+            long pendingOrders = statusStats.getOrDefault("PENDING", 0L);
+            
+            // 最近30天订单趋势
+            List<String> dates = new ArrayList<>();
+            List<Long> orderCounts = new ArrayList<>();
+            for (int i = 29; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+                
+                LambdaQueryWrapper<PurchaseOrder> trendWrapper = new LambdaQueryWrapper<>();
+                trendWrapper.eq(PurchaseOrder::getSupplierId, supplierId);
+                trendWrapper.ge(PurchaseOrder::getCreateTime, startOfDay);
+                trendWrapper.lt(PurchaseOrder::getCreateTime, endOfDay);
+                long count = purchaseOrderMapper.selectCount(trendWrapper);
+                
+                dates.add(date.format(DateTimeFormatter.ofPattern("MM-dd")));
+                orderCounts.add(count);
+            }
+            
+            result.put("totalOrders", totalOrders);
+            result.put("statusStats", statusStats);
+            result.put("totalAmount", totalAmount);
+            result.put("pendingAmount", pendingAmount);
+            result.put("confirmedAmount", confirmedAmount);
+            result.put("pendingOrders", pendingOrders); // 待处理订单数
+            result.put("dates", dates);
+            result.put("orderCounts", orderCounts);
+            
+            return result;
+        } catch (Exception e) {
+            log.error("获取供应商仪表盘数据异常", e);
+            return getEmptySupplierDashboard();
+        }
+    }
+
+    private Map<String, Object> getEmptyPurchaserDashboard() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalOrders", 0L);
+        result.put("statusStats", new HashMap<String, Long>());
+        result.put("totalAmount", 0.0);
+        result.put("dates", new ArrayList<>());
+        result.put("orderCounts", new ArrayList<>());
+        result.put("uniqueSuppliers", 0L);
+        return result;
+    }
+
+    private Map<String, Object> getEmptyMedicalStaffDashboard() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalApplies", 0L);
+        result.put("statusStats", new HashMap<String, Long>());
+        result.put("dates", new ArrayList<>());
+        result.put("applyCounts", new ArrayList<>());
+        return result;
+    }
+
+    private Map<String, Object> getEmptySupplierDashboard() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalOrders", 0L);
+        result.put("statusStats", new HashMap<String, Long>());
+        result.put("totalAmount", 0.0);
+        result.put("pendingAmount", 0.0);
+        result.put("confirmedAmount", 0.0);
+        result.put("dates", new ArrayList<>());
+        result.put("orderCounts", new ArrayList<>());
+        return result;
     }
 }
 

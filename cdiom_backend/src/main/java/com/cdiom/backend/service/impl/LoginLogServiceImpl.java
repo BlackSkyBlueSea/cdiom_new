@@ -7,6 +7,8 @@ import com.cdiom.backend.model.LoginLog;
 import com.cdiom.backend.service.LoginLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -52,6 +54,7 @@ public class LoginLogServiceImpl implements LoginLogService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveLog(LoginLog log) {
         if (log.getLoginTime() == null) {
             log.setLoginTime(LocalDateTime.now());
@@ -59,6 +62,7 @@ public class LoginLogServiceImpl implements LoginLogService {
         loginLogMapper.insert(log);
     }
 }
+
 
 
 

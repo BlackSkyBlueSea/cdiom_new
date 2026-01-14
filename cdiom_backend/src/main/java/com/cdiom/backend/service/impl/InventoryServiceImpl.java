@@ -124,26 +124,21 @@ public class InventoryServiceImpl implements InventoryService {
             throw new RuntimeException("入库数量必须大于0");
         }
         
-        // 查询是否已存在该批次
-        Inventory existing = getInventoryByDrugAndBatch(drugId, batchNumber);
+        // 使用 INSERT ... ON DUPLICATE KEY UPDATE 原子操作，确保并发安全
+        // 如果记录不存在则插入，存在则原子增加数量
+        int affectedRows = inventoryMapper.insertOrUpdateInventory(drugId, batchNumber, quantity, 
+                expiryDate, storageLocation, productionDate, manufacturer);
         
-        if (existing != null) {
-            // 如果批次已存在，增加数量
-            existing.setQuantity(existing.getQuantity() + quantity);
-            inventoryMapper.updateById(existing);
-            log.info("更新库存：药品ID={}, 批次号={}, 增加数量={}, 当前数量={}", drugId, batchNumber, quantity, existing.getQuantity());
+        if (affectedRows == 0) {
+            throw new RuntimeException("入库操作失败，请重试");
+        }
+        
+        // 查询更新后的库存数量用于日志
+        Inventory inventory = inventoryMapper.selectForUpdate(drugId, batchNumber);
+        if (inventory != null) {
+            log.info("入库操作：药品ID={}, 批次号={}, 增加数量={}, 当前数量={}", drugId, batchNumber, quantity, inventory.getQuantity());
         } else {
-            // 如果批次不存在，新增库存记录
-            Inventory inventory = new Inventory();
-            inventory.setDrugId(drugId);
-            inventory.setBatchNumber(batchNumber);
-            inventory.setQuantity(quantity);
-            inventory.setExpiryDate(expiryDate);
-            inventory.setStorageLocation(storageLocation);
-            inventory.setProductionDate(productionDate);
-            inventory.setManufacturer(manufacturer);
-            inventoryMapper.insert(inventory);
-            log.info("新增库存：药品ID={}, 批次号={}, 数量={}", drugId, batchNumber, quantity);
+            log.info("入库操作：药品ID={}, 批次号={}, 增加数量={}", drugId, batchNumber, quantity);
         }
     }
 
@@ -154,18 +149,32 @@ public class InventoryServiceImpl implements InventoryService {
             throw new RuntimeException("出库数量必须大于0");
         }
         
-        Inventory inventory = getInventoryByDrugAndBatch(drugId, batchNumber);
+        // 使用悲观锁查询库存，防止并发问题
+        Inventory inventory = inventoryMapper.selectForUpdate(drugId, batchNumber);
         if (inventory == null) {
             throw new RuntimeException("库存不存在");
         }
         
+        // 检查库存是否充足
         if (inventory.getQuantity() < quantity) {
             throw new RuntimeException("库存不足，当前库存：" + inventory.getQuantity() + "，需要出库：" + quantity);
         }
         
-        inventory.setQuantity(inventory.getQuantity() - quantity);
-        inventoryMapper.updateById(inventory);
-        log.info("减少库存：药品ID={}, 批次号={}, 减少数量={}, 剩余数量={}", drugId, batchNumber, quantity, inventory.getQuantity());
+        // 使用原子更新操作减少库存，确保并发安全
+        // 原子更新操作会在 WHERE 条件中检查 quantity >= quantity，确保库存充足
+        int affectedRows = inventoryMapper.decreaseQuantityAtomically(drugId, batchNumber, quantity);
+        if (affectedRows == 0) {
+            // 如果原子更新失败（可能是在检查后到更新前库存被其他事务修改），再次查询确认
+            Inventory currentInventory = inventoryMapper.selectForUpdate(drugId, batchNumber);
+            if (currentInventory == null) {
+                throw new RuntimeException("库存不存在");
+            }
+            throw new RuntimeException("库存不足，当前库存：" + currentInventory.getQuantity() + "，需要出库：" + quantity);
+        }
+        
+        // 计算剩余数量用于日志（避免再次查询数据库）
+        int remainingQuantity = inventory.getQuantity() - quantity;
+        log.info("减少库存：药品ID={}, 批次号={}, 减少数量={}, 剩余数量={}", drugId, batchNumber, quantity, remainingQuantity);
     }
 
     @Override
@@ -175,7 +184,8 @@ public class InventoryServiceImpl implements InventoryService {
             throw new RuntimeException("库存数量不能为负");
         }
         
-        Inventory inventory = getInventoryByDrugAndBatch(drugId, batchNumber);
+        // 使用悲观锁查询库存，防止并发问题
+        Inventory inventory = inventoryMapper.selectForUpdate(drugId, batchNumber);
         if (inventory == null) {
             throw new RuntimeException("库存不存在");
         }

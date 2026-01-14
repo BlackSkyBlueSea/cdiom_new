@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Descriptions } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, EyeOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getUser, getUserRoleId } from '../utils/auth'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
@@ -9,6 +9,8 @@ const NoticeManagement = () => {
   const [notices, setNotices] = useState([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [viewModalVisible, setViewModalVisible] = useState(false)
+  const [viewingNotice, setViewingNotice] = useState(null)
   const [editingNotice, setEditingNotice] = useState(null)
   const [form] = Form.useForm()
   const [pagination, setPagination] = useState({
@@ -61,6 +63,18 @@ const NoticeManagement = () => {
     setEditingNotice(record)
     form.setFieldsValue(record)
     setModalVisible(true)
+  }
+
+  const handleView = async (id) => {
+    try {
+      const res = await request.get(`/notices/${id}`)
+      if (res.code === 200) {
+        setViewingNotice(res.data)
+        setViewModalVisible(true)
+      }
+    } catch (error) {
+      message.error('获取通知公告详情失败')
+    }
   }
 
   const handleDelete = async (id) => {
@@ -118,6 +132,11 @@ const NoticeManagement = () => {
       key: 'noticeTitle',
       width: 200,
       ellipsis: true,
+      render: (text, record) => (
+        <a onClick={() => handleView(record.id)} style={{ cursor: 'pointer' }}>
+          {text}
+        </a>
+      ),
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>类型</span>,
@@ -152,35 +171,42 @@ const NoticeManagement = () => {
         const isAdmin = roleId === 1 || roleId === 6
         const canOperate = isAdmin || (currentUserId && record.createBy === currentUserId)
         
-        if (!canOperate) {
-          return <span style={{ color: '#999' }}>仅查看</span>
-        }
-        
         return (
           <Space>
-            <Tooltip title="编辑">
+            <Tooltip title="查看详情">
               <Button
                 type="link"
-                icon={<EditOutlined />}
-                onClick={() => handleEdit(record)}
+                icon={<EyeOutlined />}
+                onClick={() => handleView(record.id)}
               />
             </Tooltip>
-            <Tooltip title={record.status === 1 ? '关闭' : '开启'}>
-              <Button
-                type="link"
-                danger={record.status === 1}
-                icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
-                onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
-              />
-            </Tooltip>
-            <Popconfirm
-              title="确定要删除吗？"
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Tooltip title="删除">
-                <Button type="link" danger icon={<DeleteOutlined />} />
-              </Tooltip>
-            </Popconfirm>
+            {canOperate && (
+              <>
+                <Tooltip title="编辑">
+                  <Button
+                    type="link"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEdit(record)}
+                  />
+                </Tooltip>
+                <Tooltip title={record.status === 1 ? '关闭' : '开启'}>
+                  <Button
+                    type="link"
+                    danger={record.status === 1}
+                    icon={record.status === 1 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => handleStatusChange(record.id, record.status === 1 ? 0 : 1)}
+                  />
+                </Tooltip>
+                <Popconfirm
+                  title="确定要删除吗？"
+                  onConfirm={() => handleDelete(record.id)}
+                >
+                  <Tooltip title="删除">
+                    <Button type="link" danger icon={<DeleteOutlined />} />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            )}
           </Space>
         )
       },
@@ -257,6 +283,61 @@ const NoticeManagement = () => {
             </Select>
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title="通知公告详情"
+        open={viewModalVisible}
+        onCancel={() => {
+          setViewModalVisible(false)
+          setViewingNotice(null)
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setViewModalVisible(false)
+            setViewingNotice(null)
+          }}>
+            关闭
+          </Button>
+        ]}
+        width={800}
+      >
+        {viewingNotice && (
+          <Descriptions column={1} bordered>
+            <Descriptions.Item label="ID">{viewingNotice.id}</Descriptions.Item>
+            <Descriptions.Item label="标题">{viewingNotice.noticeTitle}</Descriptions.Item>
+            <Descriptions.Item label="类型">
+              {viewingNotice.noticeType === 1 ? '通知' : '公告'}
+            </Descriptions.Item>
+            <Descriptions.Item label="内容">
+              <div style={{ 
+                whiteSpace: 'pre-wrap', 
+                wordBreak: 'break-word',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                padding: '8px',
+                backgroundColor: '#f5f5f5',
+                borderRadius: '4px'
+              }}>
+                {viewingNotice.noticeContent}
+              </div>
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              {viewingNotice.status === 1 ? (
+                <span style={{ color: '#52c41a' }}>正常</span>
+              ) : (
+                <span style={{ color: '#ff4d4f' }}>关闭</span>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="创建时间">
+              {viewingNotice.createTime}
+            </Descriptions.Item>
+            {viewingNotice.updateTime && (
+              <Descriptions.Item label="更新时间">
+                {viewingNotice.updateTime}
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
       </Modal>
     </div>
   )

@@ -4,7 +4,7 @@
 
 基于 Spring Boot + React + MySQL 的医疗药品仓库管理系统，实现药品信息管理、库存监控、出入库审批、批次追溯及多角色权限管控等核心功能。
 
-> 📋 **核心业务需求分析**：详细的需求分析文档请参考 [核心业务需求分析.md](./docs/核心业务需求分析.md)，包含库存管理、入库管理、出库管理的完整业务流程和处理流程。
+> 📋 **核心业务需求分析**：详细的需求分析文档请参考 [Core_Business_Requirements_Analysis.md](./docs/Core_Business_Requirements_Analysis.md)，包含库存管理、入库管理、出库管理的完整业务流程和处理流程。
 
 ## 技术栈
 
@@ -109,12 +109,13 @@ cdiom_new/
 │   └── package.json                  # 依赖配置
 ├── docs/                              # 项目文档目录
 │   ├── README.md                     # 文档目录说明
-│   ├── 核心业务需求分析.md           # 核心业务需求分析
-│   ├── 订单与入库记录关系说明.md     # 订单与入库关系说明
-│   ├── 代码完整性检查报告.md         # 代码完整性检查报告
-│   ├── 权限问题修复说明.md           # 权限问题修复说明
-│   ├── 并发访问配置说明.md           # 并发访问配置说明
-│   └── 药品数据导入说明.md           # 药品数据导入说明
+│   ├── Core_Business_Requirements_Analysis.md           # 核心业务需求分析
+│   ├── Order_Inbound_Record_Relationship_Guide.md     # 订单与入库关系说明
+│   ├── Code_Completeness_Report.md         # 代码完整性检查报告
+│   ├── Code_Logic_Vulnerability_Report.md       # 代码逻辑漏洞检查报告（2026-01-14）
+│   ├── Permission_Issue_Fix_Guide.md           # 权限问题修复说明
+│   ├── Concurrency_Configuration_Guide.md           # 并发访问配置说明
+│   └── Drug_Data_Import_Guide.md           # 药品数据导入说明
 └── README.md                          # 项目说明文档
 ```
 
@@ -156,7 +157,19 @@ cdiom_new/
 - 根据商品码/本位码/追溯码查询（先查本地数据库，未找到则调用极速数据API）
 - 根据药品名称查询（调用万维易源API，并自动调用极速数据API补充信息）
 - 根据批准文号查询（调用万维易源API，并自动调用极速数据API补充信息）
+- 根据供应商ID查询药品列表（新增）
 - 多API数据自动合并（万维易源API + 极速数据API）
+
+✅ 供应商-药品关联管理（SupplierDrugController）
+- 添加供应商-药品关联（支持设置单价）
+- 删除供应商-药品关联
+- 更新供应商-药品关联的单价
+
+✅ 文件上传管理（FileUploadController）
+- 图片文件上传（支持jpg, jpeg, png, gif, bmp, webp格式）
+- 文件大小验证（最大10MB）
+- 文件删除功能
+- 按日期分类存储
 
 ✅ 仪表盘（DashboardController）
 - 基础统计数据（所有用户可访问）
@@ -229,6 +242,12 @@ cdiom_new/
 - 表单自动填充（API返回数据自动填充，用户可手动核对修改）
 - 表单布局优化（分组显示，更紧凑美观）
 - 特殊药品友好提示（说明如何判断特殊药品）
+
+✅ 供应商管理页面增强
+- 供应商列表展示、新增、编辑、删除
+- 供应商-药品关联管理（添加、删除、更新单价）
+- 根据供应商动态获取关联药品列表
+- 采购订单管理优化（根据供应商动态加载药品）
 
 ## 数据库设计
 
@@ -357,8 +376,11 @@ sys_user (1) ──< (N) inventory_adjustment (操作人、第二操作人)
 
 **方式一：使用完整初始化脚本（推荐）**
 ```bash
-# 执行完整初始化脚本（包含所有19张表）
+# 执行完整初始化脚本（包含所有20张表）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
+
+# 如果init_simple.sql中不包含supplier_drug表，需要额外执行：
+mysql -u root -p < cdiom_backend/src/main/resources/db/create_supplier_drug_relation.sql
 ```
 
 **方式二：分步执行**
@@ -366,11 +388,17 @@ mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
 # 1. 先执行基础表结构
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
 
-# 2. 如果需要单独创建业务表（已包含在init_simple.sql中）
+# 2. 创建供应商-药品关联表（如果init_simple.sql中未包含）
+mysql -u root -p < cdiom_backend/src/main/resources/db/create_supplier_drug_relation.sql
+
+# 3. 如果需要单独创建业务表（已包含在init_simple.sql中）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_business_tables.sql
 ```
 
-**注意**: `init_simple.sql` 已包含所有表的创建语句，推荐直接使用该文件。
+**注意**: 
+- `init_simple.sql` 已包含大部分表的创建语句，推荐直接使用该文件
+- `supplier_drug` 表（第20张表）是在v1.3.0版本中新增的，如果 `init_simple.sql` 中未包含，需要单独执行 `create_supplier_drug_relation.sql`
+- 执行前建议检查 `init_simple.sql` 是否已包含 `supplier_drug` 表的创建语句
 
 2. 修改数据库配置
 ```yaml
@@ -672,6 +700,11 @@ npm run dev
 - **说明**: 调用万维易源API获取基本信息，然后自动调用极速数据API补充信息
 - **权限**: 需要 `drug:view` 或 `drug:manage` 权限
 
+#### 根据供应商ID查询药品列表
+- **接口**: `GET /api/v1/drugs/supplier/{supplierId}`
+- **说明**: 查询指定供应商关联的所有药品
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
 ### 仪表盘接口
 
 #### 获取基础统计数据
@@ -689,6 +722,51 @@ npm run dev
 #### 获取仓库管理员仪表盘数据
 - **接口**: `GET /api/v1/dashboard/warehouse`
 - **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+### 供应商-药品关联管理接口
+
+#### 添加供应商-药品关联
+- **接口**: `POST /api/v1/supplier-drugs`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "supplierId": 1,
+  "drugId": 1,
+  "unitPrice": 10.50
+}
+```
+
+#### 删除供应商-药品关联
+- **接口**: `DELETE /api/v1/supplier-drugs?supplierId={supplierId}&drugId={drugId}`
+- **权限**: 需要 `drug:manage` 权限
+
+#### 更新供应商-药品关联单价
+- **接口**: `PUT /api/v1/supplier-drugs/price`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "supplierId": 1,
+  "drugId": 1,
+  "unitPrice": 12.00
+}
+```
+
+### 文件上传接口
+
+#### 上传文件
+- **接口**: `POST /api/v1/upload`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **请求**: multipart/form-data
+  - `file`: 文件（仅支持图片格式：jpg, jpeg, png, gif, bmp, webp）
+  - 文件大小限制：最大10MB
+- **响应**: 返回文件访问URL
+
+#### 删除文件
+- **接口**: `DELETE /api/v1/upload?url={fileUrl}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **说明**: 根据文件URL删除已上传的文件
 
 ## 安全特性
 
@@ -722,7 +800,7 @@ npm run dev
 - ✅ 超级管理员管理模块（启用/停用、邮箱验证码验证）
 - ✅ 邮箱验证码服务（EmailVerificationService）
 - ✅ 库存管理模块（查询、筛选、近效期预警）
-- ✅ 数据库表结构设计（19张表全部创建完成）
+- ✅ 数据库表结构设计（20张表全部创建完成）
 - ✅ 统一响应格式（Result<T>）
 - ✅ 全局异常处理（GlobalExceptionHandler）
 - ✅ 自动填充处理器（创建时间、更新时间）
@@ -758,8 +836,15 @@ npm run dev
 
 #### 业务模块（待开发）
 - ✅ 药品信息管理（CRUD、扫码识别、第三方API集成）**已完成**
-- ✅ 库存管理（查询、筛选、近效期预警显示）**部分完成**（后端接口已实现，前端页面已实现，库存调整功能待开发）
-- ✅ 供应商管理（数据库结构优化、多对多关系、权限配置）**部分完成**（数据库表结构已完成，后端接口和前端页面待开发）
+  - 后端：DrugInfoController（CRUD、扫码识别、万维易源API、极速数据API集成、按供应商查询）
+  - 前端：DrugManagement.jsx（列表、新增、编辑、删除、扫码、药品名称搜索、批准文号搜索）
+- ✅ 库存管理（查询、筛选、近效期预警、库存调整）**已完成**
+  - 后端：InventoryController（查询、筛选、近效期预警）、InventoryAdjustmentController（盘盈/盘亏、特殊药品双人操作）
+  - 前端：InventoryManagement.jsx（列表、多条件筛选、近效期预警、库存调整功能）
+- ✅ 供应商管理（数据库结构优化、多对多关系、权限配置、关联管理）**已完成**
+  - 后端：SupplierController（CRUD、审核功能）、SupplierDrugController（供应商-药品关联管理：添加、删除、更新单价）
+  - 前端：SupplierManagement.jsx（列表、新增、编辑、删除、审核功能、关联管理）
+  - 数据库：supplier_drug表（多对多关系）、supplier表（备注字段、审核状态）
 - ⏳ 入库管理（验收、效期校验、特殊药品双人操作）
 - ⏳ 出库管理（审批、库存扣减、特殊药品双人审批）
 - ⏳ 采购订单管理（创建、流转、物流跟踪）
@@ -768,7 +853,11 @@ npm run dev
 #### 功能增强（待开发）
 - ✅ 数据可视化图表（仪表盘统计、趋势分析）**部分完成**
 - ✅ 权限管理模块（权限分配、菜单权限、接口权限）**已完成**
-- ⏳ 文件上传功能（图片上传、文件存储）
+- ✅ 文件上传功能（图片上传、文件存储）**已完成**
+  - 后端：FileUploadController（图片上传、删除、文件类型验证、大小限制）
+  - 支持格式：jpg, jpeg, png, gif, bmp, webp
+  - 文件大小限制：最大10MB
+  - 按日期分类存储
 - ⏳ 数据导出功能（Excel导出）
 - ⏳ 扫码枪适配（HID键盘模式）
 - ⏳ 跨终端响应式优化（Pad端适配）
@@ -888,7 +977,7 @@ npm run dev
 
 ### 数据库相关
 1. **数据库密码**: 需要修改 `application.yml` 中的数据库密码为实际密码
-2. **初始化脚本**: 推荐使用 `init_simple.sql`，已包含所有19张表的创建语句
+2. **初始化脚本**: 推荐使用 `init_simple.sql`，已包含所有20张表的创建语句（注意：supplier_drug表需要单独执行create_supplier_drug_relation.sql创建）
 3. **字符集**: 数据库和表都使用 utf8mb4，支持中文和特殊字符
 4. **外键约束**: 所有外键都设置了约束，删除时注意级联关系
 
@@ -1024,6 +1113,34 @@ export default YourPage;
 
 ## 版本历史
 
+### v1.4.0 (2026-01-14)
+- ✅ 实现供应商-药品关联管理功能
+  - 创建SupplierDrug实体类，支持供应商与药品的多对多关系
+  - 实现SupplierDrugController，提供关联添加、删除、单价更新接口
+  - 更新DrugInfoController，支持根据供应商ID查询药品列表
+  - 前端SupplierManagement组件增强，支持动态获取供应商关联的药品
+  - 前端PurchaseOrderManagement组件优化，根据选择的供应商动态加载药品
+- ✅ 新增文件上传功能
+  - 创建FileUploadController，支持图片文件上传和删除
+  - 支持图片格式：jpg, jpeg, png, gif, bmp, webp
+  - 文件大小限制：最大10MB
+  - 按日期分类存储（yyyy/MM/dd目录结构）
+  - 生成唯一文件名（UUID），防止文件名冲突
+  - 配置化上传路径和URL前缀（application.yml）
+- ✅ 用户管理功能增强
+  - SysUserController功能扩展，增强用户管理能力
+  - SysUser实体添加验证注解，提升数据验证
+  - 前端UserManagement组件功能增强
+- ✅ 供应商管理功能增强
+  - Supplier实体添加验证注解
+  - SupplierController功能扩展
+  - 前端SupplierManagement组件功能完善
+- ✅ 全局异常处理增强
+  - GlobalExceptionHandler功能扩展，提升错误处理能力
+- ✅ 文档完善
+  - 新增表单验证和安全检查报告（Form_Validation_Security_Report.md）
+  - 更新数据库脚本说明文档
+
 ### v1.3.0 (2026-01-14)
 - ✅ 完善供应商管理功能
   - 为供应商表添加备注字段（remark），支持供应商信息备注
@@ -1056,7 +1173,7 @@ export default YourPage;
 ### v1.0.0 (2026-01)
 - ✅ 完成基础架构搭建
 - ✅ 完成用户管理、角色管理、参数配置、通知公告、操作日志、登录日志模块
-- ✅ 完成数据库表结构设计（19张表）
+- ✅ 完成数据库表结构设计（20张表）
 - ✅ 完成前端基础页面开发
 
 ## 技术亮点
@@ -1163,6 +1280,54 @@ server {
 
 ## 更新日志
 
+### v1.4.0 (2026-01-14)
+- ✅ 实现供应商-药品关联管理功能
+  - **后端实现**：
+    - 创建SupplierDrug实体类，支持供应商与药品的多对多关系
+    - 实现SupplierDrugService和SupplierDrugServiceImpl，提供关联管理业务逻辑
+    - 创建SupplierDrugController，提供RESTful API接口（添加、删除、更新单价）
+    - 更新DrugInfoController，新增根据供应商ID查询药品列表接口
+    - 更新DrugInfoService，支持按供应商ID查询药品
+  - **前端实现**：
+    - 增强SupplierManagement组件，支持供应商-药品关联管理
+    - 优化PurchaseOrderManagement组件，根据选择的供应商动态加载关联药品
+    - 改进UserManagement组件，增强用户管理功能
+  - **数据库**：
+    - 使用已有的supplier_drug表（在v1.3.0中创建）
+    - 支持一个药品可以有多个供应商，每个供应商可以设置不同的单价
+- ✅ 新增文件上传功能
+  - **后端实现**：
+    - 创建FileUploadController，提供文件上传和删除接口
+    - 支持图片格式：jpg, jpeg, png, gif, bmp, webp
+    - 文件大小限制：最大10MB
+    - 按日期分类存储（yyyy/MM/dd目录结构）
+    - 生成唯一文件名（UUID），防止文件名冲突
+    - 配置化上传路径和URL前缀（application.yml中的file.upload.path和file.upload.url-prefix）
+  - **安全特性**：
+    - 文件类型验证（仅允许图片格式）
+    - 文件大小验证（最大10MB）
+    - 权限控制（需要drug:view或drug:manage权限）
+- ✅ 用户管理功能增强
+  - SysUserController功能扩展，增强用户管理能力
+  - SysUser实体添加验证注解，提升数据验证
+  - SysUserService和SysUserServiceImpl功能增强
+  - 前端UserManagement组件功能增强
+- ✅ 供应商管理功能增强
+  - Supplier实体添加验证注解
+  - SupplierController功能扩展
+  - SupplierService功能增强
+  - 前端SupplierManagement组件功能完善
+- ✅ 全局异常处理增强
+  - GlobalExceptionHandler功能扩展，提升错误处理能力
+  - 添加文件上传异常处理
+- ✅ 配置增强
+  - WebMvcConfig配置更新，支持文件上传
+  - application.yml添加文件上传配置项
+- ✅ 文档完善
+  - 新增表单验证和安全检查报告（Form_Validation_Security_Report.md）
+  - 更新数据库脚本说明文档（db/README.md）
+  - 更新API接口文档，添加新接口说明
+
 ### v1.3.0 (2026-01-14)
 - ✅ 完善供应商管理功能
   - **数据库结构优化**：
@@ -1229,7 +1394,7 @@ server {
 ### v1.0.0 (2026-01)
 - ✅ 完成项目基础架构搭建
 - ✅ 完成用户管理、角色管理、参数配置、通知公告、操作日志、登录日志模块
-- ✅ 完成数据库表结构设计（19张表全部创建）
+- ✅ 完成数据库表结构设计（20张表全部创建）
 - ✅ 完成前端基础页面开发
 - ✅ 完善README文档
 - ✅ 完成数据库初始化脚本
@@ -1282,5 +1447,14 @@ server {
 
 ---
 
-**最后更新**: 2026年1月14日
+## 文档信息
+
+**文档创建时间**：2026年1月13日 10:31:17  
+**最后修改时间**：2026年1月14日 18:25:25  
+**当前更新时间**：2026年1月14日 18:25:25  
+**文档版本**：v1.4.0
+
+---
+
+**最后更新**: 2026年1月14日 18:25:25
 

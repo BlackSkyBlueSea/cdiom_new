@@ -15,7 +15,10 @@ import {
   ExportOutlined,
   ShoppingCartOutlined,
   CheckCircleFilled,
-  CloseCircleFilled
+  CloseCircleFilled,
+  DollarOutlined,
+  ShopOutlined,
+  FileDoneOutlined
 } from '@ant-design/icons'
 import { Column, Line } from '@ant-design/charts'
 import request from '../utils/request'
@@ -38,7 +41,36 @@ const Dashboard = () => {
     nearExpiryWarning: { yellow: 0, red: 0 },
     pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
     todayStats: { inbound: 0, outbound: 0 },
-    totalInventory: 0
+    totalInventory: 0,
+    dates: [],
+    inboundCounts: [],
+    outboundCounts: []
+  })
+  // 采购专员专用数据
+  const [purchaserStats, setPurchaserStats] = useState({
+    totalOrders: 0,
+    statusStats: {},
+    totalAmount: 0,
+    dates: [],
+    orderCounts: [],
+    uniqueSuppliers: 0
+  })
+  // 医护人员专用数据
+  const [medicalStaffStats, setMedicalStaffStats] = useState({
+    totalApplies: 0,
+    statusStats: {},
+    dates: [],
+    applyCounts: []
+  })
+  // 供应商专用数据
+  const [supplierStats, setSupplierStats] = useState({
+    totalOrders: 0,
+    statusStats: {},
+    totalAmount: 0,
+    pendingAmount: 0,
+    confirmedAmount: 0,
+    dates: [],
+    orderCounts: []
   })
 
   useEffect(() => {
@@ -61,16 +93,17 @@ const Dashboard = () => {
           if (warehouseRes.code === 200 && warehouseRes.data) {
             setWarehouseStats(warehouseRes.data)
           } else {
-            // 如果返回的数据格式不正确，使用默认空数据
             setWarehouseStats({
               nearExpiryWarning: { yellow: 0, red: 0 },
               pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
               todayStats: { inbound: 0, outbound: 0 },
-              totalInventory: 0
+              totalInventory: 0,
+              dates: [],
+              inboundCounts: [],
+              outboundCounts: []
             })
           }
         } catch (error) {
-          // 静默处理错误，不显示错误提示，使用默认空数据
           console.warn('获取仓库管理员数据失败，使用默认数据:', error.message)
           setWarehouseStats({
             nearExpiryWarning: { yellow: 0, red: 0 },
@@ -78,6 +111,42 @@ const Dashboard = () => {
             todayStats: { inbound: 0, outbound: 0 },
             totalInventory: 0
           })
+        }
+      }
+
+      // 采购专员专用数据
+      if (roleId === 3) {
+        try {
+          const purchaserRes = await request.get('/dashboard/purchaser')
+          if (purchaserRes.code === 200 && purchaserRes.data) {
+            setPurchaserStats(purchaserRes.data)
+          }
+        } catch (error) {
+          console.warn('获取采购专员数据失败:', error.message)
+        }
+      }
+
+      // 医护人员专用数据
+      if (roleId === 4) {
+        try {
+          const medicalRes = await request.get('/dashboard/medical-staff')
+          if (medicalRes.code === 200 && medicalRes.data) {
+            setMedicalStaffStats(medicalRes.data)
+          }
+        } catch (error) {
+          console.warn('获取医护人员数据失败:', error.message)
+        }
+      }
+
+      // 供应商专用数据
+      if (roleId === 5) {
+        try {
+          const supplierRes = await request.get('/dashboard/supplier')
+          if (supplierRes.code === 200 && supplierRes.data) {
+            setSupplierStats(supplierRes.data)
+          }
+        } catch (error) {
+          console.warn('获取供应商数据失败:', error.message)
         }
       }
 
@@ -273,6 +342,23 @@ const Dashboard = () => {
     },
   }
 
+  // 出入库趋势图表配置（仓库管理员）
+  const inOutTrendData = warehouseStats.dates?.map((date, index) => [
+    { date, type: '入库', value: warehouseStats.inboundCounts?.[index] || 0 },
+    { date, type: '出库', value: warehouseStats.outboundCounts?.[index] || 0 },
+  ]).flat() || []
+  
+  const inOutTrendConfig = {
+    data: inOutTrendData,
+    xField: 'date',
+    yField: 'value',
+    seriesField: 'type',
+    smooth: true,
+    point: { size: 4, shape: 'circle' },
+    legend: { position: 'top' },
+    color: ['#52c41a', '#1890ff'],
+  }
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -422,6 +508,19 @@ const Dashboard = () => {
           </Col>
         </Row>
 
+        {/* 出入库趋势图 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24}>
+            <Card title="最近7天出入库趋势">
+              {warehouseStats.dates && warehouseStats.dates.length > 0 ? (
+                <Line {...inOutTrendConfig} height={300} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+        </Row>
+
         {/* 近效期预警提示 */}
         {((warehouseStats.nearExpiryWarning?.yellow ?? 0) > 0 || (warehouseStats.nearExpiryWarning?.red ?? 0) > 0) && (
           <Alert
@@ -452,6 +551,381 @@ const Dashboard = () => {
           />
         )}
 
+      </div>
+    )
+  }
+
+  // 采购专员专用仪表盘
+  if (roleId === 3) {
+    const statusMap = {
+      'PENDING': { text: '待确认', color: 'orange' },
+      'REJECTED': { text: '已拒绝', color: 'red' },
+      'CONFIRMED': { text: '待发货', color: 'blue' },
+      'SHIPPED': { text: '已发货', color: 'cyan' },
+      'RECEIVED': { text: '已入库', color: 'green' },
+      'CANCELLED': { text: '已取消', color: 'default' }
+    }
+
+    const orderTrendConfig = {
+      data: purchaserStats.dates?.map((date, index) => ({
+        date,
+        订单数: purchaserStats.orderCounts?.[index] || 0,
+      })) || [],
+      xField: 'date',
+      yField: '订单数',
+      smooth: true,
+      point: { size: 4, shape: 'circle' },
+      color: '#1890ff',
+    }
+
+    const statusStatsData = Object.entries(purchaserStats.statusStats || {}).map(([status, count]) => ({
+      status: statusMap[status]?.text || status,
+      count,
+    })).filter(item => item.count > 0)
+
+    const statusStatsConfig = {
+      data: statusStatsData,
+      xField: 'status',
+      yField: 'count',
+      columnWidthRatio: 0.6,
+      color: '#52c41a',
+    }
+
+    return (
+      <div>
+        <h2 style={{ marginBottom: '24px', margin: 0 }}>采购专员仪表盘</h2>
+
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="订单总数"
+                value={purchaserStats.totalOrders || 0}
+                prefix={<ShoppingCartOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="订单总金额"
+                value={purchaserStats.totalAmount || 0}
+                prefix={<DollarOutlined />}
+                precision={2}
+                valueStyle={{ color: '#52c41a' }}
+                suffix="元"
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="合作供应商"
+                value={purchaserStats.uniqueSuppliers || 0}
+                prefix={<ShopOutlined />}
+                valueStyle={{ color: '#13c2c2' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="待确认订单"
+                value={purchaserStats.statusStats?.PENDING || 0}
+                prefix={<FileDoneOutlined />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 图表区域 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} lg={12}>
+            <Card title="最近7天订单趋势" style={{ height: '350px' }}>
+              {purchaserStats.dates && purchaserStats.dates.length > 0 ? (
+                <Line {...orderTrendConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="订单状态分布" style={{ height: '350px' }}>
+              {statusStatsData.length > 0 ? (
+                <Column {...statusStatsConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 订单状态详情 */}
+        <Card title="订单状态统计">
+          <Row gutter={[16, 16]}>
+            {Object.entries(purchaserStats.statusStats || {}).map(([status, count]) => (
+              <Col xs={12} sm={8} md={4} key={status}>
+                <Card size="small">
+                  <Statistic
+                    title={statusMap[status]?.text || status}
+                    value={count}
+                    valueStyle={{ color: statusMap[status]?.color || '#1890ff' }}
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      </div>
+    )
+  }
+
+  // 医护人员专用仪表盘
+  if (roleId === 4) {
+    const statusMap = {
+      'PENDING': { text: '待审批', color: 'orange' },
+      'APPROVED': { text: '已通过', color: 'green' },
+      'REJECTED': { text: '已驳回', color: 'red' },
+      'OUTBOUND': { text: '已出库', color: 'blue' },
+      'CANCELLED': { text: '已取消', color: 'default' }
+    }
+
+    const applyTrendConfig = {
+      data: medicalStaffStats.dates?.map((date, index) => ({
+        date,
+        申请数: medicalStaffStats.applyCounts?.[index] || 0,
+      })) || [],
+      xField: 'date',
+      yField: '申请数',
+      smooth: true,
+      point: { size: 4, shape: 'circle' },
+      color: '#1890ff',
+    }
+
+    const statusStatsData = Object.entries(medicalStaffStats.statusStats || {}).map(([status, count]) => ({
+      status: statusMap[status]?.text || status,
+      count,
+    })).filter(item => item.count > 0)
+
+    const statusStatsConfig = {
+      data: statusStatsData,
+      xField: 'status',
+      yField: 'count',
+      columnWidthRatio: 0.6,
+      color: '#52c41a',
+    }
+
+    return (
+      <div>
+        <h2 style={{ marginBottom: '24px', margin: 0 }}>医护人员仪表盘</h2>
+
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} sm={12} md={8}>
+            <Card>
+              <Statistic
+                title="申请总数"
+                value={medicalStaffStats.totalApplies || 0}
+                prefix={<FileDoneOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Card>
+              <Statistic
+                title="待审批"
+                value={medicalStaffStats.statusStats?.PENDING || 0}
+                prefix={<WarningOutlined />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Card>
+              <Statistic
+                title="已出库"
+                value={medicalStaffStats.statusStats?.OUTBOUND || 0}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 图表区域 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} lg={12}>
+            <Card title="最近7天申请趋势" style={{ height: '350px' }}>
+              {medicalStaffStats.dates && medicalStaffStats.dates.length > 0 ? (
+                <Line {...applyTrendConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="申请状态分布" style={{ height: '350px' }}>
+              {statusStatsData.length > 0 ? (
+                <Column {...statusStatsConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 申请状态详情 */}
+        <Card title="申请状态统计">
+          <Row gutter={[16, 16]}>
+            {Object.entries(medicalStaffStats.statusStats || {}).map(([status, count]) => (
+              <Col xs={12} sm={8} md={4} key={status}>
+                <Card size="small">
+                  <Statistic
+                    title={statusMap[status]?.text || status}
+                    value={count}
+                    valueStyle={{ color: statusMap[status]?.color || '#1890ff' }}
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      </div>
+    )
+  }
+
+  // 供应商专用仪表盘
+  if (roleId === 5) {
+    const statusMap = {
+      'PENDING': { text: '待确认', color: 'orange' },
+      'REJECTED': { text: '已拒绝', color: 'red' },
+      'CONFIRMED': { text: '待发货', color: 'blue' },
+      'SHIPPED': { text: '已发货', color: 'cyan' },
+      'RECEIVED': { text: '已入库', color: 'green' },
+      'CANCELLED': { text: '已取消', color: 'default' }
+    }
+
+    const orderTrendConfig = {
+      data: supplierStats.dates?.map((date, index) => ({
+        date,
+        订单数: supplierStats.orderCounts?.[index] || 0,
+      })) || [],
+      xField: 'date',
+      yField: '订单数',
+      smooth: true,
+      point: { size: 4, shape: 'circle' },
+      color: '#1890ff',
+    }
+
+    const statusStatsData = Object.entries(supplierStats.statusStats || {}).map(([status, count]) => ({
+      status: statusMap[status]?.text || status,
+      count,
+    })).filter(item => item.count > 0)
+
+    const statusStatsConfig = {
+      data: statusStatsData,
+      xField: 'status',
+      yField: 'count',
+      columnWidthRatio: 0.6,
+      color: '#52c41a',
+    }
+
+    return (
+      <div>
+        <h2 style={{ marginBottom: '24px', margin: 0 }}>供应商仪表盘</h2>
+
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="订单总数"
+                value={supplierStats.totalOrders || 0}
+                prefix={<ShoppingCartOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="订单总金额"
+                value={supplierStats.totalAmount || 0}
+                prefix={<DollarOutlined />}
+                precision={2}
+                valueStyle={{ color: '#52c41a' }}
+                suffix="元"
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="待确认金额"
+                value={supplierStats.pendingAmount || 0}
+                prefix={<WarningOutlined />}
+                precision={2}
+                valueStyle={{ color: '#faad14' }}
+                suffix="元"
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card>
+              <Statistic
+                title="已确认金额"
+                value={supplierStats.confirmedAmount || 0}
+                prefix={<CheckCircleOutlined />}
+                precision={2}
+                valueStyle={{ color: '#13c2c2' }}
+                suffix="元"
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 图表区域 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col xs={24} lg={12}>
+            <Card title="最近7天订单趋势" style={{ height: '350px' }}>
+              {supplierStats.dates && supplierStats.dates.length > 0 ? (
+                <Line {...orderTrendConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="订单状态分布" style={{ height: '350px' }}>
+              {statusStatsData.length > 0 ? (
+                <Column {...statusStatsConfig} height={280} />
+              ) : (
+                <Empty description="暂无数据" style={{ marginTop: '50px' }} />
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 订单状态详情 */}
+        <Card title="订单状态统计">
+          <Row gutter={[16, 16]}>
+            {Object.entries(supplierStats.statusStats || {}).map(([status, count]) => (
+              <Col xs={12} sm={8} md={4} key={status}>
+                <Card size="small">
+                  <Statistic
+                    title={statusMap[status]?.text || status}
+                    value={count}
+                    valueStyle={{ color: statusMap[status]?.color || '#1890ff' }}
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
       </div>
     )
   }

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, InputNumber } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined, UndoOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, InputNumber, Tag, Checkbox, Divider, Card, Tabs } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined, UndoOutlined, ExclamationCircleOutlined, SafetyOutlined, CloseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 import SuperAdminModal from '../components/SuperAdminModal'
@@ -29,10 +29,19 @@ const UserManagement = () => {
     pageSize: 10,
     total: 0,
   })
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false)
+  const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
+  const [allPermissions, setAllPermissions] = useState([])
+  const [rolePermissions, setRolePermissions] = useState([])
+  const [userDirectPermissions, setUserDirectPermissions] = useState([])
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState([])
+  const [activeTabKey, setActiveTabKey] = useState('')
+  const [visibleTabs, setVisibleTabs] = useState([])
 
   useEffect(() => {
     fetchUsers()
     fetchRoles()
+    fetchAllPermissions()
   }, [pagination.current, pagination.pageSize])
 
   useEffect(() => {
@@ -75,6 +84,149 @@ const UserManagement = () => {
     } catch (error) {
       console.error('获取角色列表失败', error)
     }
+  }
+
+  const fetchAllPermissions = async () => {
+    try {
+      const res = await request.get('/users/permissions/all')
+      if (res.code === 200) {
+        setAllPermissions(res.data || [])
+      }
+    } catch (error) {
+      console.error('获取权限列表失败', error)
+    }
+  }
+
+  // 权限分类映射
+  const getPermissionCategory = (permissionCode) => {
+    if (permissionCode.startsWith('user:')) return '用户管理'
+    if (permissionCode.startsWith('role:')) return '角色管理'
+    if (permissionCode.startsWith('drug:')) return '药品管理'
+    if (permissionCode.startsWith('supplier:')) return '供应商管理'
+    if (permissionCode.startsWith('config:')) return '系统配置'
+    if (permissionCode.startsWith('notice:')) return '通知公告'
+    if (permissionCode.startsWith('log:')) return '日志查看'
+    if (permissionCode.startsWith('outbound:')) return '出库管理'
+    if (permissionCode.startsWith('inbound:')) return '入库管理'
+    if (permissionCode.startsWith('inventory:')) return '库存管理'
+    return '其他'
+  }
+
+  // 按分类分组权限
+  const groupedPermissions = useMemo(() => {
+    const groups = {}
+    allPermissions.forEach(permission => {
+      const category = getPermissionCategory(permission.permissionCode)
+      if (!groups[category]) {
+        groups[category] = []
+      }
+      groups[category].push(permission)
+    })
+    return groups
+  }, [allPermissions])
+
+  const handleEditPermissions = async (record) => {
+    try {
+      setCurrentUserPermissions(record)
+      const res = await request.get(`/users/${record.id}/permissions`)
+      if (res.code === 200) {
+        const data = res.data
+        setRolePermissions(data.rolePermissions || [])
+        setUserDirectPermissions(data.userPermissions || [])
+        // 设置选中的权限ID（用户直接权限 + 角色权限，因为用户可以移除角色权限）
+        const allUserPermissionIds = [
+          ...(data.rolePermissions || []).map(p => p.id),
+          ...(data.userPermissions || []).map(p => p.id)
+        ]
+        setSelectedPermissionIds(allUserPermissionIds)
+        
+        // 初始化可见标签（基于用户拥有的权限分类）
+        const userPermissionCodes = new Set([
+          ...(data.rolePermissions || []).map(p => p.permissionCode),
+          ...(data.userPermissions || []).map(p => p.permissionCode)
+        ])
+        const categories = new Set()
+        allPermissions.forEach(p => {
+          if (userPermissionCodes.has(p.permissionCode)) {
+            categories.add(getPermissionCategory(p.permissionCode))
+          }
+        })
+        const visibleCategories = Array.from(categories).sort()
+        // 如果用户没有任何权限分类，显示所有分类
+        const tabsToShow = visibleCategories.length > 0 ? visibleCategories : Object.keys(groupedPermissions).sort()
+        setVisibleTabs(tabsToShow)
+        setActiveTabKey(tabsToShow.length > 0 ? tabsToShow[0] : '')
+      }
+      setPermissionModalVisible(true)
+    } catch (error) {
+      message.error('获取用户权限失败')
+    }
+  }
+
+  const handleSavePermissions = async () => {
+    try {
+      await request.put(`/users/${currentUserPermissions.id}/permissions`, {
+        permissionIds: selectedPermissionIds
+      })
+      message.success('权限更新成功')
+      setPermissionModalVisible(false)
+      setCurrentUserPermissions(null)
+      setSelectedPermissionIds([])
+      setVisibleTabs([])
+      setActiveTabKey('')
+      fetchUsers()
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '权限更新失败')
+    }
+  }
+
+  // 关闭标签
+  const handleCloseTab = (targetKey, e) => {
+    e?.stopPropagation()
+    const newVisibleTabs = visibleTabs.filter(key => key !== targetKey)
+    setVisibleTabs(newVisibleTabs)
+    
+    // 如果关闭的是当前激活的标签，切换到其他标签
+    if (targetKey === activeTabKey) {
+      const currentIndex = visibleTabs.indexOf(targetKey)
+      if (newVisibleTabs.length > 0) {
+        // 优先切换到下一个，如果没有则切换到上一个
+        const nextIndex = currentIndex < newVisibleTabs.length ? currentIndex : currentIndex - 1
+        setActiveTabKey(newVisibleTabs[nextIndex] || newVisibleTabs[0])
+      } else {
+        setActiveTabKey('')
+      }
+    }
+    
+    // 移除该分类下的所有权限
+    const categoryPermissions = groupedPermissions[targetKey] || []
+    const categoryPermissionIds = categoryPermissions.map(p => p.id)
+    setSelectedPermissionIds(prev => prev.filter(id => !categoryPermissionIds.includes(id)))
+  }
+
+  // 添加标签
+  const handleAddTab = (category) => {
+    if (!visibleTabs.includes(category)) {
+      setVisibleTabs([...visibleTabs, category].sort())
+      setActiveTabKey(category)
+    }
+  }
+
+  // 获取权限显示标签
+  const getPermissionTags = (record) => {
+    // 在表格中显示一个可点击的标签，点击后打开权限管理模态框
+    return (
+      <Tooltip title="点击查看和编辑权限">
+        <Tag 
+          icon={<SafetyOutlined />} 
+          color="blue" 
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleEditPermissions(record)}
+        >
+          管理权限
+        </Tag>
+      </Tooltip>
+    )
   }
 
   const handleAdd = () => {
@@ -254,6 +406,12 @@ const UserManagement = () => {
       },
     },
     {
+      title: <span style={{ whiteSpace: 'nowrap' }}>权限</span>,
+      key: 'permissions',
+      width: 150,
+      render: (_, record) => getPermissionTags(record),
+    },
+    {
       title: <span style={{ whiteSpace: 'nowrap' }}>状态</span>,
       dataIndex: 'status',
       key: 'status',
@@ -267,6 +425,15 @@ const UserManagement = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space>
+          {hasPermission(PERMISSIONS.USER_UPDATE) && (
+            <Tooltip title="编辑权限">
+              <Button
+                type="link"
+                icon={<SafetyOutlined />}
+                onClick={() => handleEditPermissions(record)}
+              />
+            </Tooltip>
+          )}
           {hasPermission(PERMISSIONS.USER_UPDATE) && (
             <Tooltip title="编辑">
               <Button
@@ -409,6 +576,162 @@ const UserManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 权限管理模态框 */}
+      <Modal
+        title={`权限管理 - ${currentUserPermissions?.username || ''}`}
+        open={permissionModalVisible}
+        onOk={handleSavePermissions}
+        onCancel={() => {
+          setPermissionModalVisible(false)
+          setCurrentUserPermissions(null)
+          setSelectedPermissionIds([])
+          setVisibleTabs([])
+          setActiveTabKey('')
+        }}
+        width={900}
+        okText="保存"
+        cancelText="取消"
+      >
+        {currentUserPermissions && (
+          <div>
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <div><strong>用户：</strong>{currentUserPermissions.username}</div>
+              <div><strong>角色：</strong>{roles.find(r => r.id === currentUserPermissions.roleId)?.roleName || '-'}</div>
+            </Card>
+            
+            <Divider orientation="left">权限分类</Divider>
+            
+            {visibleTabs.length > 0 ? (
+              <Tabs
+                activeKey={activeTabKey}
+                onChange={setActiveTabKey}
+                type="card"
+                items={visibleTabs.map(category => {
+                  const categoryPermissions = groupedPermissions[category] || []
+                  const isActive = activeTabKey === category
+                  
+                  return {
+                    key: category,
+                    label: (
+                      <span style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center',
+                        gap: 4,
+                        color: isActive ? '#1890ff' : undefined,
+                        position: 'relative',
+                        paddingRight: 4
+                      }}>
+                        {category}
+                        <span
+                          onClick={(e) => handleCloseTab(category, e)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 16,
+                            height: 16,
+                            marginLeft: 4,
+                            borderRadius: '50%',
+                            color: isActive ? '#1890ff' : '#8c8c8c',
+                            transition: 'all 0.2s',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            lineHeight: 1
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#ff4d4f'
+                            e.currentTarget.style.backgroundColor = '#fff1f0'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = isActive ? '#1890ff' : '#8c8c8c'
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                        >
+                          <CloseOutlined />
+                        </span>
+                      </span>
+                    ),
+                    children: (
+                      <div style={{ maxHeight: 400, overflowY: 'auto', padding: '8px 0' }}>
+                        <Checkbox.Group
+                          value={selectedPermissionIds}
+                          onChange={(checkedValues) => setSelectedPermissionIds(checkedValues)}
+                          style={{ width: '100%' }}
+                        >
+                          <Space direction="vertical" style={{ width: '100%' }}>
+                            {categoryPermissions.map(permission => {
+                              const isRolePermission = rolePermissions.some(rp => rp.id === permission.id)
+                              const isSelected = selectedPermissionIds.includes(permission.id)
+                              return (
+                                <Checkbox
+                                  key={permission.id}
+                                  value={permission.id}
+                                  style={{ width: '100%' }}
+                                >
+                                  <span style={{ marginRight: 8 }}>{permission.permissionName}</span>
+                                  <Tag size="small" color="default">{permission.permissionCode}</Tag>
+                                  {isRolePermission && (
+                                    <Tag size="small" color="green">来自角色</Tag>
+                                  )}
+                                  {isSelected && !isRolePermission && (
+                                    <Tag size="small" color="blue">用户权限</Tag>
+                                  )}
+                                </Checkbox>
+                              )
+                            })}
+                          </Space>
+                        </Checkbox.Group>
+                      </div>
+                    )
+                  }
+                })}
+              />
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 20px', 
+                color: '#999',
+                border: '1px dashed #d9d9d9',
+                borderRadius: 4
+              }}>
+                <p style={{ margin: 0, fontSize: 14 }}>暂无可选权限分类</p>
+                <p style={{ margin: '8px 0 0 0', fontSize: 12 }}>请从下方添加权限分类</p>
+              </div>
+            )}
+
+            {/* 添加权限分类 */}
+            <div style={{ marginTop: 16, padding: 12, backgroundColor: '#fafafa', borderRadius: 4 }}>
+              <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>添加权限分类：</div>
+              <Space wrap>
+                {Object.keys(groupedPermissions).sort().map(category => (
+                  <Button
+                    key={category}
+                    size="small"
+                    type={visibleTabs.includes(category) ? 'default' : 'dashed'}
+                    disabled={visibleTabs.includes(category)}
+                    onClick={() => handleAddTab(category)}
+                  >
+                    {category}
+                  </Button>
+                ))}
+              </Space>
+            </div>
+
+            <div style={{ marginTop: 16, color: '#999', fontSize: 12 }}>
+              <p>说明：</p>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                <li>点击标签右侧的 × 可关闭该分类，关闭后该分类下的所有权限将被移除</li>
+                <li>绿色标签表示来自角色的权限，取消勾选后将从用户权限中移除</li>
+                <li>蓝色标签表示用户直接拥有的权限</li>
+                <li>用户最终拥有的权限 = 角色权限 + 用户直接权限（去重）</li>
+                <li>用户不需要拥有所属角色的所有权限，可以移除不需要的角色权限</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <SuperAdminModal
         open={superAdminModalVisible}
         onCancel={() => setSuperAdminModalVisible(false)}
@@ -553,5 +876,3 @@ const UserManagement = () => {
 }
 
 export default UserManagement
-
-

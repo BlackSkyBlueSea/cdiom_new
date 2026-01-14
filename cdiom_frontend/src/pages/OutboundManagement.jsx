@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Alert } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
-import { hasPermission, PERMISSIONS } from '../utils/permission'
+import { hasPermission, PERMISSIONS, fetchUserPermissions } from '../utils/permission'
+import { getUserRoleId, getUser } from '../utils/auth'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -36,6 +37,10 @@ const OutboundManagement = () => {
   const [executeForm] = Form.useForm()
   const [drugs, setDrugs] = useState([])
   const [applyFormItems, setApplyFormItems] = useState([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+  const [approveItems, setApproveItems] = useState([]) // 审批时查看的申请明细
+  const [hasSpecialDrug, setHasSpecialDrug] = useState(false) // 是否包含特殊药品
+  const [users, setUsers] = useState([]) // 用户列表（用于选择第二审批人）
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   useEffect(() => {
     fetchOutboundApplies()
@@ -43,7 +48,29 @@ const OutboundManagement = () => {
 
   useEffect(() => {
     fetchDrugs()
+    // 如果是仓库管理员，预加载用户列表（用于选择第二审批人）
+    const roleId = getUserRoleId()
+    if (roleId === 2) {
+      fetchUsers()
+    }
   }, [])
+
+  // 获取用户列表（用于选择第二审批人）
+  const fetchUsers = async () => {
+    setLoadingUsers(true)
+    try {
+      const res = await request.get('/users', {
+        params: { page: 1, size: 1000, status: 1 }
+      })
+      if (res.code === 200) {
+        setUsers(res.data.records || [])
+      }
+    } catch (error) {
+      console.error('获取用户列表失败:', error)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
 
   // 药品选项（用于AutoComplete）
   const drugOptions = useMemo(() => {
@@ -151,22 +178,69 @@ const OutboundManagement = () => {
     setPagination({ ...pagination, current: 1 })
   }
 
+  // 检查申请是否包含特殊药品
+  const checkSpecialDrugs = async (applyId) => {
+    try {
+      const res = await request.get(`/outbound/${applyId}/items`)
+      if (res.code === 200) {
+        const items = res.data || []
+        setApproveItems(items)
+        
+        // 检查是否包含特殊药品
+        let hasSpecial = false
+        for (const item of items) {
+          const drug = drugs.find(d => d.id === item.drugId)
+          if (drug && drug.isSpecial === 1) {
+            hasSpecial = true
+            break
+          }
+        }
+        setHasSpecialDrug(hasSpecial)
+        return hasSpecial
+      }
+    } catch (error) {
+      console.error('获取申请明细失败:', error)
+    }
+    return false
+  }
+
   const handleApprove = async (values) => {
     try {
+      // 如果包含特殊药品，必须填写第二审批人
+      if (hasSpecialDrug && !values.secondApproverId) {
+        message.error('申请包含特殊药品，必须指定第二审批人')
+        return
+      }
+
+      // 验证：申请人和审批人不能是同一人（后端也会验证，这里提前提示）
+      if (currentRecord && currentRecord.applicantId) {
+        const currentUser = getUser()
+        if (currentUser && currentUser.id === currentRecord.applicantId) {
+          message.error('申请人和审批人不能是同一人')
+          return
+        }
+        if (hasSpecialDrug && values.secondApproverId && values.secondApproverId === currentRecord.applicantId) {
+          message.error('特殊药品申请人和第二审批人不能是同一人')
+          return
+        }
+      }
+
       const res = await request.post(`/outbound/${currentRecord.id}/approve`, {
-        secondApproverId: values.secondApproverId,
+        secondApproverId: values.secondApproverId || null,
       })
       if (res.code === 200) {
         message.success('审批通过')
         setApproveModalVisible(false)
         approveForm.resetFields()
+        setApproveItems([])
+        setHasSpecialDrug(false)
         fetchOutboundApplies()
       } else {
         message.error(res.msg || '审批失败')
       }
     } catch (error) {
-      console.error('审批失败:', error)
-      message.error('审批失败')
+      const errorMsg = error.response?.data?.msg || error.message || '审批失败'
+      message.error(errorMsg)
     }
   }
 
@@ -375,58 +449,64 @@ const OutboundManagement = () => {
       key: 'action',
       width: 200,
       fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          {record.status === 'PENDING' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <>
+      render: (_, record) => {
+        const canApprove = hasPermission([PERMISSIONS.OUTBOUND_APPROVE, PERMISSIONS.OUTBOUND_APPROVE_SPECIAL])
+        const canExecute = hasPermission(PERMISSIONS.OUTBOUND_EXECUTE)
+        
+        return (
+          <Space>
+            {record.status === 'PENDING' && canApprove && (
+              <>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={async () => {
+                    setCurrentRecord(record)
+                    await checkSpecialDrugs(record.id)
+                    setApproveModalVisible(true)
+                  }}
+                >
+                  审批
+                </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  onClick={() => {
+                    Modal.confirm({
+                      title: '确认驳回',
+                      content: '请输入驳回理由',
+                      onOk: (close) => {
+                        const reason = prompt('请输入驳回理由:')
+                        if (reason) {
+                          handleReject(reason)
+                          close()
+                        }
+                      },
+                    })
+                  }}
+                >
+                  驳回
+                </Button>
+              </>
+            )}
+            {record.status === 'APPROVED' && canExecute && (
               <Button
                 type="link"
                 size="small"
-                onClick={() => {
+                icon={<PlayCircleOutlined />}
+                onClick={async () => {
                   setCurrentRecord(record)
-                  setApproveModalVisible(true)
+                  await fetchApplyItems(record.id)
+                  setExecuteModalVisible(true)
                 }}
               >
-                审批
+                执行出库
               </Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                onClick={() => {
-                  Modal.confirm({
-                    title: '确认驳回',
-                    content: '请输入驳回理由',
-                    onOk: (close) => {
-                      const reason = prompt('请输入驳回理由:')
-                      if (reason) {
-                        handleReject(reason)
-                        close()
-                      }
-                    },
-                  })
-                }}
-              >
-                驳回
-              </Button>
-            </>
-          )}
-          {record.status === 'APPROVED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<PlayCircleOutlined />}
-              onClick={async () => {
-                setCurrentRecord(record)
-                await fetchApplyItems(record.id)
-                setExecuteModalVisible(true)
-              }}
-            >
-              执行出库
-            </Button>
-          )}
-        </Space>
-      ),
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
@@ -485,7 +565,7 @@ const OutboundManagement = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             重置
           </Button>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+          {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -663,9 +743,51 @@ const OutboundManagement = () => {
         onCancel={() => {
           setApproveModalVisible(false)
           approveForm.resetFields()
+          setApproveItems([])
+          setHasSpecialDrug(false)
         }}
         onOk={() => approveForm.submit()}
+        width={600}
       >
+        {currentRecord && (
+          <div style={{ marginBottom: 16 }}>
+            <p><strong>申领单号：</strong>{currentRecord.applyNumber}</p>
+            <p><strong>申请人：</strong>{currentRecord.applicantName}</p>
+            <p><strong>所属科室：</strong>{currentRecord.department}</p>
+            <p><strong>用途：</strong>{currentRecord.purpose}</p>
+          </div>
+        )}
+
+        {hasSpecialDrug && (
+          <Alert
+            message="特殊药品提醒"
+            description="此申请包含特殊药品，必须指定第二审批人进行双人审批确认。"
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {approveItems.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <strong>申请明细：</strong>
+            <ul style={{ marginTop: 8, marginBottom: 0 }}>
+              {approveItems.map((item, index) => {
+                const drug = drugs.find(d => d.id === item.drugId)
+                return (
+                  <li key={index}>
+                    {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
+                    {' '}× {item.quantity}
+                    {drug && drug.isSpecial === 1 && (
+                      <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
         <Form
           form={approveForm}
           layout="vertical"
@@ -673,16 +795,29 @@ const OutboundManagement = () => {
         >
           <Form.Item
             name="secondApproverId"
-            label="第二审批人ID（特殊药品需填写）"
-            rules={[
-              { pattern: /^\d+$/, message: '请输入有效的用户ID' },
-            ]}
+            label={hasSpecialDrug ? "第二审批人（特殊药品必填）" : "第二审批人（可选）"}
+            rules={hasSpecialDrug ? [
+              { required: true, message: '特殊药品必须指定第二审批人' },
+            ] : []}
           >
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder="请输入第二审批人ID（特殊药品必填）"
-              min={1}
-              precision={0}
+            <Select
+              placeholder={hasSpecialDrug ? "请选择第二审批人（必填）" : "请选择第二审批人（可选）"}
+              loading={loadingUsers}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+                  options={users
+                .filter(user => {
+                  // 只显示有出库审核权限的用户（仓库管理员或特殊药品审核人）
+                  // 这里需要从后端获取用户权限，暂时先过滤仓库管理员
+                  // 实际应该调用API获取有审核权限的用户列表
+                  return user.roleId === 2 || user.roleId === 4 // 仓库管理员或医护人员（可能拥有特殊药品审核权限）
+                })
+                .map(user => ({
+                  value: user.id,
+                  label: `${user.username} (${user.phone || '无手机号'})`,
+                }))}
             />
           </Form.Item>
         </Form>

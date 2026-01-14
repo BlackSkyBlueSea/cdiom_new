@@ -8,7 +8,7 @@
 
 #### 1. `init_simple.sql` ⭐ **推荐使用**
 - **用途**：简化版数据库初始化脚本（推荐）
-- **说明**：包含所有19张表的创建语句，无中文注释，避免编码问题
+- **说明**：包含所有20张表的创建语句，无中文注释，避免编码问题（注意：supplier_drug表需要单独执行create_supplier_drug_relation.sql创建）
 - **执行方式**：
   ```bash
   mysql -u root -p < init_simple.sql
@@ -17,7 +17,7 @@
   - 创建数据库 `cdiom_db`
   - 创建所有系统表（6张）
   - 创建所有权限表（3张）
-  - 创建所有业务表（9张）
+  - 创建所有业务表（10张，包含supplier_drug表）
   - 创建扩展表（1张）
   - 初始化基础数据（角色、用户、配置、通知）
 
@@ -275,3 +275,24 @@ mysql -u root -p < add_user_email_field.sql
 
 **最后更新**：2026年1月14日  
 **维护人员**：CDIOM开发团队
+
+## 📝 重要提示
+
+### 关于supplier_drug表
+
+`supplier_drug` 表（供应商-药品关联表）是在v1.3.0版本中新增的第20张表。如果您使用的是旧版本的 `init_simple.sql`，该表可能未包含在内。
+
+**解决方案**：
+1. 如果使用 `init_simple.sql` 初始化数据库，需要额外执行 `create_supplier_drug_relation.sql` 来创建 `supplier_drug` 表
+2. 或者使用包含 `supplier_drug` 表的完整初始化脚本
+
+**检查方法**：
+```sql
+-- 检查supplier_drug表是否存在
+SHOW TABLES LIKE 'supplier_drug';
+```
+
+如果表不存在，执行：
+```bash
+mysql -u root -p < create_supplier_drug_relation.sql
+```
