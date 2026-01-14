@@ -81,7 +81,10 @@ cdiom_new/
 │           ├── fix_database_charset.sql # 修复数据库字符集脚本
 │           ├── fix_operation_log_permission.sql # 修复操作日志权限脚本
 │           ├── drug_info_insert.sql # 药品信息数据导入脚本
-│           └── update_admin_password.sql # 更新管理员密码脚本
+│           ├── update_admin_password.sql # 更新管理员密码脚本
+│           ├── add_supplier_remark_field.sql # 为供应商表添加备注字段
+│           ├── create_supplier_drug_relation.sql # 创建供应商-药品关联表
+│           └── update_supplier_permissions.sql # 更新供应商管理权限
 ├── cdiom_frontend/                   # 前端项目
 │   ├── src/
 │   │   ├── pages/                    # 页面组件
@@ -235,7 +238,7 @@ cdiom_new/
 - **字符集：** utf8mb4
 - **排序规则：** utf8mb4_unicode_ci
 - **存储引擎：** InnoDB
-- **总表数：** 19张
+- **总表数：** 20张
 
 ### 数据库表分类
 
@@ -252,19 +255,20 @@ cdiom_new/
 8. `sys_permission` - 权限表
 9. `sys_role_permission` - 角色权限关联表
 
-#### 业务表（9张）
+#### 业务表（10张）
 10. `supplier` - 供应商表
 11. `drug_info` - 药品信息表
-12. `inventory` - 库存表（按批次管理）
-13. `purchase_order` - 采购订单表
-14. `purchase_order_item` - 采购订单明细表
-15. `inbound_record` - 入库记录表
-16. `outbound_apply` - 出库申请表
-17. `outbound_apply_item` - 出库申请明细表
-18. `inventory_adjustment` - 库存调整记录表
+12. `supplier_drug` - 供应商-药品关联表（支持多对多关系）
+13. `inventory` - 库存表（按批次管理）
+14. `purchase_order` - 采购订单表
+15. `purchase_order_item` - 采购订单明细表
+16. `inbound_record` - 入库记录表
+17. `outbound_apply` - 出库申请表
+18. `outbound_apply_item` - 出库申请明细表
+19. `inventory_adjustment` - 库存调整记录表
 
 #### 扩展表（1张）
-19. `favorite_drug` - 常用药品收藏表
+20. `favorite_drug` - 常用药品收藏表
 
 ### 核心表结构说明
 
@@ -282,8 +286,9 @@ cdiom_new/
 - **sys_role_permission**: 角色与权限的多对多关联
 
 #### 业务表
-- **supplier**: 供应商信息，包含资质审核、合作状态等
+- **supplier**: 供应商信息，包含资质审核、合作状态、备注等
 - **drug_info**: 药品基础信息，支持扫码识别（国家本位码、追溯码、商品码）
+- **supplier_drug**: 供应商-药品关联表，支持多对多关系，每个供应商可以为同一药品设置不同单价
 - **inventory**: 库存表，按批次管理，支持近效期预警
 - **purchase_order**: 采购订单主表，包含订单状态流转
 - **purchase_order_item**: 采购订单明细表
@@ -299,7 +304,7 @@ sys_role (1) ──< (N) sys_user
 sys_user (1) ──< (N) sys_user_role (N) >── (1) sys_role
 sys_role (1) ──< (N) sys_role_permission (N) >── (1) sys_permission
 
-supplier (1) ──< (N) drug_info
+supplier (1) ──< (N) supplier_drug (N) >── (1) drug_info
 supplier (1) ──< (N) purchase_order
 
 drug_info (1) ──< (N) inventory
@@ -754,10 +759,10 @@ npm run dev
 #### 业务模块（待开发）
 - ✅ 药品信息管理（CRUD、扫码识别、第三方API集成）**已完成**
 - ✅ 库存管理（查询、筛选、近效期预警显示）**部分完成**（后端接口已实现，前端页面已实现，库存调整功能待开发）
+- ✅ 供应商管理（数据库结构优化、多对多关系、权限配置）**部分完成**（数据库表结构已完成，后端接口和前端页面待开发）
 - ⏳ 入库管理（验收、效期校验、特殊药品双人操作）
 - ⏳ 出库管理（审批、库存扣减、特殊药品双人审批）
 - ⏳ 采购订单管理（创建、流转、物流跟踪）
-- ⏳ 供应商管理（CRUD、资质审核）
 - ⏳ 药品申领管理（申请、审批、出库）
 
 #### 功能增强（待开发）
@@ -1019,6 +1024,19 @@ export default YourPage;
 
 ## 版本历史
 
+### v1.3.0 (2026-01-14)
+- ✅ 完善供应商管理功能
+  - 为供应商表添加备注字段（remark），支持供应商信息备注
+  - 创建供应商-药品关联表（supplier_drug），支持供应商与药品的多对多关系
+  - 支持一个药品可以有多个供应商，每个供应商可以设置不同的单价
+  - 优化数据库结构，移除drug_info表中的supplier_id和supplier_name字段
+  - 添加供应商审核权限（supplier:audit）
+  - 更新角色权限配置：采购专员可创建供应商，仓库管理员可审核供应商
+- ✅ 新增数据库脚本
+  - `add_supplier_remark_field.sql` - 为供应商表添加备注字段
+  - `create_supplier_drug_relation.sql` - 创建供应商-药品关联表并迁移数据
+  - `update_supplier_permissions.sql` - 更新供应商管理权限配置
+
 ### v1.2.0 (2026-01-13)
 - ✅ 完成超级管理员管理功能（启用/停用、邮箱验证码验证）
 - ✅ 完成库存管理页面（列表查询、多条件筛选、近效期预警）
@@ -1145,6 +1163,27 @@ server {
 
 ## 更新日志
 
+### v1.3.0 (2026-01-14)
+- ✅ 完善供应商管理功能
+  - **数据库结构优化**：
+    - 为供应商表（supplier）添加备注字段（remark），支持供应商信息备注
+    - 创建供应商-药品关联表（supplier_drug），实现供应商与药品的多对多关系
+    - 支持一个药品可以有多个供应商，每个供应商可以设置不同的单价（unit_price）
+    - 优化数据库结构，从drug_info表中移除supplier_id和supplier_name字段，改为通过中间表关联
+    - 自动迁移现有数据：将drug_info表中的supplier_id数据迁移到supplier_drug中间表
+  - **权限管理优化**：
+    - 新增供应商审核权限（supplier:audit）
+    - 采购专员（角色ID=3）：可查看、创建、更新供应商，但不能删除和审核
+    - 仓库管理员（角色ID=2）：可审核供应商
+  - **新增数据库脚本**：
+    - `add_supplier_remark_field.sql` - 为供应商表添加备注字段
+    - `create_supplier_drug_relation.sql` - 创建供应商-药品关联表并迁移现有数据
+    - `update_supplier_permissions.sql` - 更新供应商管理权限配置
+  - **数据库表变更**：
+    - 新增表：`supplier_drug`（供应商-药品关联表，第20张表）
+    - 修改表：`supplier`（添加remark字段）
+    - 修改表：`drug_info`（移除supplier_id和supplier_name字段）
+
 ### v1.2.0 (2026-01-13)
 - ✅ 新增超级管理员管理功能
   - 实现超级管理员账户的启用/停用功能
@@ -1243,5 +1282,5 @@ server {
 
 ---
 
-**最后更新**: 2026年1月13日
+**最后更新**: 2026年1月14日
 
