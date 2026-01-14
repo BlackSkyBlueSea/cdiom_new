@@ -17,9 +17,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
-
 /**
  * 认证服务实现类
  * 
@@ -65,19 +62,6 @@ public class AuthServiceImpl implements AuthService {
             loginLog.setStatus(0);
             loginLog.setMsg("用户名或密码错误");
             loginLogService.saveLog(loginLog);
-            
-            // 如果用户存在，增加失败次数
-            if (user != null) {
-                int failCount = (user.getLoginFailCount() == null ? 0 : user.getLoginFailCount()) + 1;
-                user.setLoginFailCount(failCount);
-                
-                // 连续5次失败锁定1小时
-                if (failCount >= 5) {
-                    user.setLockTime(LocalDateTime.now().plus(1, ChronoUnit.HOURS));
-                }
-                sysUserMapper.updateById(user);
-            }
-            
             throw new RuntimeException("用户名或密码错误");
         }
 
@@ -89,20 +73,6 @@ public class AuthServiceImpl implements AuthService {
             loginLogService.saveLog(loginLog);
             throw new RuntimeException("用户已被禁用");
         }
-
-        // 检查是否被锁定
-        if (user.getLockTime() != null && user.getLockTime().isAfter(LocalDateTime.now())) {
-            loginLog.setStatus(0);
-            loginLog.setMsg("账号已被锁定，请稍后再试");
-            loginLog.setUserId(user.getId());
-            loginLogService.saveLog(loginLog);
-            throw new RuntimeException("账号已被锁定，请稍后再试");
-        }
-
-        // 登录成功，重置失败次数和锁定时间
-        user.setLoginFailCount(0);
-        user.setLockTime(null);
-        sysUserMapper.updateById(user);
 
         // 获取角色信息
         String roleCode = "USER";
@@ -143,5 +113,6 @@ public class AuthServiceImpl implements AuthService {
     public void logout() {
         SecurityContextHolder.clearContext();
     }
+
 }
 

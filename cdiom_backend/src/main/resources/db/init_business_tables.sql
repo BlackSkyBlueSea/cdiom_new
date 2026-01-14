@@ -91,8 +91,6 @@ CREATE TABLE IF NOT EXISTS drug_info (
     specification VARCHAR(100) DEFAULT NULL COMMENT '规格',
     approval_number VARCHAR(100) DEFAULT NULL COMMENT '批准文号',
     manufacturer VARCHAR(200) DEFAULT NULL COMMENT '生产厂家',
-    supplier_name VARCHAR(200) DEFAULT NULL COMMENT '供应商名称',
-    supplier_id BIGINT DEFAULT NULL,
     expiry_date DATE DEFAULT NULL COMMENT '有效期',
     is_special TINYINT DEFAULT 0 COMMENT '0-普通药品/1-特殊药品',
     storage_requirement VARCHAR(100) DEFAULT NULL COMMENT '存储要求',
@@ -108,13 +106,35 @@ CREATE TABLE IF NOT EXISTS drug_info (
     UNIQUE KEY uk_trace_code (trace_code),
     KEY idx_product_code (product_code),
     KEY idx_drug_name (drug_name),
-    KEY idx_supplier_id (supplier_id),
     KEY idx_is_special (is_special),
     KEY idx_expiry_date (expiry_date),
     KEY idx_create_time (create_time),
-    CONSTRAINT fk_drug_info_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(id),
     CONSTRAINT fk_drug_info_create_by FOREIGN KEY (create_by) REFERENCES sys_user(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 注意：supplier_drug 表必须在 drug_info 表之后创建，因为 drug_info 表是外键引用
+-- 供应商-药品关联表（中间表，支持多对多关系）
+CREATE TABLE IF NOT EXISTS supplier_drug (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    supplier_id BIGINT NOT NULL COMMENT '供应商ID',
+    drug_id BIGINT NOT NULL COMMENT '药品ID',
+    unit_price DECIMAL(10, 2) DEFAULT NULL COMMENT '该供应商提供该药品的单价',
+    is_active TINYINT DEFAULT 1 COMMENT '是否启用：0-禁用/1-启用',
+    remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    create_by BIGINT DEFAULT NULL COMMENT '创建人ID',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除/1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_supplier_drug (supplier_id, drug_id),
+    KEY idx_supplier_id (supplier_id),
+    KEY idx_drug_id (drug_id),
+    KEY idx_is_active (is_active),
+    KEY idx_create_time (create_time),
+    CONSTRAINT fk_supplier_drug_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(id) ON DELETE CASCADE,
+    CONSTRAINT fk_supplier_drug_drug FOREIGN KEY (drug_id) REFERENCES drug_info(id) ON DELETE CASCADE,
+    CONSTRAINT fk_supplier_drug_create_by FOREIGN KEY (create_by) REFERENCES sys_user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='供应商-药品关联表';
 
 -- 库存表
 CREATE TABLE IF NOT EXISTS inventory (

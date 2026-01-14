@@ -57,6 +57,11 @@ public class Supplier {
     private LocalDate licenseExpiryDate;
 
     /**
+     * 备注/描述
+     */
+    private String remark;
+
+    /**
      * 状态：0-禁用/1-启用/2-待审核
      */
     private Integer status;

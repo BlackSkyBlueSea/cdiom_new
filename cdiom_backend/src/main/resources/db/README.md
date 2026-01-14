@@ -98,6 +98,35 @@
   - 非NULL值必须唯一（通过唯一索引保证）
   - 超级管理员账户必须绑定邮箱
 
+#### 14. `add_supplier_remark_field.sql`
+- **用途**：为供应商表添加备注字段
+- **说明**：为 `supplier` 表添加 `remark` 字段，用于存储供应商的备注信息
+- **字段特性**：
+  - 类型：TEXT，可为空
+  - 位置：在 `license_expiry_date` 字段之后
+
+#### 15. `create_supplier_drug_relation.sql`
+- **用途**：创建供应商-药品关联表并迁移数据
+- **说明**：实现供应商与药品的多对多关系，支持一个药品可以有多个供应商
+- **包含内容**：
+  - 创建 `supplier_drug` 中间表（支持多对多关系）
+  - 支持为每个供应商-药品组合设置单价（unit_price）
+  - 自动迁移现有数据：将 `drug_info` 表中的 `supplier_id` 数据迁移到中间表
+  - 移除 `drug_info` 表中的 `supplier_id` 和 `supplier_name` 字段
+  - 包含数据验证查询语句
+- **注意事项**：
+  - 执行前建议备份数据库
+  - 如果外键或字段不存在，部分语句可能报错，可以忽略
+
+#### 16. `update_supplier_permissions.sql`
+- **用途**：更新供应商管理权限配置
+- **说明**：添加供应商审核权限，并更新角色权限配置
+- **包含内容**：
+  - 添加供应商审核权限（`supplier:audit`）
+  - 为采购专员（角色ID=3）添加供应商管理权限（可查看、创建、更新，但不能删除和审核）
+  - 为仓库管理员（角色ID=2）添加供应商审核权限
+  - 包含权限验证查询语句
+
 ## 📖 使用说明
 
 ### 首次安装数据库
@@ -173,19 +202,20 @@ mysql -u root -p < add_user_email_field.sql
 8. `sys_permission` - 权限表
 9. `sys_role_permission` - 角色权限关联表
 
-### 业务表（9张）
+### 业务表（10张）
 10. `supplier` - 供应商表
 11. `drug_info` - 药品信息表
-12. `inventory` - 库存表（按批次管理）
-13. `purchase_order` - 采购订单表
-14. `purchase_order_item` - 采购订单明细表
-15. `inbound_record` - 入库记录表
-16. `outbound_apply` - 出库申请表
-17. `outbound_apply_item` - 出库申请明细表
-18. `inventory_adjustment` - 库存调整记录表
+12. `supplier_drug` - 供应商-药品关联表（支持多对多关系）
+13. `inventory` - 库存表（按批次管理）
+14. `purchase_order` - 采购订单表
+15. `purchase_order_item` - 采购订单明细表
+16. `inbound_record` - 入库记录表
+17. `outbound_apply` - 出库申请表
+18. `outbound_apply_item` - 出库申请明细表
+19. `inventory_adjustment` - 库存调整记录表
 
 ### 扩展表（1张）
-19. `favorite_drug` - 常用药品收藏表
+20. `favorite_drug` - 常用药品收藏表
 
 ## 📝 默认数据
 
@@ -227,7 +257,21 @@ mysql -u root -p < add_user_email_field.sql
 ### Q5: 权限数据未初始化？
 **A**: 执行 `init_permissions.sql` 初始化权限数据。
 
+### Q6: 如何创建供应商-药品关联表？
+**A**: 执行 `create_supplier_drug_relation.sql`，该脚本会：
+1. 创建 `supplier_drug` 中间表
+2. 自动迁移现有数据
+3. 移除 `drug_info` 表中的 `supplier_id` 和 `supplier_name` 字段
+
+### Q7: 如何为供应商表添加备注字段？
+**A**: 执行 `add_supplier_remark_field.sql`，该脚本会为 `supplier` 表添加 `remark` 字段。
+
+### Q8: 如何更新供应商管理权限？
+**A**: 执行 `update_supplier_permissions.sql`，该脚本会：
+1. 添加供应商审核权限
+2. 为采购专员和仓库管理员分配相应的供应商管理权限
+
 ---
 
-**最后更新**：2026年1月13日  
+**最后更新**：2026年1月14日  
 **维护人员**：CDIOM开发团队

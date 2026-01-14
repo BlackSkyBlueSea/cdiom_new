@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.Supplier;
+import com.cdiom.backend.service.DrugInfoService;
 import com.cdiom.backend.service.SupplierService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,6 +31,7 @@ import java.time.LocalDate;
 public class SupplierController {
 
     private final SupplierService supplierService;
+    private final DrugInfoService drugInfoService;
     private final JwtUtil jwtUtil;
 
     /**
@@ -55,12 +59,12 @@ public class SupplierController {
     }
 
     /**
-     * 创建供应商
+     * 创建供应商（采购专员可创建，但需要审核）
      */
     @PostMapping
     @RequiresPermission({"drug:manage"})
     public Result<Supplier> createSupplier(
-            @RequestBody SupplierRequest request,
+            @Valid @RequestBody SupplierRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long createBy = getCurrentUserId(httpRequest);
@@ -72,6 +76,7 @@ public class SupplierController {
             supplier.setCreditCode(request.getCreditCode());
             supplier.setLicenseImage(request.getLicenseImage());
             supplier.setLicenseExpiryDate(request.getLicenseExpiryDate());
+            supplier.setRemark(request.getRemark());
             supplier.setStatus(request.getStatus() != null ? request.getStatus() : 2); // 默认待审核
             supplier.setAuditStatus(0); // 待审核
             supplier.setCreateBy(createBy);
@@ -90,7 +95,7 @@ public class SupplierController {
     @RequiresPermission({"drug:manage"})
     public Result<Supplier> updateSupplier(
             @PathVariable Long id,
-            @RequestBody SupplierRequest request) {
+            @Valid @RequestBody SupplierRequest request) {
         try {
             Supplier supplier = supplierService.getSupplierById(id);
             if (supplier == null) {
@@ -103,6 +108,7 @@ public class SupplierController {
             supplier.setCreditCode(request.getCreditCode());
             supplier.setLicenseImage(request.getLicenseImage());
             supplier.setLicenseExpiryDate(request.getLicenseExpiryDate());
+            supplier.setRemark(request.getRemark());
             supplier.setStatus(request.getStatus());
 
             Supplier updated = supplierService.updateSupplier(supplier);
@@ -143,10 +149,10 @@ public class SupplierController {
     }
 
     /**
-     * 审核供应商
+     * 审核供应商（仓库管理员可审核）
      */
     @PostMapping("/{id}/audit")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"supplier:audit"})
     public Result<Void> auditSupplier(
             @PathVariable Long id,
             @RequestBody AuditRequest request,
@@ -155,6 +161,24 @@ public class SupplierController {
             Long auditBy = getCurrentUserId(httpRequest);
             supplierService.auditSupplier(id, request.getAuditStatus(), request.getAuditReason(), auditBy);
             return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 获取供应商提供的药品列表
+     */
+    @GetMapping("/{id}/drugs")
+    public Result<Page<com.cdiom.backend.model.DrugInfo>> getSupplierDrugs(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String keyword) {
+        try {
+            Page<com.cdiom.backend.model.DrugInfo> drugPage = 
+                drugInfoService.getDrugInfoListBySupplierId(id, page, size, keyword);
+            return Result.success(drugPage);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -199,14 +223,32 @@ public class SupplierController {
      */
     @Data
     public static class SupplierRequest {
+        @NotBlank(message = "供应商名称不能为空")
+        @Size(max = 200, message = "供应商名称长度不能超过200个字符")
         private String name;
+        
+        @NotBlank(message = "联系人不能为空")
+        @Size(max = 50, message = "联系人长度不能超过50个字符")
         private String contactPerson;
+        
+        @NotBlank(message = "联系电话不能为空")
+        @Pattern(regexp = "^1[3-9]\\d{9}$|^0\\d{2,3}-?\\d{7,8}$", message = "请输入有效的联系电话格式（手机号或固定电话）")
         private String phone;
+        
+        @Size(max = 500, message = "地址长度不能超过500个字符")
         private String address;
+        
+        @Pattern(regexp = "^[0-9A-HJ-NPQRTUWXY]{2}\\d{6}[0-9A-HJ-NPQRTUWXY]{10}$", message = "请输入有效的统一社会信用代码（18位）")
         private String creditCode;
+        
         private String licenseImage;
+        
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         private LocalDate licenseExpiryDate;
+        
+        @Size(max = 2000, message = "备注长度不能超过2000个字符")
+        private String remark;
+        
         private Integer status;
     }
 

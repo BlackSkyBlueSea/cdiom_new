@@ -36,6 +36,11 @@ INSERT INTO sys_permission (permission_name, permission_code, permission_type, p
 ('药品删除', 'drug:delete', 3, 0, 24)
 ON DUPLICATE KEY UPDATE permission_name=VALUES(permission_name);
 
+-- 供应商管理权限
+INSERT INTO sys_permission (permission_name, permission_code, permission_type, parent_id, sort_order) VALUES
+('供应商审核', 'supplier:audit', 3, 0, 25)
+ON DUPLICATE KEY UPDATE permission_name=VALUES(permission_name);
+
 -- 系统配置权限
 INSERT INTO sys_permission (permission_name, permission_code, permission_type, parent_id, sort_order) VALUES
 ('配置管理', 'config:manage', 3, 0, 30),
@@ -76,19 +81,24 @@ WHERE permission_code IN (
 )
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 仓库管理员（角色ID=2）：药品管理和通知查看、创建
+-- 仓库管理员（角色ID=2）：药品管理、供应商审核和通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 2, id FROM sys_permission 
 WHERE permission_code IN (
     'drug:view', 'drug:manage', 'drug:create', 'drug:update', 'drug:delete',
+    'supplier:audit', -- 供应商审核权限
     'notice:view', 'notice:create'
 )
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
--- 采购专员（角色ID=3）：通知查看、创建
+-- 采购专员（角色ID=3）：供应商管理（查看、创建、更新）和通知查看、创建
 INSERT INTO sys_role_permission (role_id, permission_id) 
 SELECT 3, id FROM sys_permission 
-WHERE permission_code IN ('notice:view', 'notice:create')
+WHERE permission_code IN (
+    'drug:view', -- 查看供应商列表
+    'drug:manage', -- 创建、更新供应商（但不包括删除和审核）
+    'notice:view', 'notice:create'
+)
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id), permission_id=VALUES(permission_id);
 
 -- 医护人员（角色ID=4）：通知查看、创建

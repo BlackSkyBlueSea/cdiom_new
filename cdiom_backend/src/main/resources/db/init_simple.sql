@@ -227,8 +227,6 @@ CREATE TABLE IF NOT EXISTS drug_info (
     specification VARCHAR(100) DEFAULT NULL COMMENT '规格',
     approval_number VARCHAR(100) DEFAULT NULL COMMENT '批准文号',
     manufacturer VARCHAR(200) DEFAULT NULL COMMENT '生产厂家',
-    supplier_name VARCHAR(200) DEFAULT NULL COMMENT '供应商名称',
-    supplier_id BIGINT DEFAULT NULL,
     expiry_date DATE DEFAULT NULL COMMENT '有效期',
     is_special TINYINT DEFAULT 0 COMMENT '0-普通药品/1-特殊药品',
     storage_requirement VARCHAR(100) DEFAULT NULL COMMENT '存储要求',
@@ -244,11 +242,9 @@ CREATE TABLE IF NOT EXISTS drug_info (
     UNIQUE KEY uk_trace_code (trace_code),
     KEY idx_product_code (product_code),
     KEY idx_drug_name (drug_name),
-    KEY idx_supplier_id (supplier_id),
     KEY idx_is_special (is_special),
     KEY idx_expiry_date (expiry_date),
     KEY idx_create_time (create_time),
-    CONSTRAINT fk_drug_info_supplier FOREIGN KEY (supplier_id) REFERENCES supplier(id),
     CONSTRAINT fk_drug_info_create_by FOREIGN KEY (create_by) REFERENCES sys_user(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

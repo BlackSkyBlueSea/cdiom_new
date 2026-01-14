@@ -62,16 +62,6 @@ public class DrugInfo {
     private String manufacturer;
 
     /**
-     * 供应商名称
-     */
-    private String supplierName;
-
-    /**
-     * 供应商ID
-     */
-    private Long supplierId;
-
-    /**
      * 有效期
      */
     private LocalDate expiryDate;

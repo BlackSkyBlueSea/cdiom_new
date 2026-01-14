@@ -49,5 +49,20 @@ public interface SysUserService {
      * 根据用户名查询用户
      */
     SysUser getUserByUsername(String username);
+
+    /**
+     * 获取已删除用户列表（逻辑删除）
+     */
+    Page<SysUser> getDeletedUserList(Integer page, Integer size, String keyword);
+
+    /**
+     * 恢复用户（将deleted从1改为0）
+     */
+    void restoreUser(Long id);
+
+    /**
+     * 物理删除用户（真正从数据库删除）
+     */
+    void permanentlyDeleteUser(Long id);
 }
 

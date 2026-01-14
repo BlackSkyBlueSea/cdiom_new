@@ -40,6 +40,12 @@ email:
     code-length: 6  # 验证码长度
     expire-minutes: 5  # 验证码有效期（分钟）
 
+# 文件上传配置
+file:
+  upload:
+    path: ./uploads  # 文件上传路径（相对路径，相对于项目根目录）
+    url-prefix: /api/v1/files  # 文件访问URL前缀
+
 # 注意：以下敏感配置在 application-local.yml 中：
 # - spring.mail.username 和 password
 # - spring.datasource.username 和 password

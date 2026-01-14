@@ -25,6 +25,7 @@ const PurchaseOrderManagement = () => {
   const [form] = Form.useForm()
   const [suppliers, setSuppliers] = useState([])
   const [drugs, setDrugs] = useState([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState(undefined)
   const [orderFormItems, setOrderFormItems] = useState([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
 
   useEffect(() => {
@@ -33,8 +34,15 @@ const PurchaseOrderManagement = () => {
 
   useEffect(() => {
     fetchSuppliers()
-    fetchDrugs()
   }, [])
+
+  useEffect(() => {
+    if (selectedSupplierId) {
+      fetchDrugsBySupplier(selectedSupplierId)
+    } else {
+      fetchDrugs()
+    }
+  }, [selectedSupplierId])
 
   // 供应商选项
   const supplierOptions = useMemo(() => {
@@ -79,6 +87,20 @@ const PurchaseOrderManagement = () => {
       }
     } catch (error) {
       console.error('获取药品列表失败:', error)
+    }
+  }
+
+  const fetchDrugsBySupplier = async (supplierId) => {
+    try {
+      const res = await request.get(`/suppliers/${supplierId}/drugs`, {
+        params: { page: 1, size: 10000 }
+      })
+      if (res.code === 200) {
+        setDrugs(res.data.records || [])
+      }
+    } catch (error) {
+      console.error('获取供应商药品列表失败:', error)
+      message.error('获取供应商药品列表失败')
     }
   }
 
@@ -348,7 +370,9 @@ const PurchaseOrderManagement = () => {
               onClick={() => {
                 setModalVisible(true)
                 form.resetFields()
+                setSelectedSupplierId(undefined)
                 setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+                fetchDrugs() // 重置时加载所有药品
               }}
             >
               新建采购订单
@@ -379,7 +403,9 @@ const PurchaseOrderManagement = () => {
         onCancel={() => {
           setModalVisible(false)
           form.resetFields()
+          setSelectedSupplierId(undefined)
           setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+          fetchDrugs() // 取消时重置药品列表
         }}
         onOk={() => form.submit()}
         width={900}
@@ -403,6 +429,11 @@ const PurchaseOrderManagement = () => {
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
               options={supplierOptions}
+              onChange={(value) => {
+                setSelectedSupplierId(value)
+                // 清空已选择的药品
+                setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+              }}
             />
           </Form.Item>
 

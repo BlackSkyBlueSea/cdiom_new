@@ -29,8 +29,16 @@ public class DrugInfoController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer isSpecial) {
-        Page<DrugInfo> drugPage = drugInfoService.getDrugInfoList(page, size, keyword, isSpecial);
+            @RequestParam(required = false) Integer isSpecial,
+            @RequestParam(required = false) Long supplierId) {
+        Page<DrugInfo> drugPage;
+        if (supplierId != null) {
+            // 根据供应商ID查询该供应商提供的药品
+            drugPage = drugInfoService.getDrugInfoListBySupplierId(supplierId, page, size, keyword);
+        } else {
+            // 查询所有药品
+            drugPage = drugInfoService.getDrugInfoList(page, size, keyword, isSpecial);
+        }
         return Result.success(drugPage);
     }
 

@@ -59,6 +59,17 @@ public interface DrugInfoService {
      * @return 药品信息，如果未找到返回null
      */
     DrugInfo searchDrugByApprovalNumber(String approvalNumber);
+
+    /**
+     * 根据供应商ID查询该供应商提供的药品列表
+     * 
+     * @param supplierId 供应商ID
+     * @param page 页码
+     * @param size 每页大小
+     * @param keyword 关键词（可选）
+     * @return 药品信息分页列表
+     */
+    Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword);
 }
 
 

@@ -63,6 +63,19 @@ public class SysUserServiceImpl implements SysUserService {
             throw new RuntimeException("用户名已存在");
         }
         
+        // 检查手机号是否已存在（如果提供了手机号）
+        // 注意：MyBatis-Plus的@TableLogic会自动排除已删除的记录，但数据库唯一索引会检查所有记录
+        // 所以即使逻辑删除，手机号也不能重复使用
+        if (StringUtils.hasText(user.getPhone())) {
+            LambdaQueryWrapper<SysUser> phoneWrapper = new LambdaQueryWrapper<>();
+            phoneWrapper.eq(SysUser::getPhone, user.getPhone());
+            // MyBatis-Plus会自动添加 deleted=0 的条件，只查询未删除的记录
+            SysUser existingUser = sysUserMapper.selectOne(phoneWrapper);
+            if (existingUser != null) {
+                throw new RuntimeException("手机号 " + user.getPhone() + " 已被使用");
+            }
+        }
+        
         // 检查邮箱是否已存在（如果提供了邮箱）
         if (StringUtils.hasText(user.getEmail())) {
             LambdaQueryWrapper<SysUser> emailWrapper = new LambdaQueryWrapper<>();
@@ -103,6 +116,17 @@ public class SysUserServiceImpl implements SysUserService {
             wrapper.eq(SysUser::getUsername, user.getUsername());
             if (sysUserMapper.selectOne(wrapper) != null) {
                 throw new RuntimeException("用户名已存在");
+            }
+        }
+        
+        // 如果修改了手机号，检查是否重复（如果提供了手机号）
+        if (StringUtils.hasText(user.getPhone()) && 
+            !user.getPhone().equals(existUser.getPhone())) {
+            LambdaQueryWrapper<SysUser> phoneWrapper = new LambdaQueryWrapper<>();
+            phoneWrapper.eq(SysUser::getPhone, user.getPhone());
+            SysUser phoneUser = sysUserMapper.selectOne(phoneWrapper);
+            if (phoneUser != null && !phoneUser.getId().equals(user.getId())) {
+                throw new RuntimeException("手机号已被使用");
             }
         }
         
@@ -176,6 +200,56 @@ public class SysUserServiceImpl implements SysUserService {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, username);
         return sysUserMapper.selectOne(wrapper);
+    }
+
+    @Override
+    public Page<SysUser> getDeletedUserList(Integer page, Integer size, String keyword) {
+        Page<SysUser> pageParam = new Page<>(page, size);
+        
+        // 计算偏移量
+        Long offset = (long) ((page - 1) * size);
+        Long limit = (long) size;
+        
+        // 查询已删除的用户列表（绕过@TableLogic的自动过滤）
+        java.util.List<SysUser> records = sysUserMapper.selectDeletedUsersList(keyword, offset, limit);
+        
+        // 查询总数
+        Long total = sysUserMapper.countDeletedUsers(keyword);
+        
+        // 设置分页信息
+        pageParam.setRecords(records);
+        pageParam.setTotal(total);
+        
+        return pageParam;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void restoreUser(Long id) {
+        // 注意：由于@TableLogic会自动过滤deleted=1的记录，selectById可能查不到已删除的用户
+        // 我们需要直接更新deleted字段
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setDeleted(0);
+        user.setUpdateTime(LocalDateTime.now());
+        
+        // 使用updateById更新，如果用户不存在，返回0
+        int updated = sysUserMapper.updateById(user);
+        if (updated == 0) {
+            throw new RuntimeException("用户不存在或已被永久删除");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void permanentlyDeleteUser(Long id) {
+        // 物理删除：使用原生SQL直接删除（绕过逻辑删除）
+        // 注意：此操作不可逆，会真正从数据库删除记录
+        int deletedCount = sysUserMapper.permanentlyDeleteById(id);
+        
+        if (deletedCount == 0) {
+            throw new RuntimeException("用户不存在或已被永久删除");
+        }
     }
 }
 

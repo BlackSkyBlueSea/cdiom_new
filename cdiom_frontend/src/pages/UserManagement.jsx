@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, InputNumber } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined, UndoOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 import SuperAdminModal from '../components/SuperAdminModal'
@@ -13,6 +13,17 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState(null)
   const [form] = Form.useForm()
   const [superAdminModalVisible, setSuperAdminModalVisible] = useState(false)
+  const [recycleBinModalVisible, setRecycleBinModalVisible] = useState(false)
+  const [deletedUsers, setDeletedUsers] = useState([])
+  const [deletedUsersLoading, setDeletedUsersLoading] = useState(false)
+  const [deletedUsersPagination, setDeletedUsersPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  })
+  const [permanentDeleteModalVisible, setPermanentDeleteModalVisible] = useState(false)
+  const [permanentDeleteForm] = Form.useForm()
+  const [permanentDeleteUserId, setPermanentDeleteUserId] = useState(null)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -23,6 +34,12 @@ const UserManagement = () => {
     fetchUsers()
     fetchRoles()
   }, [pagination.current, pagination.pageSize])
+
+  useEffect(() => {
+    if (recycleBinModalVisible) {
+      fetchDeletedUsers()
+    }
+  }, [deletedUsersPagination.current, deletedUsersPagination.pageSize, recycleBinModalVisible])
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -131,6 +148,71 @@ const UserManagement = () => {
     }
   }
 
+  const fetchDeletedUsers = async () => {
+    setDeletedUsersLoading(true)
+    try {
+      const res = await request.get('/users/deleted', {
+        params: {
+          page: deletedUsersPagination.current,
+          size: deletedUsersPagination.pageSize,
+        },
+      })
+      if (res.code === 200) {
+        setDeletedUsers(res.data.records)
+        setDeletedUsersPagination({
+          ...deletedUsersPagination,
+          total: res.data.total,
+        })
+      }
+    } catch (error) {
+      message.error('获取已删除用户列表失败')
+    } finally {
+      setDeletedUsersLoading(false)
+    }
+  }
+
+  const handleOpenRecycleBin = () => {
+    setRecycleBinModalVisible(true)
+    setDeletedUsersPagination({ ...deletedUsersPagination, current: 1 })
+  }
+
+  const handleRestoreUser = async (id) => {
+    try {
+      await request.put(`/users/${id}/restore`)
+      message.success('恢复成功')
+      fetchDeletedUsers()
+      fetchUsers() // 刷新主列表
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '恢复失败')
+    }
+  }
+
+  const handlePermanentDelete = async (id) => {
+    setPermanentDeleteUserId(id)
+    setPermanentDeleteModalVisible(true)
+    permanentDeleteForm.resetFields()
+  }
+
+  const handleConfirmPermanentDelete = async () => {
+    try {
+      const values = await permanentDeleteForm.validateFields()
+      if (values.confirmText !== 'DELETE') {
+        message.error('确认文本不正确，请输入 DELETE 进行确认')
+        return
+      }
+      
+      await request.delete(`/users/${permanentDeleteUserId}/permanent`, {
+        data: { confirmText: values.confirmText }
+      })
+      message.success('用户已永久删除')
+      setPermanentDeleteModalVisible(false)
+      permanentDeleteForm.resetFields()
+      fetchDeletedUsers()
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '永久删除失败')
+    }
+  }
+
   const columns = [
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
@@ -232,11 +314,21 @@ const UserManagement = () => {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <h2 style={{ margin: 0 }}>用户管理</h2>
-        <PermissionWrapper permission={PERMISSIONS.USER_CREATE}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增用户
-          </Button>
-        </PermissionWrapper>
+        <Space>
+          <Tooltip title="查看和恢复已删除的用户">
+            <Button 
+              icon={<UndoOutlined />} 
+              onClick={handleOpenRecycleBin}
+            >
+              回收站
+            </Button>
+          </Tooltip>
+          <PermissionWrapper permission={PERMISSIONS.USER_CREATE}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              新增用户
+            </Button>
+          </PermissionWrapper>
+        </Space>
       </div>
       <Table
         columns={columns}
@@ -269,9 +361,12 @@ const UserManagement = () => {
           <Form.Item
             name="phone"
             label="手机号"
-            rules={[{ required: true, message: '请输入手机号' }]}
+            rules={[
+              { required: true, message: '请输入手机号' },
+              { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的手机号（11位数字，以1开头）' },
+            ]}
           >
-            <Input />
+            <Input placeholder="请输入11位手机号" maxLength={11} />
           </Form.Item>
           <Form.Item
             name="email"
@@ -322,6 +417,137 @@ const UserManagement = () => {
           fetchUsers()
         }}
       />
+
+      {/* 回收站模态框 */}
+      <Modal
+        title="回收站 - 已删除的用户"
+        open={recycleBinModalVisible}
+        onCancel={() => setRecycleBinModalVisible(false)}
+        footer={null}
+        width={1000}
+      >
+        <Table
+          columns={[
+            {
+              title: 'ID',
+              dataIndex: 'id',
+              key: 'id',
+              width: 80,
+            },
+            {
+              title: '用户名',
+              dataIndex: 'username',
+              key: 'username',
+              width: 120,
+            },
+            {
+              title: '手机号',
+              dataIndex: 'phone',
+              key: 'phone',
+              width: 120,
+            },
+            {
+              title: '邮箱',
+              dataIndex: 'email',
+              key: 'email',
+              width: 180,
+              render: (email) => email || '-',
+            },
+            {
+              title: '角色',
+              dataIndex: 'roleId',
+              key: 'roleId',
+              width: 120,
+              render: (roleId) => {
+                const role = roles.find((r) => r.id === roleId)
+                return role ? role.roleName : '-'
+              },
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 200,
+              render: (_, record) => (
+                <Space>
+                  <Button
+                    type="link"
+                    icon={<UndoOutlined />}
+                    onClick={() => handleRestoreUser(record.id)}
+                  >
+                    恢复
+                  </Button>
+                  <Popconfirm
+                    title="确定要永久删除吗？"
+                    description="此操作不可恢复，将真正从数据库删除该用户"
+                    onConfirm={() => handlePermanentDelete(record.id)}
+                    okText="确定"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button
+                      type="link"
+                      danger
+                      icon={<ExclamationCircleOutlined />}
+                    >
+                      永久删除
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
+          dataSource={deletedUsers}
+          loading={deletedUsersLoading}
+          rowKey="id"
+          pagination={{
+            ...deletedUsersPagination,
+            onChange: (page, pageSize) => {
+              setDeletedUsersPagination({ ...deletedUsersPagination, current: page, pageSize })
+            },
+          }}
+        />
+      </Modal>
+
+      {/* 永久删除确认模态框 */}
+      <Modal
+        title="确认永久删除"
+        open={permanentDeleteModalVisible}
+        onOk={handleConfirmPermanentDelete}
+        onCancel={() => {
+          setPermanentDeleteModalVisible(false)
+          permanentDeleteForm.resetFields()
+        }}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ color: '#ff4d4f', marginBottom: 16 }}>
+            <strong>警告：此操作不可恢复！</strong>
+          </p>
+          <p>用户将被真正从数据库中删除，所有相关数据将无法恢复。</p>
+          <p>请输入 <strong style={{ color: '#ff4d4f' }}>DELETE</strong> 以确认此操作：</p>
+        </div>
+        <Form form={permanentDeleteForm} layout="vertical">
+          <Form.Item
+            name="confirmText"
+            label="确认文本"
+            rules={[
+              { required: true, message: '请输入确认文本' },
+              { 
+                validator: (_, value) => {
+                  if (value && value !== 'DELETE') {
+                    return Promise.reject(new Error('请输入 DELETE 进行确认'))
+                  }
+                  return Promise.resolve()
+                }
+              },
+            ]}
+          >
+            <Input placeholder="请输入 DELETE" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

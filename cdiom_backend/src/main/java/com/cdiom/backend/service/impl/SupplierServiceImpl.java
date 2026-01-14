@@ -2,6 +2,8 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.mapper.PurchaseOrderMapper;
+import com.cdiom.backend.mapper.SupplierDrugMapper;
 import com.cdiom.backend.mapper.SupplierMapper;
 import com.cdiom.backend.model.Supplier;
 import com.cdiom.backend.service.SupplierService;
@@ -24,11 +26,15 @@ import java.time.LocalDateTime;
 public class SupplierServiceImpl implements SupplierService {
 
     private final SupplierMapper supplierMapper;
+    private final PurchaseOrderMapper purchaseOrderMapper;
+    private final SupplierDrugMapper supplierDrugMapper;
 
     @Override
     public Page<Supplier> getSupplierList(Integer page, Integer size, String keyword, Integer status, Integer auditStatus) {
         Page<Supplier> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
+        
+        // 逻辑删除过滤（MyBatis-Plus会自动处理@TableLogic注解）
         
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(Supplier::getName, keyword)
@@ -104,7 +110,30 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteSupplier(Long id) {
+        Supplier supplier = supplierMapper.selectById(id);
+        if (supplier == null) {
+            throw new RuntimeException("供应商不存在");
+        }
+        
+        // 检查是否有采购订单关联
+        LambdaQueryWrapper<com.cdiom.backend.model.PurchaseOrder> orderWrapper = new LambdaQueryWrapper<>();
+        orderWrapper.eq(com.cdiom.backend.model.PurchaseOrder::getSupplierId, id);
+        Long orderCount = purchaseOrderMapper.selectCount(orderWrapper);
+        if (orderCount > 0) {
+            throw new RuntimeException("该供应商存在关联的采购订单，无法删除");
+        }
+        
+        // 检查是否有供应商-药品关联（通过中间表）
+        LambdaQueryWrapper<com.cdiom.backend.model.SupplierDrug> supplierDrugWrapper = new LambdaQueryWrapper<>();
+        supplierDrugWrapper.eq(com.cdiom.backend.model.SupplierDrug::getSupplierId, id);
+        Long supplierDrugCount = supplierDrugMapper.selectCount(supplierDrugWrapper);
+        if (supplierDrugCount > 0) {
+            throw new RuntimeException("该供应商存在关联的药品信息，无法删除");
+        }
+        
+        // 执行逻辑删除
         supplierMapper.deleteById(id);
+        log.info("供应商删除成功，ID: {}", id);
     }
 
     @Override

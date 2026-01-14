@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Upload, Image } from 'antd'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
@@ -21,6 +21,8 @@ const SupplierManagement = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
   const [form] = Form.useForm()
+  const [fileList, setFileList] = useState([])
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     fetchSuppliers()
@@ -73,15 +75,24 @@ const SupplierManagement = () => {
 
   const handleSubmit = async (values) => {
     try {
+      // 处理日期格式
+      const submitData = {
+        ...values,
+        licenseExpiryDate: values.licenseExpiryDate 
+          ? dayjs(values.licenseExpiryDate).format('YYYY-MM-DD') 
+          : undefined,
+        licenseImage: values.licenseImage || undefined,
+      }
       const url = editingSupplier 
         ? `/suppliers/${editingSupplier.id}` 
         : '/suppliers'
       const method = editingSupplier ? 'put' : 'post'
-      const res = await request[method](url, values)
+      const res = await request[method](url, submitData)
       if (res.code === 200) {
         message.success(editingSupplier ? '更新成功' : '创建成功')
         setModalVisible(false)
         form.resetFields()
+        setFileList([])
         setEditingSupplier(null)
         fetchSuppliers()
       } else {
@@ -91,6 +102,56 @@ const SupplierManagement = () => {
       console.error('操作失败:', error)
       message.error('操作失败')
     }
+  }
+
+  const handleUpload = async (file) => {
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    try {
+      const res = await request.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      if (res.code === 200) {
+        const fileUrl = res.data
+        form.setFieldsValue({ licenseImage: fileUrl })
+        setFileList([{
+          uid: '-1',
+          name: file.name,
+          status: 'done',
+          url: fileUrl,
+        }])
+        message.success('文件上传成功')
+        return false // 阻止默认上传行为
+      } else {
+        message.error(res.msg || '文件上传失败')
+        return false
+      }
+    } catch (error) {
+      console.error('文件上传失败:', error)
+      message.error('文件上传失败')
+      return false
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemove = async () => {
+    const licenseImage = form.getFieldValue('licenseImage')
+    if (licenseImage) {
+      try {
+        await request.delete('/upload', {
+          params: { url: licenseImage },
+        })
+      } catch (error) {
+        console.error('删除文件失败:', error)
+      }
+    }
+    form.setFieldsValue({ licenseImage: undefined })
+    setFileList([])
   }
 
   const handleDelete = async (id) => {
@@ -108,6 +169,10 @@ const SupplierManagement = () => {
     }
   }
 
+  const [auditModalVisible, setAuditModalVisible] = useState(false)
+  const [auditForm] = Form.useForm()
+  const [currentAuditSupplier, setCurrentAuditSupplier] = useState(null)
+
   const handleAudit = async (id, auditStatus, auditReason) => {
     try {
       const res = await request.post(`/suppliers/${id}/audit`, {
@@ -116,6 +181,9 @@ const SupplierManagement = () => {
       })
       if (res.code === 200) {
         message.success('审核完成')
+        setAuditModalVisible(false)
+        auditForm.resetFields()
+        setCurrentAuditSupplier(null)
         fetchSuppliers()
       } else {
         message.error(res.msg || '审核失败')
@@ -123,6 +191,12 @@ const SupplierManagement = () => {
     } catch (error) {
       console.error('审核失败:', error)
       message.error('审核失败')
+    }
+  }
+
+  const handleAuditSubmit = (values) => {
+    if (currentAuditSupplier) {
+      handleAudit(currentAuditSupplier.id, values.auditStatus, values.auditReason || '')
     }
   }
 
@@ -197,6 +271,54 @@ const SupplierManagement = () => {
       ellipsis: true,
     },
     {
+      title: <span style={{ whiteSpace: 'nowrap' }}>许可证到期日期</span>,
+      dataIndex: 'licenseExpiryDate',
+      key: 'licenseExpiryDate',
+      width: 150,
+      render: (date) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>许可证图片</span>,
+      dataIndex: 'licenseImage',
+      key: 'licenseImage',
+      width: 120,
+      render: (url) => url ? (
+        <Image
+          src={url}
+          alt="许可证"
+          width={60}
+          height={60}
+          style={{ objectFit: 'cover' }}
+          preview={{
+            mask: '查看',
+          }}
+        />
+      ) : '-',
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>备注</span>,
+      dataIndex: 'remark',
+      key: 'remark',
+      width: 200,
+      ellipsis: true,
+      render: (text) => text || '-',
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>审核理由</span>,
+      dataIndex: 'auditReason',
+      key: 'auditReason',
+      width: 200,
+      ellipsis: true,
+      render: (reason) => reason || '-',
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>审核时间</span>,
+      dataIndex: 'auditTime',
+      key: 'auditTime',
+      width: 180,
+      render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
+    },
+    {
       title: <span style={{ whiteSpace: 'nowrap' }}>创建时间</span>,
       dataIndex: 'createTime',
       key: 'createTime',
@@ -218,7 +340,22 @@ const SupplierManagement = () => {
                 icon={<EditOutlined />}
                 onClick={() => {
                   setEditingSupplier(record)
-                  form.setFieldsValue(record)
+                  const formValues = {
+                    ...record,
+                    licenseExpiryDate: record.licenseExpiryDate ? dayjs(record.licenseExpiryDate) : undefined,
+                  }
+                  form.setFieldsValue(formValues)
+                  // 设置文件列表
+                  if (record.licenseImage) {
+                    setFileList([{
+                      uid: '-1',
+                      name: '许可证图片',
+                      status: 'done',
+                      url: record.licenseImage,
+                    }])
+                  } else {
+                    setFileList([])
+                  }
                   setModalVisible(true)
                 }}
               >
@@ -239,17 +376,15 @@ const SupplierManagement = () => {
               >
                 删除
               </Button>
-              {record.auditStatus === 0 && (
+              {record.auditStatus === 0 && hasPermission(PERMISSIONS.SUPPLIER_AUDIT) && (
                 <>
                   <Button
                     type="link"
                     size="small"
                     onClick={() => {
-                      Modal.confirm({
-                        title: '确认审核',
-                        content: '确定要通过该供应商的审核吗？',
-                        onOk: () => handleAudit(record.id, 1, '审核通过'),
-                      })
+                      setCurrentAuditSupplier(record)
+                      auditForm.setFieldsValue({ auditStatus: 1, auditReason: '审核通过' })
+                      setAuditModalVisible(true)
                     }}
                   >
                     通过
@@ -259,10 +394,9 @@ const SupplierManagement = () => {
                     size="small"
                     danger
                     onClick={() => {
-                      const reason = prompt('请输入驳回理由:')
-                      if (reason) {
-                        handleAudit(record.id, 2, reason)
-                      }
+                      setCurrentAuditSupplier(record)
+                      auditForm.setFieldsValue({ auditStatus: 2, auditReason: '' })
+                      setAuditModalVisible(true)
                     }}
                   >
                     驳回
@@ -327,6 +461,7 @@ const SupplierManagement = () => {
               onClick={() => {
                 setEditingSupplier(null)
                 form.resetFields()
+                setFileList([])
                 setModalVisible(true)
               }}
             >
@@ -357,6 +492,7 @@ const SupplierManagement = () => {
         onCancel={() => {
           setModalVisible(false)
           form.resetFields()
+          setFileList([])
           setEditingSupplier(null)
         }}
         onOk={() => form.submit()}
@@ -415,6 +551,66 @@ const SupplierManagement = () => {
           >
             <Input placeholder="请输入统一社会信用代码（18位）" maxLength={18} />
           </Form.Item>
+          <Form.Item
+            name="licenseImage"
+            label="许可证图片"
+          >
+            <Upload
+              name="file"
+              listType="picture-card"
+              fileList={fileList}
+              beforeUpload={handleUpload}
+              onRemove={handleRemove}
+              accept="image/*"
+              maxCount={1}
+            >
+              {fileList.length >= 1 ? null : (
+                <div>
+                  <UploadOutlined />
+                  <div style={{ marginTop: 8 }}>上传图片</div>
+                </div>
+              )}
+            </Upload>
+            <div style={{ marginTop: 8, color: '#999', fontSize: '12px' }}>
+              支持格式：JPG、PNG、GIF等，最大10MB
+            </div>
+            {fileList.length > 0 && fileList[0].url && (
+              <div style={{ marginTop: 8 }}>
+                <Image
+                  src={fileList[0].url}
+                  alt="许可证图片"
+                  style={{ maxWidth: '100%', maxHeight: '200px' }}
+                  preview={{
+                    mask: '预览',
+                  }}
+                />
+              </div>
+            )}
+          </Form.Item>
+          <Form.Item
+            name="licenseExpiryDate"
+            label="许可证到期日期"
+          >
+            <DatePicker 
+              style={{ width: '100%' }}
+              placeholder="请选择许可证到期日期"
+              format="YYYY-MM-DD"
+            />
+          </Form.Item>
+          <Form.Item
+            name="remark"
+            label="备注/描述"
+            rules={[
+              { max: 2000, message: '备注长度不能超过2000个字符' },
+            ]}
+          >
+            <Input.TextArea 
+              rows={4}
+              placeholder="请输入备注或描述信息"
+              showCount
+              maxLength={2000}
+            />
+          </Form.Item>
           {editingSupplier && (
             <Form.Item
               name="status"
@@ -423,9 +619,54 @@ const SupplierManagement = () => {
               <Select>
                 <Select.Option value={0}>禁用</Select.Option>
                 <Select.Option value={1}>启用</Select.Option>
+                <Select.Option value={2}>待审核</Select.Option>
               </Select>
             </Form.Item>
           )}
+        </Form>
+      </Modal>
+
+      <Modal
+        title="审核供应商"
+        open={auditModalVisible}
+        onCancel={() => {
+          setAuditModalVisible(false)
+          auditForm.resetFields()
+          setCurrentAuditSupplier(null)
+        }}
+        onOk={() => auditForm.submit()}
+        width={500}
+      >
+        <Form
+          form={auditForm}
+          layout="vertical"
+          onFinish={handleAuditSubmit}
+        >
+          <Form.Item
+            name="auditStatus"
+            label="审核结果"
+            rules={[{ required: true, message: '请选择审核结果' }]}
+          >
+            <Select placeholder="请选择审核结果">
+              <Select.Option value={1}>通过</Select.Option>
+              <Select.Option value={2}>驳回</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="auditReason"
+            label="审核理由"
+            rules={[
+              { required: true, message: '请输入审核理由' },
+              { max: 500, message: '审核理由长度不能超过500个字符' },
+            ]}
+          >
+            <Input.TextArea 
+              rows={4}
+              placeholder="请输入审核理由"
+              showCount
+              maxLength={500}
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

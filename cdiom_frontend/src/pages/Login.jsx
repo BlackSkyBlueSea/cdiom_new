@@ -26,7 +26,8 @@ const Login = () => {
         navigate('/dashboard')
       }
     } catch (error) {
-      message.error(error.message || '登录失败')
+      const errorMsg = error.message || '登录失败'
+      message.error(errorMsg)
     } finally {
       setLoading(false)
     }
