@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, message, Modal, Form, InputNumber, Alert } from 'antd'
-import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
@@ -32,6 +32,7 @@ const InventoryManagement = () => {
   const [users, setUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [adjustmentQuantity, setAdjustmentQuantity] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetchInventory()
@@ -88,6 +89,64 @@ const InventoryManagement = () => {
       isSpecial: undefined,
     })
     setPagination({ ...pagination, current: 1 })
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (filters.keyword) {
+        params.append('keyword', filters.keyword)
+      }
+      if (filters.drugId) {
+        params.append('drugId', filters.drugId)
+      }
+      if (filters.batchNumber) {
+        params.append('batchNumber', filters.batchNumber)
+      }
+      if (filters.storageLocation) {
+        params.append('storageLocation', filters.storageLocation)
+      }
+      if (filters.expiryDateStart) {
+        params.append('expiryDateStart', filters.expiryDateStart.format('YYYY-MM-DD'))
+      }
+      if (filters.expiryDateEnd) {
+        params.append('expiryDateEnd', filters.expiryDateEnd.format('YYYY-MM-DD'))
+      }
+      if (filters.isSpecial !== undefined) {
+        params.append('isSpecial', filters.isSpecial)
+      }
+      
+      const url = `/api/v1/inventory/export?${params.toString()}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+      
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `库存列表_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败: ' + (error.message || '未知错误'))
+    } finally {
+      setExporting(false)
+    }
   }
 
   const getExpiryWarning = (expiryDate) => {
@@ -350,6 +409,13 @@ const InventoryManagement = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             重置
           </Button>
+          <Button 
+            icon={<DownloadOutlined />} 
+            onClick={handleExport}
+            loading={exporting}
+          >
+            导出Excel
+          </Button>
         </Space>
       </div>
 
@@ -359,7 +425,7 @@ const InventoryManagement = () => {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        scroll={{ x: 'max-content' }}
         pagination={{
           ...pagination,
           showSizeChanger: true,

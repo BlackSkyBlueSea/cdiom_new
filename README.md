@@ -23,7 +23,7 @@
 - React Router 6.23.1
 - Ant Design 5.20.6
 - Axios 1.7.2
-- Vite 5.4.8
+- Vite 7.3.1
 - Day.js 1.11.11
 
 ## 项目结构
@@ -41,7 +41,18 @@ cdiom_new/
 │   │       │   ├── SysConfigController.java
 │   │       │   ├── SysNoticeController.java
 │   │       │   ├── OperationLogController.java
-│   │       │   └── LoginLogController.java
+│   │       │   ├── LoginLogController.java
+│   │       │   ├── DrugInfoController.java
+│   │       │   ├── InventoryController.java
+│   │       │   ├── InventoryAdjustmentController.java
+│   │       │   ├── InboundRecordController.java
+│   │       │   ├── OutboundApplyController.java
+│   │       │   ├── PurchaseOrderController.java
+│   │       │   ├── SupplierController.java
+│   │       │   ├── SupplierDrugController.java
+│   │       │   ├── DashboardController.java
+│   │       │   ├── FileUploadController.java
+│   │       │   └── SuperAdminController.java
 │   │       ├── service/              # 服务层
 │   │       │   ├── impl/            # 服务实现
 │   │       │   └── *.java          # 服务接口
@@ -52,16 +63,38 @@ cdiom_new/
 │   │       │   ├── SysRole.java
 │   │       │   ├── SysConfig.java
 │   │       │   ├── SysNotice.java
+│   │       │   ├── SysPermission.java
+│   │       │   ├── SysRolePermission.java
+│   │       │   ├── SysUserPermission.java
 │   │       │   ├── OperationLog.java
-│   │       │   └── LoginLog.java
+│   │       │   ├── LoginLog.java
+│   │       │   ├── DrugInfo.java
+│   │       │   ├── Inventory.java
+│   │       │   ├── InventoryAdjustment.java
+│   │       │   ├── InboundRecord.java
+│   │       │   ├── OutboundApply.java
+│   │       │   ├── OutboundApplyItem.java
+│   │       │   ├── PurchaseOrder.java
+│   │       │   ├── PurchaseOrderItem.java
+│   │       │   ├── Supplier.java
+│   │       │   └── SupplierDrug.java
 │   │       ├── config/               # 配置类
 │   │       │   ├── SecurityConfig.java
 │   │       │   ├── MyBatisPlusConfig.java
 │   │       │   ├── MyMetaObjectHandler.java
-│   │       │   └── filter/
-│   │       │       └── JwtAuthenticationFilter.java
+│   │       │   ├── WebMvcConfig.java
+│   │       │   ├── WebConfig.java
+│   │       │   ├── AsyncConfig.java
+│   │       │   ├── ConcurrencyConfig.java
+│   │       │   ├── RestTemplateConfig.java
+│   │       │   ├── filter/
+│   │       │   │   └── JwtAuthenticationFilter.java
+│   │       │   └── interceptor/
+│   │       │       └── PermissionInterceptor.java
 │   │       ├── util/                 # 工具类
 │   │       │   └── JwtUtil.java
+│   │       └── annotation/          # 注解类
+│   │           └── RequiresPermission.java
 │   │       └── common/              # 公共类
 │   │           ├── Result.java
 │   │           └── exception/
@@ -95,10 +128,20 @@ cdiom_new/
 │   │   │   ├── ConfigManagement.jsx
 │   │   │   ├── NoticeManagement.jsx
 │   │   │   ├── OperationLog.jsx
-│   │   │   └── LoginLog.jsx
+│   │   │   ├── LoginLog.jsx
+│   │   │   ├── DrugManagement.jsx
+│   │   │   ├── InventoryManagement.jsx
+│   │   │   ├── InboundManagement.jsx
+│   │   │   ├── OutboundManagement.jsx
+│   │   │   ├── PurchaseOrderManagement.jsx
+│   │   │   ├── SupplierManagement.jsx
+│   │   │   ├── SupplierDashboard.jsx
+│   │   │   └── SupplierOrderManagement.jsx
 │   │   ├── components/               # 公共组件
 │   │   │   ├── Layout.jsx
-│   │   │   └── PrivateRoute.jsx
+│   │   │   ├── PrivateRoute.jsx
+│   │   │   ├── SuperAdminModal.jsx
+│   │   │   └── IndexRedirect.jsx
 │   │   ├── utils/                    # 工具函数
 │   │   │   ├── request.js           # Axios封装
 │   │   │   └── auth.js              # 认证工具
@@ -184,10 +227,12 @@ cdiom_new/
 
 ✅ 权限控制系统
 - 基于角色的权限控制（RBAC）
+- 用户直接权限关联（支持用户直接拥有权限，实现更细粒度的权限控制）
 - 权限拦截器（PermissionInterceptor）
 - 权限注解（@RequiresPermission）
 - 系统管理员自动拥有所有权限（*）
 - 前端权限检查（菜单权限、按钮权限）
+- 细粒度权限支持（出库、入库、库存管理等业务权限）
 
 ### 前端模块
 ✅ 登录页面
@@ -229,6 +274,9 @@ cdiom_new/
 ✅ 仪表盘页面
 - 系统管理员仪表盘（基础统计、登录趋势、操作日志统计）
 - 仓库管理员仪表盘（近效期预警、待办任务、出入库统计）
+- 采购专员仪表盘（订单统计、供应商统计、订单趋势）
+- 医护人员仪表盘（申领统计、状态分布、申领趋势）
+- 供应商仪表盘（订单统计、状态分布、金额统计、订单趋势）
 - 响应式布局（支持不同屏幕尺寸）
 
 ✅ 药品管理页面
@@ -249,6 +297,18 @@ cdiom_new/
 - 根据供应商动态获取关联药品列表
 - 采购订单管理优化（根据供应商动态加载药品）
 
+✅ 供应商仪表盘页面（新增）
+- 订单统计（总订单数、状态分布）
+- 金额统计（总金额、待确认金额、已确认金额）
+- 订单趋势图表（最近7天订单数量趋势）
+- 响应式布局
+
+✅ 供应商订单管理页面（新增）
+- 供应商订单列表展示（分页、搜索、状态筛选）
+- 订单详情查看
+- 订单状态管理
+- 响应式表格布局
+
 ## 数据库设计
 
 ### 数据库基本信息
@@ -257,7 +317,7 @@ cdiom_new/
 - **字符集：** utf8mb4
 - **排序规则：** utf8mb4_unicode_ci
 - **存储引擎：** InnoDB
-- **总表数：** 20张
+- **总表数：** 21张（新增sys_user_permission表）
 
 ### 数据库表分类
 
@@ -269,25 +329,26 @@ cdiom_new/
 5. `operation_log` - 操作日志表
 6. `login_log` - 登录日志表
 
-#### 权限表（3张）
+#### 权限表（4张）
 7. `sys_user_role` - 用户角色关联表
 8. `sys_permission` - 权限表
 9. `sys_role_permission` - 角色权限关联表
+10. `sys_user_permission` - 用户权限关联表（支持用户直接拥有权限）
 
 #### 业务表（10张）
-10. `supplier` - 供应商表
-11. `drug_info` - 药品信息表
-12. `supplier_drug` - 供应商-药品关联表（支持多对多关系）
-13. `inventory` - 库存表（按批次管理）
-14. `purchase_order` - 采购订单表
-15. `purchase_order_item` - 采购订单明细表
-16. `inbound_record` - 入库记录表
-17. `outbound_apply` - 出库申请表
-18. `outbound_apply_item` - 出库申请明细表
-19. `inventory_adjustment` - 库存调整记录表
+11. `supplier` - 供应商表
+12. `drug_info` - 药品信息表
+13. `supplier_drug` - 供应商-药品关联表（支持多对多关系）
+14. `inventory` - 库存表（按批次管理）
+15. `purchase_order` - 采购订单表
+16. `purchase_order_item` - 采购订单明细表
+17. `inbound_record` - 入库记录表
+18. `outbound_apply` - 出库申请表
+19. `outbound_apply_item` - 出库申请明细表
+20. `inventory_adjustment` - 库存调整记录表
 
 #### 扩展表（1张）
-20. `favorite_drug` - 常用药品收藏表
+21. `favorite_drug` - 常用药品收藏表
 
 ### 核心表结构说明
 
@@ -376,29 +437,43 @@ sys_user (1) ──< (N) inventory_adjustment (操作人、第二操作人)
 
 **方式一：使用完整初始化脚本（推荐）**
 ```bash
-# 执行完整初始化脚本（包含所有20张表）
+# 1. 执行基础初始化脚本（包含19张表：6张系统表 + 4张权限表 + 9张业务表）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
 
-# 如果init_simple.sql中不包含supplier_drug表，需要额外执行：
+# 2. 创建供应商-药品关联表（第20张表，v1.3.0新增）
 mysql -u root -p < cdiom_backend/src/main/resources/db/create_supplier_drug_relation.sql
+
+# 3. 创建用户权限关联表和细粒度权限（v1.5.0新增）
+mysql -u root -p < cdiom_backend/src/main/resources/db/add_user_permission_system.sql
+
+# 4. 初始化权限数据（如果尚未初始化）
+mysql -u root -p < cdiom_backend/src/main/resources/db/init_permissions.sql
+
+# 5. 初始化超级管理员（如果尚未初始化）
+mysql -u root -p < cdiom_backend/src/main/resources/db/init_super_admin.sql
 ```
 
 **方式二：分步执行**
 ```bash
-# 1. 先执行基础表结构
+# 1. 先执行基础表结构（19张表）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
 
-# 2. 创建供应商-药品关联表（如果init_simple.sql中未包含）
+# 2. 创建供应商-药品关联表（第20张表）
 mysql -u root -p < cdiom_backend/src/main/resources/db/create_supplier_drug_relation.sql
 
-# 3. 如果需要单独创建业务表（已包含在init_simple.sql中）
+# 3. 创建用户权限关联表和细粒度权限
+mysql -u root -p < cdiom_backend/src/main/resources/db/add_user_permission_system.sql
+
+# 4. 如果需要单独创建业务表（已包含在init_simple.sql中）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_business_tables.sql
 ```
 
 **注意**: 
-- `init_simple.sql` 已包含大部分表的创建语句，推荐直接使用该文件
-- `supplier_drug` 表（第20张表）是在v1.3.0版本中新增的，如果 `init_simple.sql` 中未包含，需要单独执行 `create_supplier_drug_relation.sql`
-- 执行前建议检查 `init_simple.sql` 是否已包含 `supplier_drug` 表的创建语句
+- `init_simple.sql` 包含19张表的创建语句（6张系统表 + 4张权限表 + 9张业务表）
+- `supplier_drug` 表（第13张业务表，总第20张表）需要单独执行 `create_supplier_drug_relation.sql`
+- `sys_user_permission` 表（第10张权限表，总第21张表）需要单独执行 `add_user_permission_system.sql`
+- `favorite_drug` 表（第21张表，扩展表）已包含在 `init_simple.sql` 中
+- 执行顺序：先执行 `init_simple.sql`，再执行 `create_supplier_drug_relation.sql`，最后执行 `add_user_permission_system.sql`
 
 2. 修改数据库配置
 ```yaml
@@ -768,6 +843,261 @@ npm run dev
 - **权限**: 需要 `drug:view` 或 `drug:manage` 权限
 - **说明**: 根据文件URL删除已上传的文件
 
+### 入库管理接口
+
+#### 获取入库记录列表
+- **接口**: `GET /api/v1/inbound`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **参数**: 
+  - `page`: 页码（默认1）
+  - `size`: 每页数量（默认10）
+  - `keyword`: 关键字（入库单号、药品名称、批次号）
+  - `orderId`: 采购订单ID（可选）
+  - `drugId`: 药品ID（可选）
+  - `batchNumber`: 批次号（可选）
+  - `operatorId`: 操作人ID（可选）
+  - `startDate`: 开始日期（可选，格式：YYYY-MM-DD）
+  - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
+  - `status`: 验收状态（QUALIFIED/UNQUALIFIED，可选）
+  - `expiryCheckStatus`: 效期校验状态（PASS/WARNING/FORCE，可选）
+
+#### 获取入库记录详情
+- **接口**: `GET /api/v1/inbound/{id}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 根据入库单号查询入库记录
+- **接口**: `GET /api/v1/inbound/record-number/{recordNumber}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 创建入库记录（采购订单入库）
+- **接口**: `POST /api/v1/inbound`
+- **权限**: 需要 `drug:manage` 权限
+- **说明**: 支持采购订单入库和临时入库，包含效期校验和特殊药品双人操作
+
+#### 创建临时入库记录
+- **接口**: `POST /api/v1/inbound/temporary`
+- **权限**: 需要 `drug:manage` 权限
+- **说明**: 不关联采购订单的临时入库
+
+### 出库管理接口
+
+#### 获取出库申请列表
+- **接口**: `GET /api/v1/outbound`
+- **权限**: 需要 `outbound:view`、`outbound:apply`、`outbound:approve` 或 `outbound:execute` 权限
+- **参数**: 
+  - `page`: 页码（默认1）
+  - `size`: 每页数量（默认10）
+  - `keyword`: 关键字（申领单号、申请人、科室）
+  - `applicantId`: 申请人ID（可选）
+  - `approverId`: 审批人ID（可选）
+  - `department`: 所属科室（可选）
+  - `status`: 申请状态（PENDING/APPROVED/REJECTED/OUTBOUND/CANCELLED，可选）
+  - `startDate`: 开始日期（可选，格式：YYYY-MM-DD）
+  - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
+
+#### 获取出库申请详情
+- **接口**: `GET /api/v1/outbound/{id}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 根据申领单号查询出库申请
+- **接口**: `GET /api/v1/outbound/apply-number/{applyNumber}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 创建出库申请（医护人员申领）
+- **接口**: `POST /api/v1/outbound`
+- **权限**: 需要 `outbound:apply` 权限
+- **请求体**:
+```json
+{
+  "department": "内科",
+  "purpose": "日常用药",
+  "items": [
+    {
+      "drugId": 1,
+      "batchNumber": "BATCH001",
+      "quantity": 10,
+      "remark": "备注"
+    }
+  ],
+  "remark": "申请备注"
+}
+```
+
+#### 审批出库申请（通过）
+- **接口**: `POST /api/v1/outbound/{id}/approve`
+- **权限**: 需要 `outbound:approve` 或 `outbound:approve:special` 权限
+- **请求体**:
+```json
+{
+  "secondApproverId": 2
+}
+```
+- **说明**: 特殊药品需要提供 `secondApproverId`（第二审批人ID）
+
+#### 审批出库申请（驳回）
+- **接口**: `POST /api/v1/outbound/{id}/reject`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "rejectReason": "驳回理由"
+}
+```
+
+#### 执行出库
+- **接口**: `POST /api/v1/outbound/{id}/execute`
+- **权限**: 需要 `outbound:execute` 权限
+- **说明**: 执行出库操作，自动扣减库存（先进先出FIFO）
+
+### 采购订单管理接口
+
+#### 获取采购订单列表
+- **接口**: `GET /api/v1/purchase-orders`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **参数**: 
+  - `page`: 页码（默认1）
+  - `size`: 每页数量（默认10）
+  - `keyword`: 关键字（订单编号、供应商名称）
+  - `supplierId`: 供应商ID（可选）
+  - `purchaserId`: 采购员ID（可选）
+  - `status`: 订单状态（PENDING/CONFIRMED/SHIPPED/RECEIVED/CANCELLED，可选）
+  - `startDate`: 开始日期（可选，格式：YYYY-MM-DD）
+  - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
+
+#### 获取采购订单详情
+- **接口**: `GET /api/v1/purchase-orders/{id}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 创建采购订单
+- **接口**: `POST /api/v1/purchase-orders`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "supplierId": 1,
+  "expectedDeliveryDate": "2026-02-01",
+  "items": [
+    {
+      "drugId": 1,
+      "quantity": 100,
+      "unitPrice": 10.50,
+      "remark": "备注"
+    }
+  ],
+  "remark": "订单备注"
+}
+```
+
+#### 更新采购订单
+- **接口**: `PUT /api/v1/purchase-orders/{id}`
+- **权限**: 需要 `drug:manage` 权限
+
+#### 删除采购订单
+- **接口**: `DELETE /api/v1/purchase-orders/{id}`
+- **权限**: 需要 `drug:manage` 权限
+- **说明**: 逻辑删除
+
+#### 更新订单状态
+- **接口**: `PUT /api/v1/purchase-orders/{id}/status`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "status": "CONFIRMED",
+  "logisticsNumber": "SF1234567890",
+  "shipDate": "2026-01-20T10:00:00"
+}
+```
+- **说明**: 订单状态流转：PENDING → CONFIRMED → SHIPPED → RECEIVED
+
+#### 生成订单条形码
+- **接口**: `GET /api/v1/purchase-orders/{id}/barcode`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **说明**: 返回订单条形码图片（Base64或URL）
+
+### 供应商管理接口
+
+#### 获取供应商列表
+- **接口**: `GET /api/v1/suppliers`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **参数**: 
+  - `page`: 页码（默认1）
+  - `size`: 每页数量（默认10）
+  - `keyword`: 关键字（供应商名称、联系人、电话）
+  - `status`: 状态（0-禁用/1-启用/2-待审核，可选）
+  - `auditStatus`: 审核状态（0-待审核/1-已通过/2-已驳回，可选）
+
+#### 获取供应商详情
+- **接口**: `GET /api/v1/suppliers/{id}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 创建供应商
+- **接口**: `POST /api/v1/suppliers`
+- **权限**: 需要 `drug:manage` 权限
+
+#### 更新供应商
+- **接口**: `PUT /api/v1/suppliers/{id}`
+- **权限**: 需要 `drug:manage` 权限
+
+#### 删除供应商
+- **接口**: `DELETE /api/v1/suppliers/{id}`
+- **权限**: 需要 `drug:manage` 权限
+- **说明**: 逻辑删除
+
+#### 审核供应商
+- **接口**: `POST /api/v1/suppliers/{id}/audit`
+- **权限**: 需要 `supplier:audit` 权限
+- **请求体**:
+```json
+{
+  "auditStatus": 1,
+  "auditReason": "审核通过"
+}
+```
+- **说明**: `auditStatus`: 1-已通过/2-已驳回
+
+### 库存调整接口
+
+#### 获取库存调整记录列表
+- **接口**: `GET /api/v1/inventory-adjustments`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **参数**: 
+  - `page`: 页码（默认1）
+  - `size`: 每页数量（默认10）
+  - `keyword`: 关键字（调整单号、药品名称、批次号）
+  - `drugId`: 药品ID（可选）
+  - `batchNumber`: 批次号（可选）
+  - `adjustmentType`: 调整类型（PROFIT-盘盈/LOSS-盘亏，可选）
+  - `operatorId`: 操作人ID（可选）
+  - `startDate`: 开始日期（可选，格式：YYYY-MM-DD）
+  - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
+
+#### 获取库存调整记录详情
+- **接口**: `GET /api/v1/inventory-adjustments/{id}`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+
+#### 创建库存调整记录
+- **接口**: `POST /api/v1/inventory-adjustments`
+- **权限**: 需要 `drug:manage` 权限
+- **请求体**:
+```json
+{
+  "drugId": 1,
+  "batchNumber": "BATCH001",
+  "adjustmentType": "PROFIT",
+  "quantityBefore": 100,
+  "quantityAfter": 120,
+  "adjustmentReason": "盘点发现多出20盒",
+  "secondOperatorId": 2,
+  "adjustmentImage": "/uploads/2026/01/15/image.jpg",
+  "remark": "备注信息"
+}
+```
+- **说明**: 
+  - `adjustmentType`: PROFIT-盘盈/LOSS-盘亏
+  - 特殊药品需要提供 `secondOperatorId`（第二操作人ID）
+  - 调整数量自动计算：`adjustmentQuantity = quantityAfter - quantityBefore`
+
 ## 安全特性
 
 - ✅ JWT Token认证（8小时有效期）
@@ -782,25 +1112,67 @@ npm run dev
 
 ## 项目进度
 
+### 📊 项目完成度统计
+
+**总体完成度：约 85%**
+
+#### 核心业务模块完成度
+- ✅ 系统管理模块：100%（用户、角色、配置、通知、日志）
+- ✅ 权限管理模块：100%（RBAC、细粒度权限、用户权限关联）
+- ✅ 药品管理模块：100%（CRUD、扫码识别、第三方API集成）
+- ✅ 库存管理模块：100%（查询、筛选、预警、调整）
+- ✅ 供应商管理模块：100%（CRUD、审核、关联管理）
+- ✅ 入库管理模块：100%（验收、效期校验、特殊药品双人操作）
+- ✅ 出库管理模块：100%（申请、审批、执行、库存扣减）
+- ✅ 采购订单管理模块：100%（创建、流转、物流跟踪、条形码）
+- ✅ 仪表盘模块：100%（5种角色专用仪表盘）
+
+#### 功能增强完成度
+- ✅ 数据可视化：100%（5种角色专用图表）
+- ✅ 权限系统：100%（RBAC + 细粒度权限）
+- ✅ 文件上传：100%（图片上传、删除、验证）
+- ✅ 条形码服务：100%（订单条形码生成）
+- ✅ IP定位服务：100%（登录地点识别）
+- ⏳ 数据导出：0%（Excel导出待实现）
+- ⏳ 扫码枪适配：0%（HID键盘模式待实现）
+- ⏳ 响应式优化：70%（PC端完成，Pad端待优化）
+- ⏳ 常用药品收藏：0%（数据库表已创建，功能待实现）
+
+#### 技术架构完成度
+- ✅ 后端架构：100%（Spring Boot + MyBatis-Plus + Spring Security）
+- ✅ 前端架构：100%（React + Vite + Ant Design）
+- ✅ 数据库设计：100%（21张表全部创建）
+- ✅ 安全机制：100%（JWT、BCrypt、权限控制、日志记录）
+- ✅ API集成：100%（万维易源API、极速数据API）
+
 ### ✅ 已完成（2026年1月）
 
 #### 后端开发
 - ✅ 项目基础架构搭建（Spring Boot 3.2.8 + MyBatis-Plus）
 - ✅ 认证授权模块（JWT Token、BCrypt密码加密、登录锁定机制）
-- ✅ 用户管理模块（CRUD、状态管理、解锁功能）
+- ✅ 用户管理模块（CRUD、状态管理、解锁功能、权限管理、邮箱验证）
 - ✅ 角色管理模块（CRUD、状态管理）
 - ✅ 参数配置模块（CRUD、键名查询）
 - ✅ 通知公告模块（CRUD、状态管理）
 - ✅ 操作日志模块（查询、筛选）
-- ✅ 登录日志模块（查询、筛选）
-- ✅ 药品信息管理模块（CRUD、多方式查询、第三方API集成）
-- ✅ 权限控制系统（RBAC、权限拦截器、权限注解）
-- ✅ 仪表盘模块（系统管理员仪表盘、仓库管理员仪表盘）
+- ✅ 登录日志模块（查询、筛选、IP定位）
+- ✅ 药品信息管理模块（CRUD、多方式查询、第三方API集成、按供应商查询）
+- ✅ 权限控制系统（RBAC、细粒度权限、用户直接权限关联、权限拦截器、权限注解）
+- ✅ 仪表盘模块（系统管理员、仓库管理员、采购专员、医护人员、供应商专用仪表盘）
 - ✅ 第三方API集成（万维易源API、极速数据API）
 - ✅ 超级管理员管理模块（启用/停用、邮箱验证码验证）
 - ✅ 邮箱验证码服务（EmailVerificationService）
-- ✅ 库存管理模块（查询、筛选、近效期预警）
-- ✅ 数据库表结构设计（20张表全部创建完成）
+- ✅ 库存管理模块（查询、筛选、近效期预警、库存统计、并发安全）
+- ✅ 入库管理模块（采购订单入库、临时入库、验收、效期校验、特殊药品双人操作）
+- ✅ 出库管理模块（出库申请、审批、执行、库存扣减、特殊药品双审）
+- ✅ 采购订单管理模块（创建、编辑、状态流转、物流跟踪、条形码生成）
+- ✅ 库存调整模块（盘盈/盘亏、特殊药品双人操作、审核）
+- ✅ 供应商管理模块（CRUD、审核功能、多对多关系）
+- ✅ 供应商-药品关联管理模块（添加、删除、更新单价）
+- ✅ 文件上传模块（图片上传、删除、文件类型验证、大小限制）
+- ✅ 条形码服务（BarcodeService、订单条形码生成）
+- ✅ IP定位服务（IpLocationService、登录地点识别）
+- ✅ 数据库表结构设计（21张表全部创建完成，包含sys_user_permission表）
 - ✅ 统一响应格式（Result<T>）
 - ✅ 全局异常处理（GlobalExceptionHandler）
 - ✅ 自动填充处理器（创建时间、更新时间）
@@ -808,60 +1180,93 @@ npm run dev
 #### 前端开发
 - ✅ 项目基础架构搭建（React 18 + Vite + Ant Design）
 - ✅ 登录页面（用户名/手机号登录、Token管理）
-- ✅ 主布局（侧边栏导航、顶部用户信息、响应式布局、权限控制）
-- ✅ 用户管理页面（列表、新增、编辑、删除、状态管理、解锁、超级管理员管理）
+- ✅ 主布局（侧边栏导航、顶部用户信息、响应式布局、权限控制、IndexRedirect）
+- ✅ 用户管理页面（列表、新增、编辑、删除、状态管理、解锁、超级管理员管理、权限管理）
 - ✅ 角色管理页面（列表、新增、编辑、删除、状态管理、超级管理员管理）
 - ✅ 参数配置页面（列表、新增、编辑、删除）
 - ✅ 通知公告页面（列表、新增、编辑、删除、状态管理）
 - ✅ 操作日志页面（列表、多条件筛选、权限控制）
-- ✅ 登录日志页面（列表、多条件筛选）
-- ✅ 仪表盘页面（系统管理员仪表盘、仓库管理员仪表盘、响应式布局）
+- ✅ 登录日志页面（列表、多条件筛选、IP定位显示）
+- ✅ 仪表盘页面（系统管理员、仓库管理员、采购专员、医护人员、供应商专用仪表盘、响应式布局）
 - ✅ 药品管理页面（列表、新增、编辑、删除、多方式查询、表单自动填充）
-- ✅ 库存管理页面（列表、多条件筛选、近效期预警显示）
+- ✅ 库存管理页面（列表、多条件筛选、近效期预警显示、库存调整功能）
+- ✅ 入库管理页面（列表、多条件筛选、入库创建、验收、效期校验）
+- ✅ 出库管理页面（列表、多条件筛选、出库申请、审批、执行）
+- ✅ 采购订单管理页面（列表、新增、编辑、删除、状态流转、条形码生成、供应商筛选）
+- ✅ 供应商管理页面（列表、新增、编辑、删除、审核功能、关联管理）
+- ✅ 供应商仪表盘页面（订单统计、状态分布、金额统计、订单趋势）
+- ✅ 供应商订单管理页面（订单列表、搜索、状态筛选、订单详情）
 - ✅ 超级管理员管理组件（SuperAdminModal：状态显示、验证码发送、启用/停用）
 - ✅ 路由守卫（PrivateRoute）
 - ✅ HTTP请求封装（Axios拦截器）
-- ✅ 权限工具（前端权限检查）
+- ✅ 权限工具（前端权限检查、细粒度权限支持）
 
 #### 数据库设计
-- ✅ 系统表设计（6张）
-- ✅ 权限表设计（3张）
-- ✅ 业务表设计（9张）
-- ✅ 扩展表设计（1张）
-- ✅ 外键约束设计
-- ✅ 索引优化设计
-- ✅ 初始化数据脚本
+- ✅ 系统表设计（6张：sys_role, sys_user, sys_config, sys_notice, operation_log, login_log）
+- ✅ 权限表设计（4张：sys_user_role, sys_permission, sys_role_permission, sys_user_permission）
+- ✅ 业务表设计（10张：supplier, drug_info, supplier_drug, inventory, purchase_order, purchase_order_item, inbound_record, outbound_apply, outbound_apply_item, inventory_adjustment）
+- ✅ 扩展表设计（1张：favorite_drug）
+- ✅ 外键约束设计（所有外键都设置约束，保证数据完整性）
+- ✅ 索引优化设计（为常用查询字段创建索引，提升查询性能）
+- ✅ 初始化数据脚本（init_simple.sql、init_permissions.sql、init_super_admin.sql等）
+- ✅ 数据库升级脚本（add_user_email_field.sql、add_supplier_remark_field.sql、create_supplier_drug_relation.sql、add_user_permission_system.sql等）
 
 ### 🚧 待实现功能
 
-#### 业务模块（待开发）
+#### 业务模块（开发状态）
 - ✅ 药品信息管理（CRUD、扫码识别、第三方API集成）**已完成**
   - 后端：DrugInfoController（CRUD、扫码识别、万维易源API、极速数据API集成、按供应商查询）
   - 前端：DrugManagement.jsx（列表、新增、编辑、删除、扫码、药品名称搜索、批准文号搜索）
 - ✅ 库存管理（查询、筛选、近效期预警、库存调整）**已完成**
-  - 后端：InventoryController（查询、筛选、近效期预警）、InventoryAdjustmentController（盘盈/盘亏、特殊药品双人操作）
+  - 后端：InventoryController（查询、筛选、近效期预警）、InventoryAdjustmentController（盘盈/盘亏、特殊药品双人操作、审核）
   - 前端：InventoryManagement.jsx（列表、多条件筛选、近效期预警、库存调整功能）
 - ✅ 供应商管理（数据库结构优化、多对多关系、权限配置、关联管理）**已完成**
   - 后端：SupplierController（CRUD、审核功能）、SupplierDrugController（供应商-药品关联管理：添加、删除、更新单价）
   - 前端：SupplierManagement.jsx（列表、新增、编辑、删除、审核功能、关联管理）
   - 数据库：supplier_drug表（多对多关系）、supplier表（备注字段、审核状态）
-- ⏳ 入库管理（验收、效期校验、特殊药品双人操作）
-- ⏳ 出库管理（审批、库存扣减、特殊药品双人审批）
-- ⏳ 采购订单管理（创建、流转、物流跟踪）
-- ⏳ 药品申领管理（申请、审批、出库）
+- ✅ 入库管理（验收、效期校验、特殊药品双人操作）**已完成**
+  - 后端：InboundRecordController（采购订单入库、临时入库、验收、效期校验、特殊药品双人操作）
+  - 前端：InboundManagement.jsx（列表、多条件筛选、入库创建、验收、效期校验）
+  - 功能：入库记录查询、采购订单入库、临时入库、效期校验（PASS/WARNING/FORCE）、特殊药品双人操作、入库后自动更新库存、订单状态自动更新
+- ✅ 出库管理（审批、库存扣减、特殊药品双人审批）**已完成**
+  - 后端：OutboundApplyController（出库申请、审批、执行、库存扣减、特殊药品双审）
+  - 前端：OutboundManagement.jsx（列表、多条件筛选、出库申请、审批、执行）
+  - 功能：出库申请（医护人员申领）、出库审批（普通药品单审、特殊药品双审）、出库执行（先进先出FIFO、库存扣减）、申请状态流转（PENDING → APPROVED/REJECTED → OUTBOUND）
+- ✅ 采购订单管理（创建、流转、物流跟踪）**已完成**
+  - 后端：PurchaseOrderController（创建、编辑、状态流转、物流跟踪、条形码生成）
+  - 前端：PurchaseOrderManagement.jsx（列表、新增、编辑、删除、状态流转、条形码生成、供应商筛选）
+  - 功能：采购订单创建、编辑、状态流转（PENDING → CONFIRMED → SHIPPED → RECEIVED）、物流跟踪、条形码生成、供应商筛选、订单明细管理
+- ✅ 药品申领管理（申请、审批、出库）**已完成**
+  - 已集成在出库管理模块中，医护人员可通过出库申请功能进行药品申领
 
-#### 功能增强（待开发）
-- ✅ 数据可视化图表（仪表盘统计、趋势分析）**部分完成**
-- ✅ 权限管理模块（权限分配、菜单权限、接口权限）**已完成**
+#### 功能增强（开发状态）
+- ✅ 数据可视化图表（仪表盘统计、趋势分析）**已完成**
+  - 系统管理员仪表盘：基础统计、登录趋势、操作日志统计
+  - 仓库管理员仪表盘：近效期预警、待办任务、出入库统计、出入库趋势
+  - 采购专员仪表盘：订单统计、供应商统计、订单趋势
+  - 医护人员仪表盘：申领统计、状态分布、申领趋势
+  - 供应商仪表盘：订单统计、状态分布、金额统计、订单趋势
+- ✅ 权限管理模块（权限分配、菜单权限、接口权限、细粒度权限）**已完成**
+  - 基于角色的权限控制（RBAC）
+  - 用户直接权限关联（细粒度权限控制）
+  - 权限拦截器（接口级权限控制）
+  - 权限注解（@RequiresPermission）
+  - 前端权限检查（菜单权限、按钮权限）
 - ✅ 文件上传功能（图片上传、文件存储）**已完成**
   - 后端：FileUploadController（图片上传、删除、文件类型验证、大小限制）
   - 支持格式：jpg, jpeg, png, gif, bmp, webp
   - 文件大小限制：最大10MB
-  - 按日期分类存储
+  - 按日期分类存储（yyyy/MM/dd目录结构）
+- ✅ 条形码服务（订单条形码生成）**已完成**
+  - 后端：BarcodeService、BarcodeServiceImpl
+  - 支持订单条形码生成和下载
+- ✅ IP定位服务（登录地点识别）**已完成**
+  - 后端：IpLocationService、IpLocationServiceImpl
+  - 支持根据IP地址识别登录地点
 - ⏳ 数据导出功能（Excel导出）
 - ⏳ 扫码枪适配（HID键盘模式）
 - ⏳ 跨终端响应式优化（Pad端适配）
-- ⏳ 常用药品收藏功能
+- ⏳ 常用药品收藏功能（数据库表已创建，功能待实现）
 
 ## 开发规范
 
@@ -1113,6 +1518,80 @@ export default YourPage;
 
 ## 版本历史
 
+### v1.5.0 (2026-01-14)
+- ✅ 实现细粒度权限系统
+  - 创建用户权限关联表（sys_user_permission），支持用户直接拥有权限
+  - 实现用户权限管理功能，支持更细粒度的权限控制
+  - 添加细粒度出库、入库、库存管理权限
+  - 新增数据库脚本：`add_user_permission_system.sql`
+  - 新增权限配置脚本：`update_role_permissions_complete.sql`
+- ✅ 新增供应商仪表盘功能
+  - 前端：SupplierDashboard.jsx（供应商专用仪表盘）
+  - 显示供应商订单统计、状态分布、金额统计等
+  - 支持订单趋势图表展示
+- ✅ 新增供应商订单管理功能
+  - 前端：SupplierOrderManagement.jsx（供应商订单管理页面）
+  - 供应商可查看和管理自己的订单
+  - 支持订单状态筛选、搜索、详情查看
+- ✅ 用户管理功能增强
+  - 增强用户权限管理功能
+  - 支持邮箱验证和权限处理
+  - 改进用户管理界面和交互体验
+- ✅ 仪表盘功能增强
+  - Dashboard.jsx功能扩展，支持更多角色专用仪表盘
+  - 采购专员专用仪表盘（订单统计、供应商统计）
+  - 医护人员专用仪表盘（申领统计、状态分布）
+  - 供应商专用仪表盘（订单统计、金额统计）
+- ✅ 采购订单管理功能增强
+  - PurchaseOrderController功能扩展
+  - PurchaseOrderService业务逻辑优化
+  - 前端PurchaseOrderManagement组件功能完善
+  - 支持订单创建、编辑、状态流转、条形码生成
+- ✅ 库存管理功能增强
+  - InventoryService业务逻辑优化
+  - 前端InventoryManagement组件功能增强
+  - 支持库存查询、筛选、近效期预警
+- ✅ 入库管理功能增强
+  - InboundRecordService业务逻辑优化
+  - 支持入库验收、效期校验、特殊药品双人操作
+- ✅ 出库管理功能增强
+  - OutboundApplyService业务逻辑优化
+  - 前端OutboundManagement组件功能增强
+  - 支持出库申请、审批、执行
+- ✅ 通知公告功能增强
+  - SysNoticeService业务逻辑优化
+  - 前端NoticeManagement组件功能增强
+- ✅ 登录日志功能增强
+  - LoginLogService业务逻辑优化
+  - 前端LoginLog组件功能增强
+  - 支持IP定位服务优化
+- ✅ 文件上传功能增强
+  - FileUploadController功能扩展
+  - 改进文件上传错误处理
+- ✅ 条形码服务
+  - 新增BarcodeService和BarcodeServiceImpl
+  - 支持订单条形码生成
+- ✅ 配置优化
+  - application.yml配置更新，提高清晰度和可用性
+  - WebMvcConfig配置增强
+  - 异步配置优化
+- ✅ 文档完善
+  - 新增Code_Completeness_Report.md（代码完整性检查报告）
+  - 新增Code_Logic_Vulnerability_Report.md（代码逻辑漏洞检查报告）
+  - 新增Fine_Grained_Permission_System_Guide.md（细粒度权限系统指南）
+  - 新增Form_Parameter_Mapping_Report.md（表单参数映射报告）
+  - 更新Core_Business_Requirements_Analysis.md
+  - 更新Order_Inbound_Record_Relationship_Guide.md
+  - 更新Drug_Data_Import_Guide.md
+  - 更新Permission_Issue_Fix_Guide.md
+  - 更新Concurrency_Configuration_Guide.md
+  - 更新Drug_Data_Retrieval_Troubleshooting_Guide.md
+- ✅ 代码优化
+  - 大量代码重构和优化
+  - 改进异常处理
+  - 优化数据库查询
+  - 提升代码质量和可维护性
+
 ### v1.4.0 (2026-01-14)
 - ✅ 实现供应商-药品关联管理功能
   - 创建SupplierDrug实体类，支持供应商与药品的多对多关系
@@ -1279,6 +1758,98 @@ server {
 ```
 
 ## 更新日志
+
+### v1.5.0 (2026-01-14)
+- ✅ 实现细粒度权限系统
+  - **数据库结构**：
+    - 创建用户权限关联表（`sys_user_permission`），支持用户直接拥有权限
+    - 新增数据库脚本：`add_user_permission_system.sql`（创建用户权限关联表和细粒度权限）
+    - 新增权限配置脚本：`update_role_permissions_complete.sql`（完整角色权限配置）
+  - **权限管理**：
+    - 支持用户直接拥有权限，实现更细粒度的权限控制
+    - 添加细粒度出库相关权限（outbound:view, outbound:apply, outbound:approve, outbound:approve:special, outbound:execute, outbound:reject）
+    - 添加细粒度入库相关权限（inbound:view, inbound:create, inbound:approve, inbound:execute）
+    - 添加细粒度库存管理权限（inventory:view, inventory:adjust, inventory:adjust:approve）
+    - 为各角色分配相应的细粒度权限
+  - **后端实现**：
+    - 创建SysUserPermission实体类和Mapper
+    - 实现PermissionService权限查询功能增强
+    - 更新权限拦截器，支持用户直接权限检查
+- ✅ 新增供应商仪表盘功能
+  - 前端：SupplierDashboard.jsx（供应商专用仪表盘）
+  - 显示供应商订单统计（总订单数、状态分布）
+  - 金额统计（总金额、待确认金额、已确认金额）
+  - 订单趋势图表（最近7天订单数量趋势）
+  - 响应式布局，支持不同屏幕尺寸
+- ✅ 新增供应商订单管理功能
+  - 前端：SupplierOrderManagement.jsx（供应商订单管理页面）
+  - 供应商可查看和管理自己的订单
+  - 支持订单列表展示（分页、搜索、状态筛选）
+  - 订单详情查看
+  - 订单状态管理
+  - 响应式表格布局
+- ✅ 仪表盘功能增强
+  - Dashboard.jsx功能扩展，支持更多角色专用仪表盘
+  - 采购专员专用仪表盘（订单统计、供应商统计、订单趋势）
+  - 医护人员专用仪表盘（申领统计、状态分布、申领趋势）
+  - 供应商专用仪表盘（订单统计、金额统计、订单趋势）
+  - DashboardController和DashboardService功能扩展
+- ✅ 采购订单管理功能增强
+  - PurchaseOrderController功能扩展
+  - PurchaseOrderService业务逻辑优化
+  - 前端PurchaseOrderManagement组件功能完善（482行新增代码）
+  - 支持订单创建、编辑、状态流转、条形码生成
+  - 优化订单查询和筛选功能
+- ✅ 库存管理功能增强
+  - InventoryService业务逻辑优化（474行代码重构）
+  - 前端InventoryManagement组件功能增强（291行新增代码）
+  - 支持库存查询、筛选、近效期预警
+  - 优化库存统计和预警功能
+- ✅ 入库管理功能增强
+  - InboundRecordService业务逻辑优化（611行代码重构）
+  - 支持入库验收、效期校验、特殊药品双人操作
+  - 优化入库流程和验证逻辑
+- ✅ 出库管理功能增强
+  - OutboundApplyService业务逻辑优化
+  - 前端OutboundManagement组件功能增强（255行新增代码）
+  - 支持出库申请、审批、执行
+  - 优化出库流程和权限控制
+- ✅ 通知公告功能增强
+  - SysNoticeService业务逻辑优化（338行代码重构）
+  - 前端NoticeManagement组件功能增强（131行新增代码）
+- ✅ 登录日志功能增强
+  - LoginLogService业务逻辑优化（138行代码重构）
+  - 前端LoginLog组件功能增强（364行代码重构）
+  - 支持IP定位服务优化（IpLocationServiceImpl 216行代码重构）
+- ✅ 文件上传功能增强
+  - FileUploadController功能扩展（252行代码重构）
+  - 改进文件上传错误处理
+  - 优化文件验证和存储逻辑
+- ✅ 条形码服务
+  - 新增BarcodeService和BarcodeServiceImpl（44行+80行代码）
+  - 支持订单条形码生成
+- ✅ 配置优化
+  - application.yml配置更新（110行变更），提高清晰度和可用性
+  - application.yml.example配置更新（74行变更）
+  - WebMvcConfig配置增强（64行变更）
+  - 异步配置优化（AsyncConfig）
+- ✅ 文档完善
+  - 新增Code_Completeness_Report.md（520行）- 代码完整性检查报告
+  - 新增Code_Logic_Vulnerability_Report.md（382行）- 代码逻辑漏洞检查报告 ⚠️ **重要**
+  - 新增Fine_Grained_Permission_System_Guide.md（350行）- 细粒度权限系统指南
+  - 新增Form_Parameter_Mapping_Report.md（211行）- 表单参数映射报告
+  - 更新Core_Business_Requirements_Analysis.md（1224行重构）
+  - 更新Order_Inbound_Record_Relationship_Guide.md
+  - 更新Drug_Data_Import_Guide.md
+  - 更新Permission_Issue_Fix_Guide.md
+  - 更新Concurrency_Configuration_Guide.md
+  - 更新Drug_Data_Retrieval_Troubleshooting_Guide.md（164行新增）
+- ✅ 代码优化
+  - 大量代码重构和优化（124个文件变更，10618行新增，4661行删除）
+  - 改进异常处理
+  - 优化数据库查询
+  - 提升代码质量和可维护性
+  - 统一代码风格和规范
 
 ### v1.4.0 (2026-01-14)
 - ✅ 实现供应商-药品关联管理功能
@@ -1450,11 +2021,19 @@ server {
 ## 文档信息
 
 **文档创建时间**：2026年1月13日 10:31:17  
-**最后修改时间**：2026年1月14日 18:25:25  
-**当前更新时间**：2026年1月14日 18:25:25  
-**文档版本**：v1.4.0
+**最后修改时间**：2026年1月15日  
+**当前更新时间**：2026年1月15日  
+**文档版本**：v1.5.2
 
 ---
 
-**最后更新**: 2026年1月14日 18:25:25
+**最后更新**: 2026年1月15日
+
+**更新内容（v1.5.2）**：
+- ✅ 修正Vite版本号（5.4.8 → 7.3.1）
+- ✅ 完善项目结构描述（补充所有Controller、Model、Config、前端页面）
+- ✅ 修正数据库表编号（业务表从11开始，扩展表为21）
+- ✅ 更新数据库初始化说明（详细说明21张表的创建顺序）
+- ✅ 补充API接口文档（入库管理、出库管理、采购订单管理、供应商管理、库存调整接口）
+- ✅ 完善数据库相关注意事项
 

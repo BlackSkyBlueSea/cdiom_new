@@ -5,6 +5,7 @@ import com.cdiom.backend.common.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,6 +37,9 @@ public class FileUploadController {
     @Value("${file.upload.url-prefix:/api/v1/files}")
     private String urlPrefix;
 
+    @Value("${spring.servlet.multipart.max-file-size:10MB}")
+    private DataSize maxFileSize;
+
     /**
      * 上传文件
      */
@@ -66,10 +70,11 @@ public class FileUploadController {
                 return Result.error("仅支持图片格式：jpg, jpeg, png, gif, bmp, webp");
             }
 
-            // 验证文件大小（最大10MB）
-            long maxSize = 10 * 1024 * 1024; // 10MB
-            if (file.getSize() > maxSize) {
-                return Result.error("文件大小不能超过10MB");
+            // 验证文件大小（从配置读取）
+            long maxSizeBytes = maxFileSize.toBytes();
+            if (file.getSize() > maxSizeBytes) {
+                String maxSizeMB = String.format("%.1f", maxSizeBytes / (1024.0 * 1024.0));
+                return Result.error("文件大小不能超过" + maxSizeMB + "MB");
             }
 
             // 创建上传目录（按日期分类）

@@ -106,14 +106,44 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         outboundApplyMapper.insert(outboundApply);
         
         // 保存申请明细
-        for (Map<String, Object> item : items) {
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> item = items.get(i);
             OutboundApplyItem applyItem = new OutboundApplyItem();
             applyItem.setApplyId(outboundApply.getId());
-            applyItem.setDrugId(Long.valueOf(item.get("drugId").toString()));
+            
+            // 验证并转换 drugId
+            Object drugIdObj = item.get("drugId");
+            if (drugIdObj == null) {
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID不能为空");
+            }
+            try {
+                Long drugId = Long.valueOf(drugIdObj.toString());
+                applyItem.setDrugId(drugId);
+            } catch (NumberFormatException e) {
+                log.error("出库申请明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID格式不正确");
+            }
+            
             if (item.get("batchNumber") != null) {
                 applyItem.setBatchNumber(item.get("batchNumber").toString());
             }
-            applyItem.setQuantity(Integer.valueOf(item.get("quantity").toString()));
+            
+            // 验证并转换 quantity
+            Object quantityObj = item.get("quantity");
+            if (quantityObj == null) {
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量不能为空");
+            }
+            try {
+                Integer quantity = Integer.valueOf(quantityObj.toString());
+                if (quantity <= 0) {
+                    throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量必须大于0");
+                }
+                applyItem.setQuantity(quantity);
+            } catch (NumberFormatException e) {
+                log.error("出库申请明细第{}项：数量类型转换失败，值={}, 错误={}", i + 1, quantityObj, e.getMessage());
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量格式不正确");
+            }
+            
             if (item.get("remark") != null) {
                 applyItem.setRemark(item.get("remark").toString());
             }
@@ -214,14 +244,43 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(id);
         
         // 执行出库
-        for (Map<String, Object> outboundItem : outboundItems) {
-            Long drugId = Long.valueOf(outboundItem.get("drugId").toString());
+        for (int i = 0; i < outboundItems.size(); i++) {
+            Map<String, Object> outboundItem = outboundItems.get(i);
+            
+            // 验证并转换 drugId
+            Object drugIdObj = outboundItem.get("drugId");
+            if (drugIdObj == null) {
+                throw new RuntimeException("出库明细第" + (i + 1) + "项：药品ID不能为空");
+            }
+            Long drugId;
+            try {
+                drugId = Long.valueOf(drugIdObj.toString());
+            } catch (NumberFormatException e) {
+                log.error("出库明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
+                throw new RuntimeException("出库明细第" + (i + 1) + "项：药品ID格式不正确");
+            }
+            
             String batchNumber = outboundItem.get("batchNumber") != null ? outboundItem.get("batchNumber").toString() : null;
-            Integer actualQuantity = Integer.valueOf(outboundItem.get("actualQuantity").toString());
+            
+            // 验证并转换 actualQuantity
+            Object actualQuantityObj = outboundItem.get("actualQuantity");
+            if (actualQuantityObj == null) {
+                throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量不能为空");
+            }
+            Integer actualQuantity;
+            try {
+                actualQuantity = Integer.valueOf(actualQuantityObj.toString());
+                if (actualQuantity <= 0) {
+                    throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量必须大于0");
+                }
+            } catch (NumberFormatException e) {
+                log.error("出库明细第{}项：实际出库数量类型转换失败，值={}, 错误={}", i + 1, actualQuantityObj, e.getMessage());
+                throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量格式不正确");
+            }
             
             // 查找对应的申请明细
             OutboundApplyItem item = items.stream()
-                    .filter(i -> i.getDrugId().equals(drugId))
+                    .filter(applyItem -> applyItem.getDrugId().equals(drugId))
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException("未找到对应的申请明细"));
             

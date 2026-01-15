@@ -183,6 +183,7 @@ const Layout = () => {
         collapsedWidth={64}
         theme="light"
         trigger={null}
+        style={{ overflow: 'auto', height: '100%' }}
       >
         <div className={`logo ${collapsed ? 'logo-collapsed' : ''}`}>
           {collapsed ? 'C' : 'CDIOM系统'}
@@ -194,7 +195,7 @@ const Layout = () => {
           onClick={handleMenuClick}
         />
       </Sider>
-      <AntLayout>
+      <AntLayout style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <Header className="header">
           <div className="header-left">
             <Button

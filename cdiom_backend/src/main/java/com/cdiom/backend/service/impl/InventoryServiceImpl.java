@@ -7,9 +7,9 @@ import com.cdiom.backend.mapper.InventoryMapper;
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.Inventory;
 import com.cdiom.backend.service.InventoryService;
+import com.cdiom.backend.util.SystemConfigUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -32,12 +32,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryMapper inventoryMapper;
     private final DrugInfoMapper drugInfoMapper;
-
-    @Value("${system.config.expiry-warning-days:180}")
-    private Integer expiryWarningDays;
-
-    @Value("${system.config.expiry-critical-days:90}")
-    private Integer expiryCriticalDays;
+    private final SystemConfigUtil systemConfigUtil;
 
     @Override
     public Page<Inventory> getInventoryList(Integer page, Integer size, String keyword, Long drugId, String batchNumber, String storageLocation, LocalDate expiryDateStart, LocalDate expiryDateEnd, Integer isSpecial) {
@@ -197,6 +192,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Map<String, Long> getNearExpiryWarning() {
+        // 从配置工具类获取预警天数（优先从数据库读取，否则使用配置文件默认值）
+        Integer expiryWarningDays = systemConfigUtil.getExpiryWarningDays();
+        Integer expiryCriticalDays = systemConfigUtil.getExpiryCriticalDays();
+        
         LocalDate today = LocalDate.now();
         LocalDate yellowWarningDate = today.plusDays(expiryWarningDays);
         LocalDate redWarningDate = today.plusDays(expiryCriticalDays);

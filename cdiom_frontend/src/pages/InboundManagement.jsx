@@ -462,7 +462,7 @@ const InboundManagement = () => {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        scroll={{ x: 'max-content' }}
         pagination={{
           ...pagination,
           showSizeChanger: true,

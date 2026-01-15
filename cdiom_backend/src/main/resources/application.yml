@@ -2,13 +2,56 @@
 # 此文件会被提交到 Git，不包含敏感信息
 # 敏感配置请放在 application-local.yml 中
 
+# 服务器配置
+server:
+  port: 8080  # 服务端口
+  servlet:
+    context-path: /  # 应用上下文路径
+    encoding:
+      charset: UTF-8  # 请求和响应编码
+      enabled: true
+      force: true
+  tomcat:
+    threads:
+      max: 200  # 最大工作线程数（可同时处理200个请求）
+      min-spare: 10  # 最小空闲线程数
+    max-connections: 10000  # 最大连接数
+    accept-count: 100  # 等待队列长度
+    connection-timeout: 20000  # 连接超时时间（毫秒）
+
 spring:
+  # 应用名称
+  application:
+    name: cdiom-backend
+  
+  # 日志配置
+  logging:
+    charset:
+      console: UTF-8
+      file: UTF-8
+    pattern:
+      console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+      file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+    level:
+      root: INFO
+      com.cdiom.backend: DEBUG
+  
+  # 激活的配置文件
   profiles:
     active: local  # 激活本地开发环境配置
   
+  # 自动配置排除
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration
+  
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true  # 启用文件上传
+      max-file-size: 10MB  # 单个文件最大大小
+      max-request-size: 10MB  # 请求最大大小
+      file-size-threshold: 2KB  # 文件写入磁盘的阈值
   
   # 163邮箱配置（用于发送验证码）
   # 注意：邮箱用户名和密码在 application-local.yml 中配置
@@ -32,7 +75,16 @@ spring:
   # 注意：数据库用户名和密码在 application-local.yml 中配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    url: jdbc:mysql://localhost:3306/cdiom_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&sessionVariables=transaction_isolation='READ-COMMITTED'
+    # HikariCP 连接池配置
+    hikari:
+      minimum-idle: 10  # 最小空闲连接数
+      maximum-pool-size: 50  # 最大连接池大小（可同时50个数据库操作）
+      connection-timeout: 30000  # 连接超时时间（毫秒）
+      idle-timeout: 600000  # 空闲连接超时时间（毫秒）
+      max-lifetime: 1800000  # 连接最大生命周期（毫秒，30分钟）
+      leak-detection-threshold: 60000  # 连接泄漏检测阈值（毫秒）
+      pool-name: CDIOMHikariCP  # 连接池名称
 
 # 邮箱验证码配置（非敏感配置）
 email:
@@ -45,6 +97,26 @@ file:
   upload:
     path: ./uploads  # 文件上传路径（相对路径，相对于项目根目录）
     url-prefix: /api/v1/files  # 文件访问URL前缀
+
+# 系统配置
+# 注意：这些配置在数据库 sys_config 表中也有存储，前端可以通过系统配置管理界面动态调整
+# 配置文件中的值作为默认值/后备值使用，如果数据库中有配置则优先使用数据库的值
+# 如果代码改为从数据库读取，则配置文件中的值仅作为初始值
+system:
+  config:
+    expiry-warning-days: 180  # 药品过期预警天数（距离过期还有多少天时预警）- 默认值，可在数据库中动态调整
+    expiry-critical-days: 90  # 药品过期严重预警天数（距离过期还有多少天时严重预警）- 默认值，可在数据库中动态调整
+
+# 万维易源药品信息API配置（非敏感配置）
+yuanyanyao:
+  api:
+    base-url: https://route.showapi.com/1468-3  # API基础URL
+    default-classify-id: 599ad2a0600b2149d689b75a  # 默认分类ID
+
+# 极速数据药品信息API配置（非敏感配置）
+jisuapi:
+  api:
+    base-url: https://api.jisuapi.com/medicine/detail  # API基础URL
 
 # 注意：以下敏感配置在 application-local.yml 中：
 # - spring.mail.username 和 password

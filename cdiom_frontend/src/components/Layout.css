@@ -1,5 +1,7 @@
 .layout-container {
-  height: 100vh;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
 }
 
 .logo {
@@ -14,6 +16,7 @@
   white-space: nowrap;
   padding: 0 16px;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .logo-collapsed {
@@ -28,6 +31,8 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  height: 64px;
 }
 
 .header-left {
@@ -65,7 +70,9 @@
   margin: 1px 10px;
   padding: 24px;
   background: #fff;
-  min-height: calc(100vh - 112px);
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 

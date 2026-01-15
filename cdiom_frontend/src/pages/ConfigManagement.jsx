@@ -169,7 +169,7 @@ const ConfigManagement = () => {
         loading={loading}
         rowKey="id"
         size="middle"
-        scroll={{ x: 'max-content', y: 'calc(100vh - 200px)' }}
+        scroll={{ x: 'max-content' }}
         pagination={{
           ...pagination,
           onChange: (page, pageSize) => {

@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.mapper.SysConfigMapper;
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
+import com.cdiom.backend.util.SystemConfigUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,6 +24,10 @@ import java.time.LocalDateTime;
 public class SysConfigServiceImpl implements SysConfigService {
 
     private final SysConfigMapper sysConfigMapper;
+    
+    // 使用 @Lazy 避免循环依赖：SystemConfigUtil 依赖 SysConfigService，SysConfigService 依赖 SystemConfigUtil
+    @Lazy
+    private final SystemConfigUtil systemConfigUtil;
 
     @Override
     public Page<SysConfig> getConfigList(Integer page, Integer size, String keyword, Integer configType) {
@@ -94,6 +100,14 @@ public class SysConfigServiceImpl implements SysConfigService {
         
         config.setUpdateTime(LocalDateTime.now());
         sysConfigMapper.updateById(config);
+        
+        // 清除配置缓存，使新配置立即生效
+        systemConfigUtil.clearCache(existConfig.getConfigKey());
+        // 如果键名被修改了，也要清除旧键名的缓存
+        if (!existConfig.getConfigKey().equals(config.getConfigKey())) {
+            systemConfigUtil.clearCache(config.getConfigKey());
+        }
+        
         return config;
     }
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, AutoComplete, message, Popconfirm, Tooltip, DatePicker } from 'antd'
 
 const { Compact } = Space
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, ScanOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, ScanOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
@@ -50,6 +50,7 @@ const DrugManagement = () => {
   const [scanning, setScanning] = useState(false)
   const [searchingByName, setSearchingByName] = useState(false)
   const [searchingByApproval, setSearchingByApproval] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   // 从已有药品数据中提取生产厂家选项
   const manufacturerOptions = useMemo(() => {
@@ -262,6 +263,49 @@ const DrugManagement = () => {
     setFilters({ ...filters, [key]: value })
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (filters.keyword) {
+        params.append('keyword', filters.keyword)
+      }
+      if (filters.isSpecial !== undefined) {
+        params.append('isSpecial', filters.isSpecial)
+      }
+      
+      const url = `/api/v1/drugs/export?${params.toString()}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+      
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `药品列表_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败: ' + (error.message || '未知错误'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const columns = [
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
@@ -374,6 +418,13 @@ const DrugManagement = () => {
             <Select.Option value={0}>普通药品</Select.Option>
             <Select.Option value={1}>特殊药品</Select.Option>
           </Select>
+          <Button 
+            icon={<DownloadOutlined />} 
+            onClick={handleExport}
+            loading={exporting}
+          >
+            导出Excel
+          </Button>
           <PermissionWrapper permission={PERMISSIONS.DRUG_CREATE}>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
               新增药品
@@ -388,7 +439,7 @@ const DrugManagement = () => {
         loading={loading}
         rowKey="id"
         size="middle"
-        scroll={{ x: 1200, y: 'calc(100vh - 200px)' }}
+        scroll={{ x: 1200 }}
         pagination={false}
       />
       

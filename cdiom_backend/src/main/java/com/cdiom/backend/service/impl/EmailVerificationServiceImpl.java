@@ -37,7 +37,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Value("${email.verification.code-length:6}")
     private int codeLength;
 
-    @Value("${email.verification.expire-minutes:10}")
+    @Value("${email.verification.expire-minutes:5}")
     private int expireMinutes;
 
     // 存储验证码：key=email, value=CodeInfo{code, expireTime}

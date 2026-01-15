@@ -61,6 +61,11 @@ public class SysUser {
     private Integer loginFailCount;
 
     /**
+     * 最后登录失败时间
+     */
+    private LocalDateTime lastLoginFailTime;
+
+    /**
      * 创建人ID
      */
     private Long createBy;

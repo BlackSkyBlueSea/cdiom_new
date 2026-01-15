@@ -13,9 +13,9 @@ import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.service.InventoryService;
 import com.cdiom.backend.service.PurchaseOrderService;
+import com.cdiom.backend.util.SystemConfigUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -40,12 +40,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
     private final PurchaseOrderItemMapper purchaseOrderItemMapper;
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
-
-    @Value("${system.config.expiry-warning-days:180}")
-    private Integer expiryWarningDays;
-
-    @Value("${system.config.expiry-critical-days:90}")
-    private Integer expiryCriticalDays;
+    private final SystemConfigUtil systemConfigUtil;
 
     @Override
     public Page<InboundRecord> getInboundRecordList(Integer page, Integer size, String keyword, Long orderId, Long drugId, String batchNumber, Long operatorId, LocalDate startDate, LocalDate endDate, String status, String expiryCheckStatus) {
@@ -275,15 +270,19 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             return "FORCE"; // 如果没有有效期，需要强制确认
         }
         
+        // 从配置工具类获取预警天数（优先从数据库读取，否则使用配置文件默认值）
+        Integer expiryWarningDays = systemConfigUtil.getExpiryWarningDays();
+        Integer expiryCriticalDays = systemConfigUtil.getExpiryCriticalDays();
+        
         LocalDate today = LocalDate.now();
         long daysUntilExpiry = java.time.temporal.ChronoUnit.DAYS.between(today, expiryDate);
         
         if (daysUntilExpiry >= expiryWarningDays) {
-            return "PASS"; // 有效期≥180天，直接通过
+            return "PASS"; // 有效期≥预警天数，直接通过
         } else if (daysUntilExpiry >= expiryCriticalDays) {
-            return "WARNING"; // 90-180天，需确认
+            return "WARNING"; // 严重预警天数-预警天数之间，需确认
         } else {
-            return "FORCE"; // <90天，需填写强制入库原因
+            return "FORCE"; // <严重预警天数，需填写强制入库原因
         }
     }
 

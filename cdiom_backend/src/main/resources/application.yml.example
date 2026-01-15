@@ -23,12 +23,10 @@ jwt:
 yuanyanyao:
   api:
     app-key: your-yuanyanyao-api-key  # 请替换为实际的API密钥
-    base-url: https://api.yuanyanyao.com/medicine/detail
 
 # 极速数据药品信息API配置
 jisuapi:
   api:
-    base-url: https://api.jisuapi.com/medicine/detail
     app-key: your-jisuapi-key  # 请替换为实际的API密钥
 
 # 邮箱验证码配置

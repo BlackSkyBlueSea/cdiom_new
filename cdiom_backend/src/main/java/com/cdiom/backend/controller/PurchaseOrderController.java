@@ -7,9 +7,11 @@ import com.cdiom.backend.model.PurchaseOrder;
 import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.model.Supplier;
 import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.mapper.PurchaseOrderMapper;
 import com.cdiom.backend.mapper.SupplierMapper;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.BarcodeService;
+import com.cdiom.backend.service.ExcelExportService;
 import com.cdiom.backend.service.PurchaseOrderService;
 import com.cdiom.backend.util.JwtUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -19,10 +21,16 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +50,8 @@ public class PurchaseOrderController {
     private final AuthService authService;
     private final SupplierMapper supplierMapper;
     private final JwtUtil jwtUtil;
+    private final ExcelExportService excelExportService;
+    private final PurchaseOrderMapper purchaseOrderMapper;
 
     /**
      * 分页查询采购订单列表
@@ -529,6 +539,90 @@ public class PurchaseOrderController {
     @Data
     public static class UpdateLogisticsRequest {
         private String logisticsNumber;
+    }
+
+    /**
+     * 导出采购订单列表到Excel
+     */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportPurchaseOrderList(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Long purchaserId,
+            @RequestParam(required = false) String status,
+            HttpServletRequest request) {
+        try {
+            // 获取当前用户
+            SysUser currentUser = authService.getCurrentUser();
+            if (currentUser == null) {
+                throw new RuntimeException("未登录或登录已过期");
+            }
+            
+            // 如果是供应商角色，只能查看自己的订单
+            if (currentUser.getRoleId() != null && currentUser.getRoleId() == 5L) {
+                // 通过supplier表的createBy字段查询供应商ID
+                LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(Supplier::getCreateBy, currentUser.getId());
+                wrapper.eq(Supplier::getDeleted, 0);
+                List<Supplier> suppliers = supplierMapper.selectList(wrapper);
+                
+                if (suppliers != null && !suppliers.isEmpty()) {
+                    // 取第一个供应商（通常一个供应商用户对应一个供应商记录）
+                    Long mySupplierId = suppliers.get(0).getId();
+                    // 强制使用供应商自己的ID，忽略传入的supplierId参数
+                    supplierId = mySupplierId;
+                } else {
+                    // 如果供应商用户没有关联的供应商记录，返回空列表
+                    supplierId = -1L; // 设置为不存在的ID，查询结果为空
+                }
+            }
+
+            // 构建查询条件（与列表查询保持一致）
+            LambdaQueryWrapper<PurchaseOrder> wrapper = new LambdaQueryWrapper<>();
+            
+            if (StringUtils.hasText(keyword)) {
+                wrapper.and(w -> w.like(PurchaseOrder::getOrderNumber, keyword)
+                        .or().like(PurchaseOrder::getLogisticsNumber, keyword));
+            }
+            
+            if (supplierId != null && supplierId != -1L) {
+                wrapper.eq(PurchaseOrder::getSupplierId, supplierId);
+            } else if (supplierId != null && supplierId == -1L) {
+                // 供应商用户没有关联的供应商记录，返回空结果
+                wrapper.eq(PurchaseOrder::getId, -1);
+            }
+            
+            if (purchaserId != null) {
+                wrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
+            }
+            
+            if (StringUtils.hasText(status)) {
+                wrapper.eq(PurchaseOrder::getStatus, status);
+            }
+            
+            wrapper.orderByDesc(PurchaseOrder::getCreateTime);
+            
+            // 查询所有数据（不分页）
+            List<PurchaseOrder> orderList = purchaseOrderMapper.selectList(wrapper);
+
+            // 生成Excel
+            byte[] excelBytes = excelExportService.exportPurchaseOrderList(orderList, currentUser);
+
+            // 设置响应头
+            String fileName = "采购订单列表_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", encodedFileName);
+            headers.setContentLength(excelBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("导出失败: " + e.getMessage(), e);
+        }
     }
 }
 

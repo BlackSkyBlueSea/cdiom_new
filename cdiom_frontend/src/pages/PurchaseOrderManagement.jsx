@@ -40,6 +40,7 @@ const PurchaseOrderManagement = () => {
   const [barcodeModalVisible, setBarcodeModalVisible] = useState(false)
   const [currentBarcode, setCurrentBarcode] = useState(null)
   const [currentBarcodeOrderId, setCurrentBarcodeOrderId] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetchOrders()
@@ -162,6 +163,55 @@ const PurchaseOrderManagement = () => {
       status: undefined,
     })
     setPagination({ ...pagination, current: 1 })
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (filters.keyword) {
+        params.append('keyword', filters.keyword)
+      }
+      if (filters.supplierId) {
+        params.append('supplierId', filters.supplierId)
+      }
+      if (filters.purchaserId) {
+        params.append('purchaserId', filters.purchaserId)
+      }
+      if (filters.status) {
+        params.append('status', filters.status)
+      }
+      
+      const url = `/api/v1/purchase-orders/export?${params.toString()}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+      
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `采购订单列表_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败: ' + (error.message || '未知错误'))
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleCreateOrder = async (values) => {
@@ -622,6 +672,13 @@ const PurchaseOrderManagement = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             重置
           </Button>
+          <Button 
+            icon={<DownloadOutlined />} 
+            onClick={handleExport}
+            loading={exporting}
+          >
+            导出Excel
+          </Button>
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <Button
               type="primary"
@@ -646,7 +703,7 @@ const PurchaseOrderManagement = () => {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 'max-content', y: 'calc(100vh - 250px)' }}
+        scroll={{ x: 'max-content' }}
         pagination={{
           ...pagination,
           showSizeChanger: true,

@@ -3,6 +3,7 @@ package com.cdiom.backend.common.exception;
 import com.cdiom.backend.common.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.Arrays;
 
 /**
  * 全局异常处理器
@@ -21,14 +23,34 @@ import java.sql.SQLIntegrityConstraintViolationException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    
+    private final Environment environment;
+    
+    public GlobalExceptionHandler(Environment environment) {
+        this.environment = environment;
+    }
+    
+    /**
+     * 判断是否为生产环境
+     */
+    private boolean isProduction() {
+        String[] activeProfiles = environment.getActiveProfiles();
+        return Arrays.stream(activeProfiles)
+                .anyMatch(profile -> profile.equalsIgnoreCase("prod") || profile.equalsIgnoreCase("production"));
+    }
 
     /**
      * 业务异常
      */
     @ExceptionHandler(ServiceException.class)
     public Result<?> handleServiceException(ServiceException e) {
-        log.error("业务异常：{}", e.getMessage());
-        return Result.error(e.getCode(), e.getMessage());
+        if (isProduction()) {
+            log.error("业务异常：code={}, message={}", e.getCode(), e.getMessage(), e);
+            return Result.error(e.getCode(), "操作失败，请稍后重试");
+        } else {
+            log.error("业务异常：code={}, message={}", e.getCode(), e.getMessage(), e);
+            return Result.error(e.getCode(), e.getMessage());
+        }
     }
 
     /**
@@ -36,7 +58,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
-        log.error("参数校验异常：{}", e.getMessage());
+        String detailMessage = e.getMessage();
+        log.error("参数校验异常：{}", detailMessage, e);
+        
         String message = "参数校验失败";
         var fieldError = e.getBindingResult().getFieldError();
         if (fieldError != null && fieldError.getDefaultMessage() != null) {
@@ -47,7 +71,12 @@ public class GlobalExceptionHandler {
                 message = firstError.getDefaultMessage();
             }
         }
-        return Result.error(400, message);
+        
+        if (isProduction()) {
+            return Result.error(400, "参数校验失败，请检查输入信息");
+        } else {
+            return Result.error(400, message);
+        }
     }
 
     /**
@@ -55,7 +84,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BindException.class)
     public Result<?> handleBindException(BindException e) {
-        log.error("参数绑定异常：{}", e.getMessage());
+        String detailMessage = e.getMessage();
+        log.error("参数绑定异常：{}", detailMessage, e);
+        
         String message = "参数绑定失败";
         var fieldError = e.getBindingResult().getFieldError();
         if (fieldError != null && fieldError.getDefaultMessage() != null) {
@@ -66,7 +97,12 @@ public class GlobalExceptionHandler {
                 message = firstError.getDefaultMessage();
             }
         }
-        return Result.error(400, message);
+        
+        if (isProduction()) {
+            return Result.error(400, "参数绑定失败，请检查输入信息");
+        } else {
+            return Result.error(400, message);
+        }
     }
 
     /**
@@ -101,8 +137,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(SQLIntegrityConstraintViolationException.class)
     public Result<?> handleSQLIntegrityConstraintViolationException(SQLIntegrityConstraintViolationException e) {
-        log.error("数据库约束违反异常：{}", e.getMessage());
-        String message = e.getMessage();
+        String detailMessage = e.getMessage();
+        log.error("数据库约束违反异常：{}", detailMessage, e);
+        
+        String message = detailMessage;
         
         // 解析错误消息，提供友好的错误提示
         if (message != null) {
@@ -169,10 +207,29 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public Result<?> handleRuntimeException(RuntimeException e) {
-        // 如果是业务相关的RuntimeException，返回原始消息
-        // 这些异常通常包含用户友好的错误信息
-        log.warn("业务异常：{}", e.getMessage());
-        return Result.error(e.getMessage());
+        String detailMessage = e.getMessage();
+        log.error("运行时异常：{}", detailMessage, e);
+        
+        // 判断是否为业务异常（用户友好的错误信息）
+        // 通常业务异常的消息是中文且不包含技术细节
+        boolean isBusinessException = detailMessage != null 
+                && !detailMessage.contains("Exception")
+                && !detailMessage.contains("at ")
+                && !detailMessage.contains("java.")
+                && !detailMessage.contains("com.");
+        
+        if (isProduction()) {
+            if (isBusinessException) {
+                // 业务异常在生产环境也返回原始消息（通常是用户友好的）
+                return Result.error(detailMessage);
+            } else {
+                // 技术异常在生产环境返回通用消息
+                return Result.error(500, "操作失败，请稍后重试");
+            }
+        } else {
+            // 开发环境返回详细错误信息
+            return Result.error(detailMessage != null ? detailMessage : "未知错误");
+        }
     }
 
     /**
@@ -180,8 +237,15 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
-        log.error("系统异常：", e);
-        return Result.error(500, "系统内部错误，请联系管理员");
+        String detailMessage = e.getMessage();
+        log.error("系统异常：{}", detailMessage, e);
+        
+        if (isProduction()) {
+            return Result.error(500, "系统内部错误，请联系管理员");
+        } else {
+            // 开发环境返回详细错误信息
+            return Result.error(500, detailMessage != null ? detailMessage : "系统内部错误");
+        }
     }
 }
 

@@ -1,12 +1,27 @@
 package com.cdiom.backend.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
+import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.model.DrugInfo;
+import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DrugInfoService;
+import com.cdiom.backend.service.ExcelExportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 药品信息管理控制器
@@ -20,6 +35,9 @@ import org.springframework.web.bind.annotation.*;
 public class DrugInfoController {
 
     private final DrugInfoService drugInfoService;
+    private final ExcelExportService excelExportService;
+    private final AuthService authService;
+    private final DrugInfoMapper drugInfoMapper;
 
     /**
      * 分页查询药品信息列表
@@ -140,6 +158,59 @@ public class DrugInfoController {
             }
         } catch (Exception e) {
             return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 导出药品列表到Excel
+     */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportDrugInfoList(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer isSpecial) {
+        try {
+            // 获取当前用户
+            SysUser currentUser = authService.getCurrentUser();
+            if (currentUser == null) {
+                throw new RuntimeException("未登录或登录已过期");
+            }
+
+            // 构建查询条件（与列表查询保持一致）
+            LambdaQueryWrapper<DrugInfo> wrapper = new LambdaQueryWrapper<>();
+            
+            if (StringUtils.hasText(keyword)) {
+                wrapper.and(w -> w.like(DrugInfo::getDrugName, keyword)
+                        .or().like(DrugInfo::getNationalCode, keyword)
+                        .or().like(DrugInfo::getApprovalNumber, keyword)
+                        .or().like(DrugInfo::getManufacturer, keyword));
+            }
+            
+            if (isSpecial != null) {
+                wrapper.eq(DrugInfo::getIsSpecial, isSpecial);
+            }
+            
+            wrapper.orderByDesc(DrugInfo::getCreateTime);
+            
+            // 查询所有数据（不分页）
+            List<DrugInfo> drugList = drugInfoMapper.selectList(wrapper);
+
+            // 生成Excel
+            byte[] excelBytes = excelExportService.exportDrugInfoList(drugList, currentUser);
+
+            // 设置响应头
+            String fileName = "药品列表_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", encodedFileName);
+            headers.setContentLength(excelBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("导出失败: " + e.getMessage(), e);
         }
     }
 }
