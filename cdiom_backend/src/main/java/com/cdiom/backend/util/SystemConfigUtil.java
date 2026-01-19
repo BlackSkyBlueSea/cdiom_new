@@ -2,9 +2,9 @@ package com.cdiom.backend.util;
 
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,10 +19,17 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class SystemConfigUtil {
 
+    // 使用 @Lazy 避免循环依赖：SystemConfigUtil 依赖 SysConfigService，SysConfigServiceImpl 依赖 SystemConfigUtil
     private final SysConfigService sysConfigService;
+
+    /**
+     * 构造器注入，使用 @Lazy 延迟加载 SysConfigService 以解决循环依赖
+     */
+    public SystemConfigUtil(@Lazy SysConfigService sysConfigService) {
+        this.sysConfigService = sysConfigService;
+    }
 
     // 配置文件中的默认值
     @Value("${system.config.expiry-warning-days:180}")

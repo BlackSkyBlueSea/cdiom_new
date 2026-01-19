@@ -38,6 +38,11 @@ public class SupplierDrug {
     private BigDecimal unitPrice;
 
     /**
+     * 当前生效的协议ID
+     */
+    private Long currentAgreementId;
+
+    /**
      * 是否启用：0-禁用/1-启用
      */
     private Integer isActive;
@@ -70,6 +75,7 @@ public class SupplierDrug {
     @TableLogic
     private Integer deleted;
 }
+
 
 
 

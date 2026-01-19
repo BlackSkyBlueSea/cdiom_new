@@ -85,6 +85,14 @@ spring:
       max-lifetime: 1800000  # 连接最大生命周期（毫秒，30分钟）
       leak-detection-threshold: 60000  # 连接泄漏检测阈值（毫秒）
       pool-name: CDIOMHikariCP  # 连接池名称
+      # 解决 housekeeper 线程饥饿问题的配置
+      housekeeping-period-ms: 30000  # housekeeper 线程运行间隔（毫秒，默认30秒）
+      # 连接验证配置，确保连接有效性
+      connection-test-query: SELECT 1  # 连接测试查询（MySQL）
+      validation-timeout: 3000  # 连接验证超时时间（毫秒）
+      # 连接池健康检查配置
+      keepalive-time: 0  # 保持连接活跃时间（0表示使用默认值，600000ms）
+      register-mbeans: false  # 是否注册JMX MBeans（生产环境建议关闭）
 
 # 邮箱验证码配置（非敏感配置）
 email:

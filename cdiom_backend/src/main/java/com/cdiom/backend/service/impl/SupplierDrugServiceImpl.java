@@ -3,7 +3,9 @@ package com.cdiom.backend.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cdiom.backend.mapper.SupplierDrugMapper;
 import com.cdiom.backend.model.SupplierDrug;
+import com.cdiom.backend.model.SupplierDrugPriceHistory;
 import com.cdiom.backend.service.SupplierDrugService;
+import com.cdiom.backend.service.SupplierDrugPriceHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 public class SupplierDrugServiceImpl implements SupplierDrugService {
 
     private final SupplierDrugMapper supplierDrugMapper;
+    private final SupplierDrugPriceHistoryService priceHistoryService;
 
     @Override
     public List<Long> getDrugIdsBySupplierId(Long supplierId) {
@@ -92,7 +95,9 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public SupplierDrug updateSupplierDrugPrice(Long supplierId, Long drugId, BigDecimal unitPrice) {
+    public SupplierDrug updateSupplierDrugPrice(Long supplierId, Long drugId, BigDecimal unitPrice, 
+                                                 Long agreementId, String changeReason, Long operatorId, 
+                                                 String operatorName, String ipAddress) {
         LambdaQueryWrapper<SupplierDrug> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SupplierDrug::getSupplierId, supplierId)
                .eq(SupplierDrug::getDrugId, drugId);
@@ -102,9 +107,43 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
             throw new RuntimeException("供应商-药品关联不存在");
         }
         
+        // 记录变更前价格
+        BigDecimal priceBefore = supplierDrug.getUnitPrice();
+        
+        // 更新价格
         supplierDrug.setUnitPrice(unitPrice);
+        if (agreementId != null) {
+            supplierDrug.setCurrentAgreementId(agreementId);
+        }
         supplierDrugMapper.updateById(supplierDrug);
+        
+        // 记录价格变更历史
+        SupplierDrugPriceHistory history = new SupplierDrugPriceHistory();
+        history.setSupplierId(supplierId);
+        history.setDrugId(drugId);
+        history.setAgreementId(agreementId);
+        history.setPriceBefore(priceBefore);
+        history.setPriceAfter(unitPrice);
+        history.setChangeReason(changeReason);
+        history.setChangeType(agreementId != null ? "AGREEMENT" : "MANUAL");
+        history.setOperatorId(operatorId);
+        history.setOperatorName(operatorName);
+        history.setIpAddress(ipAddress);
+        priceHistoryService.recordPriceChange(history);
+        
+        log.info("价格更新成功: supplierId={}, drugId={}, priceBefore={}, priceAfter={}, agreementId={}", 
+                supplierId, drugId, priceBefore, unitPrice, agreementId);
+        
         return supplierDrug;
+    }
+    
+    /**
+     * 更新供应商-药品关联的单价（兼容旧接口）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SupplierDrug updateSupplierDrugPrice(Long supplierId, Long drugId, BigDecimal unitPrice) {
+        return updateSupplierDrugPrice(supplierId, drugId, unitPrice, null, null, null, null, null);
     }
 
     @Override
@@ -128,6 +167,7 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
         }
     }
 }
+
 
 
 

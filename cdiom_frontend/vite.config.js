@@ -12,8 +12,19 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  build: {
+    // 生产环境移除console语句
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // 移除所有console语句
+        drop_debugger: true, // 移除debugger语句
+      },
+    },
+  },
 })
+
 
 
 

@@ -1,0 +1,308 @@
+// 当 BackendMonitor 页面显示时，允许滚动
+body.backend-monitor-page {
+  overflow: auto !important;
+}
+
+#root.backend-monitor-page {
+  overflow: auto !important;
+}
+
+.backend-monitor-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  position: relative;
+}
+
+.monitor-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 0;
+  height: 64px;
+  line-height: 64px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+  }
+}
+
+.monitor-content {
+  flex: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+// 卡片样式优化
+.monitor-content {
+  .ant-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .ant-card-head {
+      border-bottom: 1px solid #f0f0f0;
+      font-weight: 600;
+    }
+
+    .ant-card-body {
+      padding: 20px;
+    }
+  }
+}
+
+.log-container {
+  height: 600px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
+
+  .log-content {
+    color: #d4d4d4;
+  }
+
+  .log-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid transparent;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+
+    // 根据日志级别设置左边框颜色
+    &[data-level="ERROR"] {
+      border-left-color: #ff4d4f;
+      background: rgba(255, 77, 79, 0.15);
+      
+      &:hover {
+        background: rgba(255, 77, 79, 0.25) !important;
+      }
+    }
+    &[data-level="WARN"], &[data-level="WARNING"] {
+      border-left-color: #faad14;
+      background: rgba(250, 173, 20, 0.15);
+      
+      &:hover {
+        background: rgba(250, 173, 20, 0.25) !important;
+      }
+    }
+    &[data-level="DEBUG"] {
+      border-left-color: #1890ff;
+      background: rgba(24, 144, 255, 0.15);
+      
+      &:hover {
+        background: rgba(24, 144, 255, 0.25) !important;
+      }
+    }
+    &[data-level="INFO"] {
+      border-left-color: #52c41a;
+      
+      &:hover {
+        background: rgba(82, 196, 26, 0.1) !important;
+      }
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border-radius: 4px;
+      transform: translateX(2px);
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+// 状态卡片特殊样式
+.status-card {
+  .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  // 状态标签动画
+  .ant-tag {
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+}
+
+// 系统信息卡片样式
+.system-info-card {
+  .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  // 信息框样式
+  .ant-space-item {
+    width: 100%;
+  }
+}
+
+// 日志卡片样式
+.log-card {
+  .ant-card-head {
+    border-bottom: 2px solid #f0f0f0;
+    background: linear-gradient(to right, #fafafa, #fff);
+  }
+
+  .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ant-card-extra {
+    @media (max-width: 768px) {
+      width: 100%;
+      margin-top: 12px;
+      
+      .ant-space {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .monitor-content {
+    padding: 16px;
+  }
+
+  .log-container {
+    height: 400px;
+  }
+
+  .monitor-header {
+    .header-content {
+      padding: 0 16px;
+      flex-wrap: wrap;
+      height: auto;
+      min-height: 64px;
+      line-height: 1.5;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+  }
+
+  // 移动端卡片优化
+  .monitor-content {
+    .ant-card {
+      margin-bottom: 16px;
+    }
+  }
+}
+
+// 平板端优化
+@media (min-width: 769px) and (max-width: 1024px) {
+  .monitor-content {
+    padding: 20px;
+  }
+
+  .log-container {
+    height: 500px;
+  }
+}
+
+// 动画效果
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.monitor-content {
+  .ant-card {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+}
+
+// 状态指示器动画
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: pulse 2s infinite;
+  
+  &.healthy {
+    background: #52c41a;
+  }
+  
+  &.unhealthy {
+    background: #ff4d4f;
+  }
+}
+
+// 日志容器滚动条优化
+.log-container {
+  // 平滑滚动
+  scroll-behavior: smooth;
+  
+  // 滚动条样式（Firefox）
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+

@@ -19,6 +19,14 @@
   flex-shrink: 0;
 }
 
+/* Pad端Logo优化 */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .logo {
+    font-size: 17px;
+    padding: 0 12px;
+  }
+}
+
 .logo-collapsed {
   font-size: 20px;
   padding: 0;
@@ -48,6 +56,14 @@
   align-items: center;
   justify-content: center;
   margin-left: -24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trigger-btn:active {
+  opacity: 0.7;
+  transform: scale(0.95);
 }
 
 .header-right {
@@ -60,6 +76,17 @@
   align-items: center;
   cursor: pointer;
   padding: 0 12px;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 4px;
+}
+
+.user-info:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.user-info:active {
+  background-color: rgba(0, 0, 0, 0.08);
 }
 
 .username {
@@ -73,6 +100,15 @@
   overflow: auto;
   flex: 1;
   min-height: 0;
+  -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+}
+
+/* Pad端内容区域优化 */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .content {
+    padding: 20px;
+    margin: 1px 8px;
+  }
 }
 
 

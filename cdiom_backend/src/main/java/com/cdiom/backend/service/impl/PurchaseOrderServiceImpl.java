@@ -12,8 +12,10 @@ import com.cdiom.backend.model.SysNotice;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.service.PurchaseOrderService;
 import com.cdiom.backend.service.SysNoticeService;
+import com.cdiom.backend.util.RetryUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -103,17 +105,42 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             throw new RuntimeException("订单明细不能为空");
         }
         
-        // 生成订单编号
+        // 若未指定单号，使用重试机制生成并创建订单
         if (!StringUtils.hasText(purchaseOrder.getOrderNumber())) {
-            purchaseOrder.setOrderNumber(generateOrderNumber());
+            try {
+                return RetryUtil.executeWithRetry(() -> createOrderWithGeneratedNumber(purchaseOrder, items));
+            } catch (Exception e) {
+                if (e.getCause() instanceof DuplicateKeyException) {
+                    throw new RuntimeException("当前订单创建过于繁忙，请稍后重试", e);
+                }
+                throw new RuntimeException("创建订单失败：" + e.getMessage(), e);
+            }
         } else {
-            // 检查订单编号是否已存在
+            // 手动指定单号，先校验唯一性
             PurchaseOrder existing = getPurchaseOrderByOrderNumber(purchaseOrder.getOrderNumber());
             if (existing != null) {
                 throw new RuntimeException("订单编号已存在");
             }
+            return createOrderDirectly(purchaseOrder, items);
         }
+    }
+
+    /**
+     * 核心任务：生成单号 + 插入订单（供重试工具调用）
+     */
+    private PurchaseOrder createOrderWithGeneratedNumber(PurchaseOrder purchaseOrder, List<PurchaseOrderItem> items) {
+        // 1. 生成唯一单号（原有逻辑，此处保留格式兼容性）
+        String orderNumber = generateOrderNumber();
+        purchaseOrder.setOrderNumber(orderNumber);
         
+        // 2. 插入订单（若单号重复，会抛出DuplicateKeyException）
+        return createOrderDirectly(purchaseOrder, items);
+    }
+
+    /**
+     * 直接创建订单（不生成单号，用于手动指定单号或重试场景）
+     */
+    private PurchaseOrder createOrderDirectly(PurchaseOrder purchaseOrder, List<PurchaseOrderItem> items) {
         // 设置默认状态
         if (!StringUtils.hasText(purchaseOrder.getStatus())) {
             purchaseOrder.setStatus("PENDING");
@@ -131,7 +158,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         purchaseOrder.setTotalAmount(totalAmount);
         
-        // 保存订单
+        // 保存订单（若单号重复，数据库唯一索引会抛出DuplicateKeyException）
         purchaseOrderMapper.insert(purchaseOrder);
         
         // 保存订单明细

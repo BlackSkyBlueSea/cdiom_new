@@ -16,8 +16,11 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 从Cookie获取token
-    const token = Cookies.get('cdiom_token')
+    // 优先从sessionStorage获取token（多用户登录模式），其次从Cookie获取
+    let token = sessionStorage.getItem('cdiom_token')
+    if (!token) {
+      token = Cookies.get('cdiom_token')
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -52,9 +55,12 @@ request.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
-        // 未授权，清除token并跳转到登录页
+        // 未授权，清除token并跳转到首页
         Cookies.remove('cdiom_token')
-        window.location.href = '/login'
+        sessionStorage.removeItem('cdiom_token')
+        sessionStorage.removeItem('cdiom_user')
+        sessionStorage.removeItem('cdiom_multi_login')
+        window.location.href = '/'
         return Promise.reject(error)
       } else if (status === 403) {
         // 权限不足，不显示错误提示，让调用方处理

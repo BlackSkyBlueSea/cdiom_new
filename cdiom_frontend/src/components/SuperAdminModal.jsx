@@ -135,7 +135,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
           removeToken()
           // 延迟跳转，让用户看到提示信息
           setTimeout(() => {
-            navigate('/login')
+            navigate('/')
             window.location.reload() // 刷新页面确保完全清除状态
           }, 1000)
         } else {

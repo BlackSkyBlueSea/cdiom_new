@@ -1,3 +1,6 @@
+/* 引入Pad端响应式样式 */
+@import './styles/pad-responsive.css';
+
 * {
   margin: 0;
   padding: 0;

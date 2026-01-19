@@ -17,3 +17,4 @@ public class LoginConfigConstant {
     public static final int DEFAULT_LOCK_DURATION = 1;
 }
 
+

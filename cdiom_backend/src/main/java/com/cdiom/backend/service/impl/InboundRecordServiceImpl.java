@@ -13,9 +13,11 @@ import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.service.InventoryService;
 import com.cdiom.backend.service.PurchaseOrderService;
+import com.cdiom.backend.util.RetryUtil;
 import com.cdiom.backend.util.SystemConfigUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -153,9 +155,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             ));
         }
         
-        // 生成入库单号
-        String recordNumber = generateRecordNumber();
-        inboundRecord.setRecordNumber(recordNumber);
+        // 生成入库单号（使用重试机制）
         inboundRecord.setOrderId(orderId);
         inboundRecord.setDrugId(drugId);
         
@@ -178,28 +178,34 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             inboundRecord.setStatus("QUALIFIED");
         }
         
-        // 保存入库记录
-        inboundRecordMapper.insert(inboundRecord);
-        
-        // 如果验收合格，更新库存
-        if ("QUALIFIED".equals(inboundRecord.getStatus())) {
-            inventoryService.increaseInventory(
-                    drugId,
-                    inboundRecord.getBatchNumber(),
-                    inboundRecord.getQuantity(),
-                    inboundRecord.getExpiryDate(),
-                    drug.getStorageLocation(),
-                    inboundRecord.getProductionDate(),
-                    inboundRecord.getManufacturer() != null ? inboundRecord.getManufacturer() : drug.getManufacturer()
-            );
+        // 使用重试机制创建入库记录
+        try {
+            InboundRecord created = RetryUtil.executeWithRetry(() -> createInboundWithGeneratedNumber(inboundRecord));
             
-            // 更新订单状态（检查是否全部入库）
-            purchaseOrderService.updateOrderInboundStatus(orderId);
+            // 如果验收合格，更新库存（在插入成功后执行，避免重试时重复更新）
+            if ("QUALIFIED".equals(created.getStatus())) {
+                inventoryService.increaseInventory(
+                        drugId,
+                        created.getBatchNumber(),
+                        created.getQuantity(),
+                        created.getExpiryDate(),
+                        drug.getStorageLocation(),
+                        created.getProductionDate(),
+                        created.getManufacturer() != null ? created.getManufacturer() : drug.getManufacturer()
+                );
+                
+                // 更新订单状态（检查是否全部入库）
+                purchaseOrderService.updateOrderInboundStatus(orderId);
+            }
+            
+            log.info("创建入库记录：入库单号={}, 订单ID={}, 药品ID={}, 数量={}", created.getRecordNumber(), orderId, drugId, created.getQuantity());
+            return created;
+        } catch (Exception e) {
+            if (e.getCause() instanceof DuplicateKeyException) {
+                throw new RuntimeException("当前入库操作过于繁忙，请稍后重试", e);
+            }
+            throw new RuntimeException("创建入库记录失败：" + e.getMessage(), e);
         }
-        
-        log.info("创建入库记录：入库单号={}, 订单ID={}, 药品ID={}, 数量={}", recordNumber, orderId, drugId, inboundRecord.getQuantity());
-        
-        return inboundRecord;
     }
 
     @Override
@@ -218,9 +224,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             }
         }
         
-        // 生成入库单号
-        String recordNumber = generateRecordNumber();
-        inboundRecord.setRecordNumber(recordNumber);
+        // 生成入库单号（使用重试机制）
         inboundRecord.setOrderId(null); // 临时入库不关联订单
         inboundRecord.setDrugId(drugId);
         
@@ -243,25 +247,31 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             inboundRecord.setStatus("QUALIFIED");
         }
         
-        // 保存入库记录
-        inboundRecordMapper.insert(inboundRecord);
-        
-        // 如果验收合格，更新库存
-        if ("QUALIFIED".equals(inboundRecord.getStatus())) {
-            inventoryService.increaseInventory(
-                    drugId,
-                    inboundRecord.getBatchNumber(),
-                    inboundRecord.getQuantity(),
-                    inboundRecord.getExpiryDate(),
-                    drug.getStorageLocation(),
-                    inboundRecord.getProductionDate(),
-                    inboundRecord.getManufacturer() != null ? inboundRecord.getManufacturer() : drug.getManufacturer()
-            );
+        // 使用重试机制创建入库记录
+        try {
+            InboundRecord created = RetryUtil.executeWithRetry(() -> createInboundWithGeneratedNumber(inboundRecord));
+            
+            // 如果验收合格，更新库存（在插入成功后执行，避免重试时重复更新）
+            if ("QUALIFIED".equals(created.getStatus())) {
+                inventoryService.increaseInventory(
+                        drugId,
+                        created.getBatchNumber(),
+                        created.getQuantity(),
+                        created.getExpiryDate(),
+                        drug.getStorageLocation(),
+                        created.getProductionDate(),
+                        created.getManufacturer() != null ? created.getManufacturer() : drug.getManufacturer()
+                );
+            }
+            
+            log.info("创建临时入库记录：入库单号={}, 药品ID={}, 数量={}", created.getRecordNumber(), drugId, created.getQuantity());
+            return created;
+        } catch (Exception e) {
+            if (e.getCause() instanceof DuplicateKeyException) {
+                throw new RuntimeException("当前入库操作过于繁忙，请稍后重试", e);
+            }
+            throw new RuntimeException("创建入库记录失败：" + e.getMessage(), e);
         }
-        
-        log.info("创建临时入库记录：入库单号={}, 药品ID={}, 数量={}", recordNumber, drugId, inboundRecord.getQuantity());
-        
-        return inboundRecord;
     }
 
     @Override
@@ -297,6 +307,21 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime todayEnd = today.plusDays(1).atStartOfDay();
         return inboundRecordMapper.countTodayInbound(todayStart, todayEnd);
+    }
+
+    /**
+     * 核心任务：生成单号 + 插入入库记录（供重试工具调用）
+     * 注意：库存更新逻辑在插入成功后执行，不在此方法中，避免重试时重复更新
+     */
+    private InboundRecord createInboundWithGeneratedNumber(InboundRecord inboundRecord) {
+        // 1. 生成唯一单号
+        String recordNumber = generateRecordNumber();
+        inboundRecord.setRecordNumber(recordNumber);
+        
+        // 2. 插入入库记录（若单号重复，会抛出DuplicateKeyException）
+        inboundRecordMapper.insert(inboundRecord);
+        
+        return inboundRecord;
     }
 
     /**

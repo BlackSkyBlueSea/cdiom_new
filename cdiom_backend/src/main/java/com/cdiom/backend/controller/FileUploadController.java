@@ -57,7 +57,8 @@ public class FileUploadController {
             }
 
             String extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
-            String[] allowedExtensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"};
+            // 支持图片和文档格式（用于协议文件上传）
+            String[] allowedExtensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".pdf", ".doc", ".docx"};
             boolean isAllowed = false;
             for (String ext : allowedExtensions) {
                 if (extension.equals(ext)) {
@@ -67,7 +68,7 @@ public class FileUploadController {
             }
 
             if (!isAllowed) {
-                return Result.error("仅支持图片格式：jpg, jpeg, png, gif, bmp, webp");
+                return Result.error("仅支持以下格式：jpg, jpeg, png, gif, bmp, webp, pdf, doc, docx");
             }
 
             // 验证文件大小（从配置读取）

@@ -18,6 +18,7 @@ import {
   ShoppingCartOutlined,
   ShopOutlined,
   DatabaseOutlined,
+  UserSwitchOutlined,
 } from '@ant-design/icons'
 import request from '../utils/request'
 import { removeToken, getUser, getUserRoleId } from '../utils/auth'
@@ -44,98 +45,98 @@ const Layout = () => {
     // 供应商使用专用菜单（轻量化操作风格）
     const allMenuItems = roleId === 5 ? [
       {
-        key: '/supplier-dashboard',
+        key: 'supplier-dashboard',
         icon: <DashboardOutlined />,
         label: '工作台',
         roles: [5],
       },
       {
-        key: '/supplier-orders',
+        key: 'supplier-orders',
         icon: <ShoppingCartOutlined />,
         label: '订单管理',
         roles: [5],
       },
       {
-        key: '/notices',
+        key: 'notices',
         icon: <BellOutlined />,
         label: '通知公告',
         roles: [5],
       },
     ] : [
       {
-        key: '/dashboard',
+        key: 'dashboard',
         icon: <DashboardOutlined />,
         label: '仪表盘',
         roles: [1, 2, 3, 4, 6], // 所有角色可见（除供应商）
       },
       {
-        key: '/drugs',
+        key: 'drugs',
         icon: <MedicineBoxOutlined />,
         label: '药品信息管理',
         roles: [2, 6], // 仓库管理员、超级管理员可见
       },
       {
-        key: '/inventory',
+        key: 'inventory',
         icon: <DatabaseOutlined />,
         label: '库存管理',
         roles: [2, 6], // 仓库管理员、超级管理员可见
       },
       {
-        key: '/inbound',
+        key: 'inbound',
         icon: <InboxOutlined />,
         label: '入库管理',
         roles: [2, 6], // 仓库管理员、超级管理员可见
       },
       {
-        key: '/outbound',
+        key: 'outbound',
         icon: <ExportOutlined />,
         label: '出库管理',
         roles: [2, 4, 6], // 仓库管理员、医护人员、超级管理员可见
       },
       {
-        key: '/purchase-orders',
+        key: 'purchase-orders',
         icon: <ShoppingCartOutlined />,
         label: '采购订单',
         roles: [3, 6], // 采购专员、超级管理员可见
       },
       {
-        key: '/suppliers',
+        key: 'suppliers',
         icon: <ShopOutlined />,
         label: '供应商管理',
         roles: [3, 6], // 采购专员、超级管理员可见
       },
       {
-        key: '/users',
+        key: 'users',
         icon: <UserOutlined />,
         label: '用户管理',
         roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
-        key: '/roles',
+        key: 'roles',
         icon: <TeamOutlined />,
         label: '角色管理',
         roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
-        key: '/configs',
+        key: 'configs',
         icon: <SettingOutlined />,
         label: '参数配置',
         roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
-        key: '/notices',
+        key: 'notices',
         icon: <BellOutlined />,
         label: '通知公告',
         roles: [1, 2, 3, 4, 5], // 所有角色可见
       },
       {
-        key: '/operation-logs',
+        key: 'operation-logs',
         icon: <FileTextOutlined />,
         label: '操作日志',
         roles: [1, 6], // 系统管理员、超级管理员可见
       },
       {
-        key: '/login-logs',
+        key: 'login-logs',
         icon: <LoginOutlined />,
         label: '登录日志',
         roles: [1, 6], // 系统管理员、超级管理员可见
@@ -159,14 +160,27 @@ const Layout = () => {
       await request.post('/auth/logout')
       removeToken()
       message.success('登出成功')
-      navigate('/login')
+      navigate('/')
     } catch (error) {
       removeToken()
-      navigate('/login')
+      navigate('/')
     }
   }
 
+  const handleLoginOtherUser = () => {
+    // 在新标签页中打开登录页面，带multiLogin参数
+    const loginUrl = `${window.location.origin}/login?multiLogin=true`
+    window.open(loginUrl, '_blank')
+    message.info('已在新标签页中打开登录页面，请在新标签页中登录')
+  }
+
   const userMenuItems = [
+    {
+      key: 'loginOther',
+      icon: <UserSwitchOutlined />,
+      label: '登录其他用户',
+      onClick: handleLoginOtherUser,
+    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -183,16 +197,17 @@ const Layout = () => {
         collapsedWidth={64}
         theme="light"
         trigger={null}
-        style={{ overflow: 'auto', height: '100%' }}
+        style={{ overflow: 'auto', height: '100%', WebkitOverflowScrolling: 'touch' }}
       >
         <div className={`logo ${collapsed ? 'logo-collapsed' : ''}`}>
           {collapsed ? 'C' : 'CDIOM系统'}
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[location.pathname.replace('/app/', '')]}
           items={menuItems}
           onClick={handleMenuClick}
+          style={{ borderRight: 0 }}
         />
       </Sider>
       <AntLayout style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -203,6 +218,7 @@ const Layout = () => {
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsed(!collapsed)}
               className="trigger-btn"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             />
           </div>
           <div className="header-right">
@@ -218,6 +234,7 @@ const Layout = () => {
           <Outlet />
         </Content>
       </AntLayout>
+
     </AntLayout>
   )
 }

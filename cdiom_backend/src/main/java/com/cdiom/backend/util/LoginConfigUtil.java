@@ -3,7 +3,7 @@ package com.cdiom.backend.util;
 import com.cdiom.backend.constant.LoginConfigConstant;
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,10 +12,17 @@ import org.springframework.stereotype.Component;
  * @author cdiom
  */
 @Component
-@RequiredArgsConstructor
 public class LoginConfigUtil {
 
+    // 使用 @Lazy 避免循环依赖：LoginConfigUtil 依赖 SysConfigService，SysConfigServiceImpl 依赖 SystemConfigUtil，SystemConfigUtil 依赖 SysConfigService
     private final SysConfigService sysConfigService;
+
+    /**
+     * 构造器注入，使用 @Lazy 延迟加载 SysConfigService 以解决循环依赖
+     */
+    public LoginConfigUtil(@Lazy SysConfigService sysConfigService) {
+        this.sysConfigService = sysConfigService;
+    }
 
     /**
      * 获取登录失败次数阈值

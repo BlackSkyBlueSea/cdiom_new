@@ -66,6 +66,24 @@ export const PERMISSIONS = {
   INVENTORY_VIEW: 'inventory:view',
   INVENTORY_ADJUST: 'inventory:adjust',
   INVENTORY_ADJUST_APPROVE: 'inventory:adjust:approve',
+  
+  // 供应商审批流程权限
+  SUPPLIER_APPROVAL_APPLY: 'supplier:approval:apply',
+  SUPPLIER_APPROVAL_QUALITY: 'supplier:approval:quality',
+  SUPPLIER_APPROVAL_PRICE: 'supplier:approval:price',
+  SUPPLIER_APPROVAL_FINAL: 'supplier:approval:final',
+  SUPPLIER_APPROVAL_VIEW: 'supplier:approval:view',
+  
+  // 供应商黑名单权限
+  SUPPLIER_BLACKLIST_MANAGE: 'supplier:blacklist:manage',
+  SUPPLIER_BLACKLIST_VIEW: 'supplier:blacklist:view',
+  
+  // 价格管理权限
+  PRICE_AGREEMENT_MANAGE: 'price:agreement:manage',
+  PRICE_AGREEMENT_VIEW: 'price:agreement:view',
+  PRICE_HISTORY_VIEW: 'price:history:view',
+  PRICE_WARNING_CONFIG: 'price:warning:config',
+  PRICE_WARNING_VIEW: 'price:warning:view',
 }
 
 /**
@@ -138,12 +156,30 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.SUPPLIER_AUDIT, // 供应商审核权限
     PERMISSIONS.NOTICE_VIEW,
     PERMISSIONS.NOTICE_CREATE,
+    // 供应商审批流程权限
+    PERMISSIONS.SUPPLIER_APPROVAL_QUALITY, // 资质核验
+    PERMISSIONS.SUPPLIER_APPROVAL_PRICE,   // 价格审核
+    PERMISSIONS.SUPPLIER_APPROVAL_FINAL,   // 最终审批
+    PERMISSIONS.SUPPLIER_APPROVAL_VIEW,    // 查看审批
+    // 价格管理权限
+    PERMISSIONS.PRICE_AGREEMENT_MANAGE,    // 价格协议管理
+    PERMISSIONS.PRICE_AGREEMENT_VIEW,       // 查看价格协议
+    PERMISSIONS.PRICE_WARNING_CONFIG,       // 价格预警配置
+    PERMISSIONS.PRICE_WARNING_VIEW,         // 查看价格预警
+    PERMISSIONS.PRICE_HISTORY_VIEW,         // 查看价格历史
   ],
   3: [ // 采购专员
     PERMISSIONS.DRUG_VIEW, // 查看供应商列表
     PERMISSIONS.DRUG_MANAGE, // 创建、更新供应商（但不包括删除和审核）
     PERMISSIONS.NOTICE_VIEW,
     PERMISSIONS.NOTICE_CREATE,
+    // 供应商审批流程权限
+    PERMISSIONS.SUPPLIER_APPROVAL_APPLY,   // 发起审批申请
+    PERMISSIONS.SUPPLIER_APPROVAL_VIEW,    // 查看审批
+    PERMISSIONS.SUPPLIER_APPROVAL_PRICE,   // 价格审核
+    // 价格管理权限
+    PERMISSIONS.PRICE_AGREEMENT_VIEW,       // 查看价格协议
+    PERMISSIONS.PRICE_HISTORY_VIEW,         // 查看价格历史
   ],
   4: [ // 医护人员
     PERMISSIONS.NOTICE_VIEW,

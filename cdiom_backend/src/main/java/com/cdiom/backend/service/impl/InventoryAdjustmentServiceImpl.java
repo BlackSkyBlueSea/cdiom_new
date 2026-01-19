@@ -8,8 +8,10 @@ import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.InventoryAdjustment;
 import com.cdiom.backend.service.InventoryAdjustmentService;
 import com.cdiom.backend.service.InventoryService;
+import com.cdiom.backend.util.RetryUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -112,23 +114,41 @@ public class InventoryAdjustmentServiceImpl implements InventoryAdjustmentServic
             throw new RuntimeException("调整后数量不能为负");
         }
         
-        // 生成调整单号
+        // 使用重试机制创建库存调整记录
+        try {
+            InventoryAdjustment created = RetryUtil.executeWithRetry(() -> createAdjustmentWithGeneratedNumber(adjustment));
+            
+            // 更新库存数量（在插入成功后执行，避免重试时重复更新）
+            inventoryService.updateInventoryQuantity(
+                    created.getDrugId(),
+                    created.getBatchNumber(),
+                    created.getQuantityAfter()
+            );
+            
+            log.info("创建库存调整：调整单号={}, 药品ID={}, 批次号={}, 调整前={}, 调整后={}, 调整数量={}",
+                    created.getAdjustmentNumber(), created.getDrugId(), created.getBatchNumber(),
+                    created.getQuantityBefore(), created.getQuantityAfter(), created.getAdjustmentQuantity());
+            
+            return created;
+        } catch (Exception e) {
+            if (e.getCause() instanceof DuplicateKeyException) {
+                throw new RuntimeException("当前库存调整操作过于繁忙，请稍后重试", e);
+            }
+            throw new RuntimeException("创建库存调整失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 核心任务：生成单号 + 插入库存调整记录（供重试工具调用）
+     * 注意：库存更新逻辑在插入成功后执行，不在此方法中，避免重试时重复更新
+     */
+    private InventoryAdjustment createAdjustmentWithGeneratedNumber(InventoryAdjustment adjustment) {
+        // 1. 生成唯一单号
         String adjustmentNumber = generateAdjustmentNumber();
         adjustment.setAdjustmentNumber(adjustmentNumber);
         
-        // 保存调整记录
+        // 2. 插入调整记录（若单号重复，会抛出DuplicateKeyException）
         inventoryAdjustmentMapper.insert(adjustment);
-        
-        // 更新库存数量
-        inventoryService.updateInventoryQuantity(
-                adjustment.getDrugId(),
-                adjustment.getBatchNumber(),
-                adjustment.getQuantityAfter()
-        );
-        
-        log.info("创建库存调整：调整单号={}, 药品ID={}, 批次号={}, 调整前={}, 调整后={}, 调整数量={}",
-                adjustmentNumber, adjustment.getDrugId(), adjustment.getBatchNumber(),
-                adjustment.getQuantityBefore(), adjustment.getQuantityAfter(), adjustmentQuantity);
         
         return adjustment;
     }

@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import Home from './pages/Home'
 import Login from './pages/Login'
+import BackendMonitor from './pages/BackendMonitor'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import UserManagement from './pages/UserManagement'
@@ -32,9 +34,11 @@ function App() {
         }}
       >
         <Routes>
+          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/backend-monitor" element={<BackendMonitor />} />
           <Route
-            path="/"
+            path="/app"
             element={
               <PrivateRoute>
                 <Layout />

@@ -35,6 +35,13 @@ public interface SupplierDrugService {
      * 更新供应商-药品关联的单价
      */
     SupplierDrug updateSupplierDrugPrice(Long supplierId, Long drugId, java.math.BigDecimal unitPrice);
+    
+    /**
+     * 更新供应商-药品关联的单价（带协议关联和历史记录）
+     */
+    SupplierDrug updateSupplierDrugPrice(Long supplierId, Long drugId, java.math.BigDecimal unitPrice, 
+                                         Long agreementId, String changeReason, Long operatorId, 
+                                         String operatorName, String ipAddress);
 
     /**
      * 根据供应商ID和药品ID查询关联信息
@@ -46,6 +53,7 @@ public interface SupplierDrugService {
      */
     void batchAddSupplierDrugs(Long supplierId, List<Long> drugIds, Long createBy);
 }
+
 
 
 

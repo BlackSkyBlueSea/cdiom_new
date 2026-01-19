@@ -226,16 +226,24 @@ public class InventoryServiceImpl implements InventoryService {
         
         List<Inventory> batches = inventoryMapper.selectList(wrapper);
         
-        // 计算累计数量，返回足够数量的批次
+        // 计算累计数量，只返回足够数量的批次
         int totalQuantity = 0;
+        java.util.List<Inventory> resultBatches = new java.util.ArrayList<>();
         for (Inventory batch : batches) {
+            resultBatches.add(batch);
             totalQuantity += batch.getQuantity();
             if (totalQuantity >= requiredQuantity) {
+                // 已找到足够数量的批次，停止添加
                 break;
             }
         }
         
-        return batches;
+        // 验证总数量是否足够
+        if (totalQuantity < requiredQuantity) {
+            throw new RuntimeException("库存不足，药品ID=" + drugId + "，需要数量：" + requiredQuantity + "，可用数量：" + totalQuantity);
+        }
+        
+        return resultBatches;
     }
 }
 

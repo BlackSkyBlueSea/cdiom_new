@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Form, Input, Button, Card, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import request from '../utils/request'
 import { setToken, setUser } from '../utils/auth'
 import { fetchUserPermissions } from '../utils/permission'
@@ -10,6 +10,8 @@ import './Login.css'
 const Login = () => {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isMultiLogin = searchParams.get('multiLogin') === 'true'
 
   const onFinish = async (values) => {
     setLoading(true)
@@ -19,14 +21,16 @@ const Login = () => {
         password: values.password,
       })
       if (res.code === 200) {
-        setToken(res.data.token)
+        // 如果是多用户登录模式，使用sessionStorage
+        setToken(res.data.token, isMultiLogin)
         if (res.data.user) {
-          setUser(res.data.user)
+          setUser(res.data.user, isMultiLogin)
         }
         // 获取用户权限
         await fetchUserPermissions()
         message.success('登录成功')
-        navigate('/dashboard')
+        // 跳转到主应用（如果是多用户登录，URL参数会在跳转时自动清除）
+        navigate('/app', { replace: true })
       }
     } catch (error) {
       const errorMsg = error.message || '登录失败'
@@ -38,7 +42,7 @@ const Login = () => {
 
   return (
     <div className="login-container">
-      <Card className="login-card" title="CDIOM 临床药品出入库管理系统">
+      <Card className="login-card" title={isMultiLogin ? "登录其他账号 - CDIOM 临床药品出入库管理系统" : "CDIOM 临床药品出入库管理系统"}>
         <Form
           name="login"
           onFinish={onFinish}

@@ -32,6 +32,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 允许访问登录接口
                         .requestMatchers("/api/v1/auth/login").permitAll()
+                        // 允许访问监控接口（公开访问）
+                        .requestMatchers("/api/v1/system/info", "/api/v1/logs/recent", "/api/v1/health").permitAll()
+                        // 允许WebSocket连接
+                        .requestMatchers("/api/v1/logs/stream/**").permitAll()
                         // 允许访问静态资源
                         .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
                         // 所有API接口都需要认证

@@ -11,8 +11,10 @@ import com.cdiom.backend.model.OutboundApply;
 import com.cdiom.backend.model.OutboundApplyItem;
 import com.cdiom.backend.service.InventoryService;
 import com.cdiom.backend.service.OutboundApplyService;
+import com.cdiom.backend.util.RetryUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -97,62 +99,19 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             throw new RuntimeException("出库申请明细不能为空");
         }
         
-        // 生成申领单号
-        String applyNumber = generateApplyNumber();
-        outboundApply.setApplyNumber(applyNumber);
         outboundApply.setStatus("PENDING");
         
-        // 保存申请
-        outboundApplyMapper.insert(outboundApply);
-        
-        // 保存申请明细
-        for (int i = 0; i < items.size(); i++) {
-            Map<String, Object> item = items.get(i);
-            OutboundApplyItem applyItem = new OutboundApplyItem();
-            applyItem.setApplyId(outboundApply.getId());
-            
-            // 验证并转换 drugId
-            Object drugIdObj = item.get("drugId");
-            if (drugIdObj == null) {
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID不能为空");
+        // 使用重试机制创建出库申请
+        try {
+            OutboundApply created = RetryUtil.executeWithRetry(() -> createApplyWithGeneratedNumber(outboundApply, items));
+            log.info("创建出库申请：申领单号={}, 申请人ID={}", created.getApplyNumber(), created.getApplicantId());
+            return created;
+        } catch (Exception e) {
+            if (e.getCause() instanceof DuplicateKeyException) {
+                throw new RuntimeException("当前出库申请创建过于繁忙，请稍后重试", e);
             }
-            try {
-                Long drugId = Long.valueOf(drugIdObj.toString());
-                applyItem.setDrugId(drugId);
-            } catch (NumberFormatException e) {
-                log.error("出库申请明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID格式不正确");
-            }
-            
-            if (item.get("batchNumber") != null) {
-                applyItem.setBatchNumber(item.get("batchNumber").toString());
-            }
-            
-            // 验证并转换 quantity
-            Object quantityObj = item.get("quantity");
-            if (quantityObj == null) {
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量不能为空");
-            }
-            try {
-                Integer quantity = Integer.valueOf(quantityObj.toString());
-                if (quantity <= 0) {
-                    throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量必须大于0");
-                }
-                applyItem.setQuantity(quantity);
-            } catch (NumberFormatException e) {
-                log.error("出库申请明细第{}项：数量类型转换失败，值={}, 错误={}", i + 1, quantityObj, e.getMessage());
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量格式不正确");
-            }
-            
-            if (item.get("remark") != null) {
-                applyItem.setRemark(item.get("remark").toString());
-            }
-            outboundApplyItemMapper.insert(applyItem);
+            throw new RuntimeException("创建出库申请失败：" + e.getMessage(), e);
         }
-        
-        log.info("创建出库申请：申领单号={}, 申请人ID={}", applyNumber, outboundApply.getApplicantId());
-        
-        return outboundApply;
     }
 
     @Override
@@ -289,9 +248,19 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 inventoryService.decreaseInventory(drugId, batchNumber, actualQuantity);
             } else {
                 // 如果未指定批次，按FIFO原则出库
+                // getAvailableBatches 方法已经验证了总数量是否足够，并只返回足够数量的批次
                 List<Inventory> availableBatches = inventoryService.getAvailableBatches(drugId, actualQuantity);
                 int remainingQuantity = actualQuantity;
                 
+                // 在扣减前再次验证（双重保险）
+                int totalAvailableQuantity = availableBatches.stream()
+                        .mapToInt(Inventory::getQuantity)
+                        .sum();
+                if (totalAvailableQuantity < actualQuantity) {
+                    throw new RuntimeException("库存不足，药品ID=" + drugId + "，需要出库：" + actualQuantity + "，可用数量：" + totalAvailableQuantity);
+                }
+                
+                // 按FIFO顺序扣减库存
                 for (Inventory batch : availableBatches) {
                     if (remainingQuantity <= 0) {
                         break;
@@ -302,8 +271,9 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                     remainingQuantity -= batchQuantity;
                 }
                 
+                // 理论上不应该到达这里（因为已经验证过），但保留作为最后一道防线
                 if (remainingQuantity > 0) {
-                    throw new RuntimeException("库存不足，药品ID=" + drugId + "，需要出库：" + actualQuantity);
+                    throw new RuntimeException("库存扣减异常，药品ID=" + drugId + "，剩余未扣减数量：" + remainingQuantity);
                 }
             }
             
@@ -354,6 +324,65 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     @Override
     public List<OutboundApplyItem> getOutboundApplyItems(Long applyId) {
         return outboundApplyItemMapper.selectByApplyId(applyId);
+    }
+
+    /**
+     * 核心任务：生成单号 + 插入出库申请（供重试工具调用）
+     */
+    private OutboundApply createApplyWithGeneratedNumber(OutboundApply outboundApply, List<Map<String, Object>> items) {
+        // 1. 生成唯一单号
+        String applyNumber = generateApplyNumber();
+        outboundApply.setApplyNumber(applyNumber);
+        
+        // 2. 保存申请（若单号重复，会抛出DuplicateKeyException）
+        outboundApplyMapper.insert(outboundApply);
+        
+        // 3. 保存申请明细
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> item = items.get(i);
+            OutboundApplyItem applyItem = new OutboundApplyItem();
+            applyItem.setApplyId(outboundApply.getId());
+            
+            // 验证并转换 drugId
+            Object drugIdObj = item.get("drugId");
+            if (drugIdObj == null) {
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID不能为空");
+            }
+            try {
+                Long drugId = Long.valueOf(drugIdObj.toString());
+                applyItem.setDrugId(drugId);
+            } catch (NumberFormatException e) {
+                log.error("出库申请明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID格式不正确");
+            }
+            
+            if (item.get("batchNumber") != null) {
+                applyItem.setBatchNumber(item.get("batchNumber").toString());
+            }
+            
+            // 验证并转换 quantity
+            Object quantityObj = item.get("quantity");
+            if (quantityObj == null) {
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量不能为空");
+            }
+            try {
+                Integer quantity = Integer.valueOf(quantityObj.toString());
+                if (quantity <= 0) {
+                    throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量必须大于0");
+                }
+                applyItem.setQuantity(quantity);
+            } catch (NumberFormatException e) {
+                log.error("出库申请明细第{}项：数量类型转换失败，值={}, 错误={}", i + 1, quantityObj, e.getMessage());
+                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量格式不正确");
+            }
+            
+            if (item.get("remark") != null) {
+                applyItem.setRemark(item.get("remark").toString());
+            }
+            outboundApplyItemMapper.insert(applyItem);
+        }
+        
+        return outboundApply;
     }
 
     /**
