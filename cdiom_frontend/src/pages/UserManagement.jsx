@@ -453,15 +453,16 @@ const UserManagement = () => {
               />
             </Tooltip>
           )}
-          {record.lockTime && hasPermission(PERMISSIONS.USER_UPDATE) && (
-            <Tooltip title="解锁">
-              <Button
-                type="link"
-                icon={<UnlockOutlined />}
-                onClick={() => handleUnlock(record.id)}
-              />
-            </Tooltip>
-          )}
+          {record.lockTime && hasPermission(PERMISSIONS.USER_UPDATE) && 
+            new Date(record.lockTime) > new Date() && (
+              <Tooltip title="解锁">
+                <Button
+                  type="link"
+                  icon={<UnlockOutlined />}
+                  onClick={() => handleUnlock(record.id)}
+                />
+              </Tooltip>
+            )}
           {hasPermission(PERMISSIONS.USER_DELETE) && (
             <Popconfirm
               title="确定要删除吗？"

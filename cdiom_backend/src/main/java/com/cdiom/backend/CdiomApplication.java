@@ -16,7 +16,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class CdiomApplication {
     public static void main(String[] args) {
         SpringApplication.run(CdiomApplication.class, args);
-        System.out.println("(♥◠‿◠)ﾉﾞ  CDIOM系统启动成功   ლ(´ڡ`ლ)ﾞ");
+        System.out.println("=============================================================");
+        System.out.println("╭───────────────────────────────────────────────────────────╮");
+        System.out.println("│                                                           │");
+        System.out.println("│          (♥◠‿◠)ﾉﾞ  CDIOM系统启动成功   ლ(´ڡ`ლ)ﾞ           │");
+        System.out.println("│                 系统就绪，可正常提供服务 ~                │");
+        System.out.println("│                                                           │");
+        System.out.println("╰───────────────────────────────────────────────────────────╯");
+        System.out.println("=============================================================");
     }
 }
 

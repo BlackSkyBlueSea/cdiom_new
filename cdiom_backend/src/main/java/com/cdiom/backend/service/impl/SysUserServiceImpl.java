@@ -58,7 +58,32 @@ public class SysUserServiceImpl implements SysUserService {
         
         wrapper.orderByDesc(SysUser::getCreateTime);
         
-        return sysUserMapper.selectPage(pageParam, wrapper);
+        Page<SysUser> userPage = sysUserMapper.selectPage(pageParam, wrapper);
+        
+        // 检查并清除已过期的锁定状态
+        LocalDateTime currentTime = LocalDateTime.now();
+        List<SysUser> usersToUpdate = new java.util.ArrayList<>();
+        
+        for (SysUser user : userPage.getRecords()) {
+            if (user.getLockTime() != null && currentTime.isAfter(user.getLockTime())) {
+                // 锁定时间已过期，清除锁定状态
+                user.setLockTime(null);
+                user.setLoginFailCount(0);
+                user.setLastLoginFailTime(null);
+                user.setUpdateTime(LocalDateTime.now());
+                usersToUpdate.add(user);
+            }
+        }
+        
+        // 批量更新已过期的用户锁定状态
+        if (!usersToUpdate.isEmpty()) {
+            for (SysUser user : usersToUpdate) {
+                sysUserMapper.updateById(user);
+            }
+            log.info("自动清除 {} 个用户的过期锁定状态", usersToUpdate.size());
+        }
+        
+        return userPage;
     }
 
     @Override

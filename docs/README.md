@@ -1,156 +1,218 @@
 # CDIOM 项目文档目录
 
-本目录包含CDIOM项目的所有技术文档和需求分析文档。
+本目录包含CDIOM项目的所有技术文档，按照软件开发流程组织。
 
-## 文档列表
+## 📚 文档分类（按软件开发流程）
 
-### 📋 需求分析文档
+### 📋 一、需求分析阶段
 
-- **[Core_Business_Requirements_Analysis.md](./Core_Business_Requirements_Analysis.md)**
+#### Core_Business_Requirements_Analysis.md
+- **内容**：核心业务需求分析
+- **包含**：
   - 库存管理功能需求分析
   - 入库管理功能需求分析
   - 出库管理功能需求分析
   - 业务流程和处理流程说明
   - 数据模型和业务规则
 
-- **[Order_Inbound_Record_Relationship_Guide.md](./Order_Inbound_Record_Relationship_Guide.md)**
-  - 订单与入库记录的数据库关系
-  - 订单条形码生成方案
-  - 入库验收流程设计
-  - 数据流转关系
 
-### 📊 技术文档
+---
 
-- **[Code_Completeness_Report.md](./Code_Completeness_Report.md)**
+### 🎨 二、设计阶段
+
+#### Database_Design.md
+- **内容**：数据库设计文档
+- **包含**：
+  - 数据库基本信息
+  - 数据库表分类（系统表、权限表、业务表、扩展表）
+  - 表结构详细说明
+  - 表关系说明
+  - 设计特点
+  - 索引设计
+  - 约束设计
+  - 注意事项
+
+#### Function_Modules.md
+- **内容**：功能模块详细说明
+- **包含**：
+  - 功能模块概览
+  - 后端模块详细说明（用户管理、角色管理、药品管理、库存管理等）
+  - 前端模块详细说明（登录页面、主布局、各业务页面等）
+  - 项目进度统计
+  - 待实现功能规划
+
+#### API_Documentation.md
+- **内容**：API接口文档
+- **包含**：
+  - 统一响应格式
+  - 认证接口
+  - 用户管理接口
+  - 角色管理接口
+  - 业务管理接口（药品、库存、入库、出库、采购订单、供应商等）
+  - 第三方API集成说明
+
+---
+
+### 🧪 三、测试阶段
+
+#### System_Test_Report.md
+- **内容**：系统测试报告
+- **包含**：
+  - 功能测试用例和结果
+  - 性能测试结果
+  - 安全测试结果
+  - 兼容性测试结果
+
+---
+
+### 📋 四、维护和版本管理
+
+#### CHANGELOG.md
+- **内容**：版本历史文档
+- **包含**：
+  - 所有版本的完整更新内容
+  - 功能更新记录
+  - Bug修复记录
+  - 性能优化记录
+  - 数据库变更记录
+
+---
+
+### 🚀 五、部署和运维
+
+#### Deployment_Guide.md
+- **内容**：部署指南
+- **包含**：
+  - 环境要求
+  - 开发环境部署（后端、前端）
+  - 生产环境部署（后端、前端）
+  - Nginx配置（HTTP、HTTPS）
+  - 配置说明（数据库、JWT、邮箱、第三方API、环境变量）
+  - 系统服务配置（Linux systemd、Windows服务）
+  - 常见问题排查
+
+---
+
+### 💻 六、开发指南
+
+#### Development_Guide.md
+- **内容**：开发指南
+- **包含**：
+  - 项目架构概述
+  - 后端开发指南（添加新业务模块、开发规范、代码示例）
+  - 前端开发指南（添加新页面、开发规范、代码示例）
+  - 开发注意事项（通用、后端、前端、安全）
+  - 贡献指南（代码规范、提交规范、测试要求、PR流程）
+  - 常见问题
+
+#### Project_Structure.md
+- **内容**：项目结构详细说明
+- **包含**：
+  - 项目根目录结构
+  - 后端项目结构（Java源码、资源文件）
+  - 前端项目结构（页面组件、公共组件、工具函数）
+  - 数据库脚本结构（初始化脚本、扩展脚本、修复脚本）
+  - 文档目录结构
+  - 目录说明和架构设计说明
+  - 文件统计
+
+---
+
+### 🔧 七、开发指南和问题修复
+
+#### Code_Completeness_Report.md
+- **内容**：代码完整性检查报告
+- **包含**：
   - 已实现功能模块检查
   - 缺失功能模块说明
   - 代码质量分析
   - 完成度统计
 
-- **[Code_Logic_Vulnerability_Report.md](./Code_Logic_Vulnerability_Report.md)** ⚠️ **重要**
+#### Code_Logic_Vulnerability_Report.md ⚠️ **重要**
+- **内容**：代码逻辑漏洞检查报告
+- **包含**：
   - 严重问题：登录锁定机制、库存并发安全、单号生成并发问题
   - 中等问题：出库逻辑、入库验证、订单状态更新
   - 轻微问题：异常信息暴露、数据验证
   - 修复优先级和修复建议
 
-- **[Permission_Issue_Fix_Guide.md](./Permission_Issue_Fix_Guide.md)**
+#### Permission_Issue_Fix_Guide.md
+- **内容**：权限问题修复指南
+- **包含**：
   - 权限问题发现和修复
   - 权限配置说明
   - 权限代码对照表
 
-- **[Concurrency_Configuration_Guide.md](./Concurrency_Configuration_Guide.md)**
+#### Concurrency_Configuration_Guide.md
+- **内容**：并发访问配置指南
+- **包含**：
   - 系统并发支持原理
   - 配置优化说明
   - 性能优化建议
 
-- **[Drug_Data_Import_Guide.md](./Drug_Data_Import_Guide.md)**
+#### Drug_Data_Import_Guide.md
+- **内容**：药品数据导入指南
+- **包含**：
   - 药品数据导入方法
   - 数据格式说明
   - 注意事项
 
-- **[Drug_Data_Retrieval_Troubleshooting_Guide.md](./Drug_Data_Retrieval_Troubleshooting_Guide.md)**
+#### Drug_Data_Retrieval_Troubleshooting_Guide.md
+- **内容**：药品数据获取问题排查指南
+- **包含**：
   - 药品数据获取问题排查指南
   - 常见问题及解决方案
   - 快速诊断命令
 
-- **[Fine_Grained_Permission_System_Guide.md](./Fine_Grained_Permission_System_Guide.md)**
+#### Fine_Grained_Permission_System_Guide.md
+- **内容**：细粒度权限系统指南
+- **包含**：
   - 细粒度权限系统说明
   - 权限设计原理
   - 权限配置指南
 
-- **[Form_Validation_Security_Report.md](./Form_Validation_Security_Report.md)**
+#### Form_Validation_Security_Report.md
+- **内容**：表单验证和安全检查报告
+- **包含**：
   - 表单验证和安全检查报告
   - 安全漏洞分析
   - 修复建议
 
-## 文档更新说明
+---
+
+## 📖 文档使用建议
+
+### 新开发者入门
+1. 先阅读 **Core_Business_Requirements_Analysis.md** 了解业务需求
+2. 阅读 **Database_Design.md** 了解数据库结构
+3. 阅读 **Function_Modules.md** 了解功能模块
+4. 阅读 **API_Documentation.md** 了解接口规范
+
+### 开发过程中
+- 参考 **Function_Modules.md** 了解功能实现细节
+- 参考 **API_Documentation.md** 进行接口开发
+- 遇到问题查看对应的修复指南文档
+
+### 测试和部署
+- 参考 **System_Test_Report.md** 进行测试
+- 参考 **Deployment_Guide.md** 进行系统部署
+- 参考 **CHANGELOG.md** 了解版本变更
+
+---
+
+## 📝 文档更新说明
 
 所有文档的最后更新日期已统一为实际创建/修改时间，便于追踪文档版本。
 
 ---
 
-## 文档信息
+## 📋 文档信息
 
 **文档创建时间**：2026年1月13日 10:31:17  
 **最后修改时间**：2026年1月20日  
 **当前更新时间**：2026年1月20日  
-**文档版本**：v1.6
+**文档版本**：v1.6.0
 
 ---
 
 **最后更新**：2026年1月20日
-
-## 今日更新（2026-01-14）
-
-### 新增文档（v1.5.0）
-- ✅ **Code_Completeness_Report.md** - 代码完整性检查报告
-  - 已实现功能模块检查
-  - 缺失功能模块说明
-  - 代码质量分析
-  - 完成度统计
-
-- ✅ **Code_Logic_Vulnerability_Report.md** - 代码逻辑漏洞检查报告 ⚠️ **重要**
-  - 严重问题：登录锁定机制、库存并发安全、单号生成并发问题
-  - 中等问题：出库逻辑、入库验证、订单状态更新
-  - 轻微问题：异常信息暴露、数据验证
-  - 修复优先级和修复建议
-
-- ✅ **Fine_Grained_Permission_System_Guide.md** - 细粒度权限系统指南
-  - 细粒度权限系统说明
-  - 权限设计原理
-  - 权限配置指南
-  - 用户直接权限关联说明
-
-- ✅ **Form_Parameter_Mapping_Report.md** - 表单参数映射报告
-  - 前端表单参数与后端接口参数映射关系
-  - 参数验证规则说明
-
-- ✅ **Form_Validation_Security_Report.md** - 表单验证和安全检查报告
-  - 详细分析了系统中的表单验证机制
-  - 识别了潜在的安全漏洞
-  - 提供了修复建议和最佳实践
-
-### 更新文档
-- ✅ **Core_Business_Requirements_Analysis.md** - 核心业务需求分析（更新）
-- ✅ **Order_Inbound_Record_Relationship_Guide.md** - 订单与入库关系说明（更新）
-- ✅ **Drug_Data_Import_Guide.md** - 药品数据导入说明（更新）
-- ✅ **Permission_Issue_Fix_Guide.md** - 权限问题修复说明（更新）
-- ✅ **Concurrency_Configuration_Guide.md** - 并发访问配置说明（更新）
-- ✅ **Drug_Data_Retrieval_Troubleshooting_Guide.md** - 药品数据获取问题排查指南（更新）
-
-### 功能更新（v1.5.0）
-- ✅ 细粒度权限系统实现（用户直接权限关联）
-- ✅ 供应商仪表盘功能（SupplierDashboard）
-- ✅ 供应商订单管理功能（SupplierOrderManagement）
-- ✅ 用户管理功能增强（权限管理、邮箱验证）
-- ✅ 仪表盘功能增强（多角色专用仪表盘）
-- ✅ 采购订单管理功能增强
-- ✅ 库存管理功能增强
-- ✅ 入库管理功能增强
-- ✅ 出库管理功能增强
-- ✅ 通知公告功能增强
-- ✅ 登录日志功能增强
-- ✅ 文件上传功能增强
-- ✅ 条形码服务实现
-- ✅ 代码优化和重构
-
-### 新增文档（v1.6.0）
-- ✅ **20260120-今日任务.md** - 代码检查任务清单
-  - P0紧急问题：前端console日志清理、文件上传安全性增强、Controller参数验证完善
-  - P1重要优化：N+1查询问题优化、数据库索引优化、错误处理完善
-  - P2优化建议：代码质量优化、前端代码优化、文档完善、测试覆盖
-
-- ✅ **UPDATE_LOG_20260120.md** - 系统更新日志（2026-01-20）
-  - 文档更新说明
-  - 前端代码优化（统一日志工具、Vite配置优化）
-  - 待处理问题清单
-  - 使用说明和后续计划
-
-### 待解决问题（v1.6.0）
-- ⏳ 前端console日志清理（P0）
-- ⏳ 文件上传安全性增强（P0）
-- ⏳ Controller参数验证完善（P0）
-- ⏳ N+1查询问题优化（P1）
-- ⏳ 数据库索引优化（P1）
-- ⏳ 错误处理完善（P1）
-
