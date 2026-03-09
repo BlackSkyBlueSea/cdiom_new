@@ -11,6 +11,7 @@ import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DrugInfoService;
 import com.cdiom.backend.service.ExcelExportService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -73,7 +74,7 @@ public class DrugInfoController {
      * 创建药品信息
      */
     @PostMapping
-    public Result<DrugInfo> createDrugInfo(@RequestBody DrugInfo drugInfo) {
+    public Result<DrugInfo> createDrugInfo(@Valid @RequestBody DrugInfo drugInfo) {
         try {
             DrugInfo createdDrug = drugInfoService.createDrugInfo(drugInfo);
             return Result.success("创建成功", createdDrug);
@@ -86,7 +87,7 @@ public class DrugInfoController {
      * 更新药品信息
      */
     @PutMapping("/{id}")
-    public Result<DrugInfo> updateDrugInfo(@PathVariable Long id, @RequestBody DrugInfo drugInfo) {
+    public Result<DrugInfo> updateDrugInfo(@PathVariable Long id, @Valid @RequestBody DrugInfo drugInfo) {
         try {
             drugInfo.setId(id);
             DrugInfo updatedDrug = drugInfoService.updateDrugInfo(drugInfo);

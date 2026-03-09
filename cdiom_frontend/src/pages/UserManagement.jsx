@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, InputNumber, Tag, Checkbox, Divider, Card, Tabs } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UnlockOutlined, CheckCircleOutlined, CloseCircleOutlined, UndoOutlined, ExclamationCircleOutlined, SafetyOutlined, CloseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 import SuperAdminModal from '../components/SuperAdminModal'
 
@@ -82,7 +83,7 @@ const UserManagement = () => {
         setRoles(res.data.records)
       }
     } catch (error) {
-      console.error('获取角色列表失败', error)
+      logger.error('获取角色列表失败', error)
     }
   }
 
@@ -93,7 +94,7 @@ const UserManagement = () => {
         setAllPermissions(res.data || [])
       }
     } catch (error) {
-      console.error('获取权限列表失败', error)
+      logger.error('获取权限列表失败', error)
     }
   }
 
@@ -483,18 +484,13 @@ const UserManagement = () => {
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <h2 style={{ margin: 0 }}>用户管理</h2>
         <Space>
-          <Tooltip title="查看和恢复已删除的用户">
-            <Button 
-              icon={<UndoOutlined />} 
-              onClick={handleOpenRecycleBin}
-            >
-              回收站
-            </Button>
+          <Tooltip title="回收站">
+            <Button icon={<UndoOutlined />} onClick={handleOpenRecycleBin} />
           </Tooltip>
           <PermissionWrapper permission={PERMISSIONS.USER_CREATE}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增用户
-            </Button>
+            <Tooltip title="新增用户">
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+            </Tooltip>
           </PermissionWrapper>
         </Space>
       </div>

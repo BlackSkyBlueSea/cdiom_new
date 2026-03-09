@@ -1,6 +1,7 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysPermissionMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
 import com.cdiom.backend.mapper.SysUserPermissionMapper;
@@ -223,18 +224,18 @@ public class PermissionServiceImpl implements PermissionService {
     public void updateUserPermissions(Long userId, List<Long> permissionIds) {
         try {
             if (userId == null) {
-                throw new RuntimeException("用户ID不能为空");
+                throw new ServiceException("用户ID不能为空");
             }
 
             // 检查用户是否存在
             SysUser user = userMapper.selectById(userId);
             if (user == null) {
-                throw new RuntimeException("用户不存在");
+                throw new ServiceException("用户不存在");
             }
 
             // 超级管理员不允许修改权限
             if (user.getRoleId() != null && user.getRoleId() == 6) {
-                throw new RuntimeException("超级管理员的权限不允许修改");
+                throw new ServiceException("超级管理员的权限不允许修改");
             }
 
             // 删除用户现有的直接权限

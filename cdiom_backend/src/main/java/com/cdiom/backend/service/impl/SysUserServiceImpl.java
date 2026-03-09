@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysPermissionMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
 import com.cdiom.backend.mapper.SysUserPermissionMapper;
@@ -98,7 +99,7 @@ public class SysUserServiceImpl implements SysUserService {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, user.getUsername());
         if (sysUserMapper.selectOne(wrapper) != null) {
-            throw new RuntimeException("用户名已存在");
+            throw new ServiceException("用户名已存在");
         }
         
         // 检查手机号是否已存在（如果提供了手机号）
@@ -110,7 +111,7 @@ public class SysUserServiceImpl implements SysUserService {
             // MyBatis-Plus会自动添加 deleted=0 的条件，只查询未删除的记录
             SysUser existingUser = sysUserMapper.selectOne(phoneWrapper);
             if (existingUser != null) {
-                throw new RuntimeException("手机号 " + user.getPhone() + " 已被使用");
+                throw new ServiceException("手机号 " + user.getPhone() + " 已被使用");
             }
         }
         
@@ -119,7 +120,7 @@ public class SysUserServiceImpl implements SysUserService {
             LambdaQueryWrapper<SysUser> emailWrapper = new LambdaQueryWrapper<>();
             emailWrapper.eq(SysUser::getEmail, user.getEmail());
             if (sysUserMapper.selectOne(emailWrapper) != null) {
-                throw new RuntimeException("邮箱已被使用");
+                throw new ServiceException("邮箱已被使用");
             }
         }
         
@@ -171,7 +172,7 @@ public class SysUserServiceImpl implements SysUserService {
     public SysUser updateUser(SysUser user) {
         SysUser existUser = sysUserMapper.selectById(user.getId());
         if (existUser == null) {
-            throw new RuntimeException("用户不存在");
+            throw new ServiceException("用户不存在");
         }
         
         // 如果修改了用户名，检查是否重复
@@ -179,7 +180,7 @@ public class SysUserServiceImpl implements SysUserService {
             LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(SysUser::getUsername, user.getUsername());
             if (sysUserMapper.selectOne(wrapper) != null) {
-                throw new RuntimeException("用户名已存在");
+                throw new ServiceException("用户名已存在");
             }
         }
         
@@ -190,7 +191,7 @@ public class SysUserServiceImpl implements SysUserService {
             phoneWrapper.eq(SysUser::getPhone, user.getPhone());
             SysUser phoneUser = sysUserMapper.selectOne(phoneWrapper);
             if (phoneUser != null && !phoneUser.getId().equals(user.getId())) {
-                throw new RuntimeException("手机号已被使用");
+                throw new ServiceException("手机号已被使用");
             }
         }
         
@@ -201,7 +202,7 @@ public class SysUserServiceImpl implements SysUserService {
             emailWrapper.eq(SysUser::getEmail, user.getEmail());
             SysUser emailUser = sysUserMapper.selectOne(emailWrapper);
             if (emailUser != null && !emailUser.getId().equals(user.getId())) {
-                throw new RuntimeException("邮箱已被使用");
+                throw new ServiceException("邮箱已被使用");
             }
         }
         
@@ -229,13 +230,13 @@ public class SysUserServiceImpl implements SysUserService {
     public void updateUserStatus(Long id, Integer status) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new ServiceException("用户不存在");
         }
         
         // 超级管理员的状态修改必须通过专门的接口（需要验证码验证）
         // 这里只允许通过 /super-admin/enable 或 /super-admin/disable 接口修改
         if ("super_admin".equals(user.getUsername())) {
-            throw new RuntimeException("超级管理员的状态修改需要通过专门的接口，并需要邮箱验证码验证");
+            throw new ServiceException("超级管理员的状态修改需要通过专门的接口，并需要邮箱验证码验证");
         }
         
         user.setStatus(status);
@@ -248,7 +249,7 @@ public class SysUserServiceImpl implements SysUserService {
     public void unlockUser(Long id) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new ServiceException("用户不存在");
         }
         user.setLoginFailCount(0);
         user.setLockTime(null);
@@ -300,7 +301,7 @@ public class SysUserServiceImpl implements SysUserService {
         // 使用updateById更新，如果用户不存在，返回0
         int updated = sysUserMapper.updateById(user);
         if (updated == 0) {
-            throw new RuntimeException("用户不存在或已被永久删除");
+            throw new ServiceException("用户不存在或已被永久删除");
         }
     }
 
@@ -312,7 +313,7 @@ public class SysUserServiceImpl implements SysUserService {
         int deletedCount = sysUserMapper.permanentlyDeleteById(id);
         
         if (deletedCount == 0) {
-            throw new RuntimeException("用户不存在或已被永久删除");
+            throw new ServiceException("用户不存在或已被永久删除");
         }
     }
 }

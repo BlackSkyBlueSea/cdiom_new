@@ -21,6 +21,11 @@ public interface OutboundApplyService {
     Page<OutboundApply> getOutboundApplyList(Integer page, Integer size, String keyword, Long applicantId, Long approverId, String department, String status, LocalDate startDate, LocalDate endDate);
 
     /**
+     * 获取已有科室列表（出库申请中已使用过的科室，供新建申请时下拉选择）
+     */
+    List<String> listDepartments();
+
+    /**
      * 根据ID查询出库申请
      */
     OutboundApply getOutboundApplyById(Long id);
@@ -56,6 +61,11 @@ public interface OutboundApplyService {
     void cancelOutboundApply(Long id);
 
     /**
+     * 申请人撤回出库申请（仅待审批状态下本人可撤回）
+     */
+    void withdrawOutboundApply(Long id, Long applicantUserId);
+
+    /**
      * 查询待审批的出库申请数量
      */
     Long getPendingOutboundCount();
@@ -69,5 +79,11 @@ public interface OutboundApplyService {
      * 获取出库申请明细列表
      */
     List<OutboundApplyItem> getOutboundApplyItems(Long applyId);
+
+    /**
+     * 校验出库申请所需库存是否充足（用于审批前在界面友好提示）
+     * @return Map: sufficient(Boolean), message(String), details(List<Map: drugId, drugName, required, available, sufficient>)
+     */
+    Map<String, Object> checkStockForApply(Long applyId);
 }
 

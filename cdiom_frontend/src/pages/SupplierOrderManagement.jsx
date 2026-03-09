@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker } from 'antd'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Tooltip } from 'antd'
 import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckOutlined, CloseOutlined, SendOutlined, EditOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const SupplierOrderManagement = () => {
@@ -25,7 +26,6 @@ const SupplierOrderManagement = () => {
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [shipModalVisible, setShipModalVisible] = useState(false)
   const [logisticsModalVisible, setLogisticsModalVisible] = useState(false)
-  const [confirmForm] = Form.useForm()
   const [rejectForm] = Form.useForm()
   const [shipForm] = Form.useForm()
   const [logisticsForm] = Form.useForm()
@@ -55,7 +55,7 @@ const SupplierOrderManagement = () => {
         message.error(res.msg || '获取订单列表失败')
       }
     } catch (error) {
-      console.error('获取订单列表失败:', error)
+      logger.error('获取订单列表失败:', error)
       message.error('获取订单列表失败')
     } finally {
       setLoading(false)
@@ -98,7 +98,6 @@ const SupplierOrderManagement = () => {
       if (res.code === 200) {
         message.success('订单确认成功')
         setConfirmModalVisible(false)
-        confirmForm.resetFields()
         setActionOrderId(null)
         fetchOrders()
       } else {
@@ -227,79 +226,79 @@ const SupplierOrderManagement = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space wrap>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={async () => {
-              try {
-                const res = await request.get(`/purchase-orders/${record.id}/items`)
-                if (res.code === 200) {
-                  setCurrentOrder({ ...record, items: res.data })
-                  setDetailModalVisible(true)
+          <Tooltip title="查看明细">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={async () => {
+                try {
+                  const res = await request.get(`/purchase-orders/${record.id}/items`)
+                  if (res.code === 200) {
+                    setCurrentOrder({ ...record, items: res.data })
+                    setDetailModalVisible(true)
+                  }
+                } catch (error) {
+                  message.error('获取订单明细失败')
                 }
-              } catch (error) {
-                message.error('获取订单明细失败')
-              }
-            }}
-          >
-            查看明细
-          </Button>
+              }}
+            />
+          </Tooltip>
           {record.status === 'PENDING' && (
             <>
-              <Button
-                type="link"
-                size="small"
-                icon={<CheckOutlined />}
-                style={{ color: '#52c41a' }}
-                onClick={() => {
-                  setActionOrderId(record.id)
-                  setConfirmModalVisible(true)
-                }}
-              >
-                确认
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                icon={<CloseOutlined />}
-                danger
-                onClick={() => {
-                  setActionOrderId(record.id)
-                  setRejectModalVisible(true)
-                }}
-              >
-                拒绝
-              </Button>
+              <Tooltip title="确认">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  style={{ color: '#52c41a' }}
+                  onClick={() => {
+                    setActionOrderId(record.id)
+                    setConfirmModalVisible(true)
+                  }}
+                />
+              </Tooltip>
+              <Tooltip title="拒绝">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  danger
+                  onClick={() => {
+                    setActionOrderId(record.id)
+                    setRejectModalVisible(true)
+                  }}
+                />
+              </Tooltip>
             </>
           )}
           {record.status === 'CONFIRMED' && (
-            <Button
-              type="link"
-              size="small"
-              icon={<SendOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                shipForm.resetFields()
-                setShipModalVisible(true)
-              }}
-            >
-              发货
-            </Button>
+            <Tooltip title="发货">
+              <Button
+                type="link"
+                size="small"
+                icon={<SendOutlined />}
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  shipForm.resetFields()
+                  setShipModalVisible(true)
+                }}
+              />
+            </Tooltip>
           )}
           {(record.status === 'SHIPPED' || record.status === 'CONFIRMED') && (
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
-                setLogisticsModalVisible(true)
-              }}
-            >
-              物流
-            </Button>
+            <Tooltip title="物流">
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                  setLogisticsModalVisible(true)
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       ),
@@ -332,16 +331,16 @@ const SupplierOrderManagement = () => {
             <Select.Option value="RECEIVED">已入库</Select.Option>
             <Select.Option value="CANCELLED">已取消</Select.Option>
           </Select>
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchOrders}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
+          <Tooltip title="查询">
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={fetchOrders}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
         </Space>
       </div>
 
@@ -369,9 +368,9 @@ const SupplierOrderManagement = () => {
           setCurrentOrder(null)
         }}
         footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
-            关闭
-          </Button>,
+          <Tooltip key="close" title="关闭">
+            <Button icon={<CloseOutlined />} onClick={() => setDetailModalVisible(false)} />
+          </Tooltip>,
         ]}
         width={800}
       >
@@ -414,7 +413,6 @@ const SupplierOrderManagement = () => {
         open={confirmModalVisible}
         onCancel={() => {
           setConfirmModalVisible(false)
-          confirmForm.resetFields()
           setActionOrderId(null)
         }}
         onOk={handleConfirmOrder}

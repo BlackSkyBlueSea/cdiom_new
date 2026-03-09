@@ -1,5 +1,6 @@
 package com.cdiom.backend.service.impl;
 
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.service.BarcodeService;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -32,7 +33,7 @@ public class BarcodeServiceImpl implements BarcodeService {
             return "data:image/png;base64," + Base64.getEncoder().encodeToString(imageBytes);
         } catch (Exception e) {
             log.error("生成条形码Base64失败：content={}", content, e);
-            throw new RuntimeException("生成条形码失败：" + e.getMessage());
+            throw new ServiceException("生成条形码失败：" + e.getMessage());
         }
     }
 
@@ -44,7 +45,7 @@ public class BarcodeServiceImpl implements BarcodeService {
             outputStream.flush();
         } catch (Exception e) {
             log.error("生成条形码到输出流失败：content={}", content, e);
-            throw new RuntimeException("生成条形码失败：" + e.getMessage());
+            throw new ServiceException("生成条形码失败：" + e.getMessage());
         }
     }
 
@@ -73,7 +74,7 @@ public class BarcodeServiceImpl implements BarcodeService {
             return outputStream.toByteArray();
         } catch (Exception e) {
             log.error("生成条形码失败：content={}", content, e);
-            throw new RuntimeException("生成条形码失败：" + e.getMessage());
+            throw new ServiceException("生成条形码失败：" + e.getMessage());
         }
     }
 }

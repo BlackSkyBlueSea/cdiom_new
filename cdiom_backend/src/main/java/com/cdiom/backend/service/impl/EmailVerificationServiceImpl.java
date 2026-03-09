@@ -1,5 +1,6 @@
 package com.cdiom.backend.service.impl;
 
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.service.EmailVerificationService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -83,7 +84,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         } catch (MessagingException e) {
             log.error("发送验证码邮件失败，邮箱: {}", email, e);
             codeStorage.remove(email); // 发送失败，清除验证码
-            throw new RuntimeException("发送验证码失败: " + e.getMessage(), e);
+            throw new ServiceException("发送验证码失败: " + e.getMessage());
         }
     }
 

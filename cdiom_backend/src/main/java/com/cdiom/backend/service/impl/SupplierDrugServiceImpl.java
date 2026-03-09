@@ -1,6 +1,7 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SupplierDrugMapper;
 import com.cdiom.backend.model.SupplierDrug;
 import com.cdiom.backend.model.SupplierDrugPriceHistory;
@@ -40,6 +41,14 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
     }
 
     @Override
+    public List<SupplierDrug> getListBySupplierId(Long supplierId) {
+        LambdaQueryWrapper<SupplierDrug> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SupplierDrug::getSupplierId, supplierId);
+        wrapper.eq(SupplierDrug::getIsActive, 1);
+        return supplierDrugMapper.selectList(wrapper);
+    }
+
+    @Override
     public List<Long> getSupplierIdsByDrugId(Long drugId) {
         LambdaQueryWrapper<SupplierDrug> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SupplierDrug::getDrugId, drugId)
@@ -68,7 +77,7 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
                 supplierDrugMapper.updateById(existing);
                 return existing;
             } else {
-                throw new RuntimeException("该供应商-药品关联已存在");
+                throw new ServiceException("该供应商-药品关联已存在");
             }
         }
         
@@ -104,7 +113,7 @@ public class SupplierDrugServiceImpl implements SupplierDrugService {
         SupplierDrug supplierDrug = supplierDrugMapper.selectOne(wrapper);
         
         if (supplierDrug == null) {
-            throw new RuntimeException("供应商-药品关联不存在");
+            throw new ServiceException("供应商-药品关联不存在");
         }
         
         // 记录变更前价格

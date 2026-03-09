@@ -2,6 +2,7 @@ package com.cdiom.backend.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.model.DrugInfo;
+import com.cdiom.backend.model.vo.SupplierDrugVO;
 
 /**
  * 药品信息服务接口
@@ -70,6 +71,11 @@ public interface DrugInfoService {
      * @return 药品信息分页列表
      */
     Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword);
+
+    /**
+     * 根据供应商ID查询该供应商提供的药品列表（含协议价），用于采购订单带价与供应商维护
+     */
+    Page<SupplierDrugVO> getSupplierDrugsWithPrice(Long supplierId, Integer page, Integer size, String keyword);
 }
 
 

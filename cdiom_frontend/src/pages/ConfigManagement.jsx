@@ -159,9 +159,9 @@ const ConfigManagement = () => {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <h2 style={{ margin: 0 }}>参数配置</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增配置
-        </Button>
+        <Tooltip title="新增配置">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+        </Tooltip>
       </div>
       <Table
         columns={columns}

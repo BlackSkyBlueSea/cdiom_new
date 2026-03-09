@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 库存Mapper接口
@@ -35,6 +36,12 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
      */
     @Select("SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE quantity > 0")
     Long getTotalInventory();
+
+    /**
+     * 查询某药品的可用库存总量（未过期且数量>0的批次合计）
+     */
+    @Select("SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE drug_id = #{drugId} AND quantity > 0 AND expiry_date >= #{today}")
+    Integer getTotalAvailableQuantityByDrugId(@Param("drugId") Long drugId, @Param("today") LocalDate today);
 
     /**
      * 使用悲观锁查询库存（SELECT ... FOR UPDATE）
@@ -71,5 +78,18 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
                                 @Param("storageLocation") String storageLocation,
                                 @Param("productionDate") LocalDate productionDate,
                                 @Param("manufacturer") String manufacturer);
+
+    /**
+     * 使用JOIN查询优化N+1问题：根据关键字和特殊药品标识查询库存列表
+     * 一次性JOIN查询，避免先查DrugInfo再查Inventory的多次查询
+     * SQL 定义在 resources/mapper/InventoryMapper.xml 中，避免注解内 XML 解析问题
+     */
+    List<Inventory> selectInventoryListWithJoin(@Param("keyword") String keyword,
+                                                 @Param("drugId") Long drugId,
+                                                 @Param("batchNumber") String batchNumber,
+                                                 @Param("storageLocation") String storageLocation,
+                                                 @Param("expiryDateStart") LocalDate expiryDateStart,
+                                                 @Param("expiryDateEnd") LocalDate expiryDateEnd,
+                                                 @Param("isSpecial") Integer isSpecial);
 }
 

@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.InventoryAdjustmentMapper;
 import com.cdiom.backend.model.DrugInfo;
@@ -84,13 +85,13 @@ public class InventoryAdjustmentServiceImpl implements InventoryAdjustmentServic
         // 验证药品是否存在
         DrugInfo drug = drugInfoMapper.selectById(adjustment.getDrugId());
         if (drug == null) {
-            throw new RuntimeException("药品信息不存在");
+            throw new ServiceException("药品信息不存在");
         }
         
         // 检查是否特殊药品，需要第二操作人
         if (drug.getIsSpecial() != null && drug.getIsSpecial() == 1) {
             if (secondOperatorId == null) {
-                throw new RuntimeException("特殊药品库存调整需要第二操作人确认");
+                throw new ServiceException("特殊药品库存调整需要第二操作人确认");
             }
             adjustment.setSecondOperatorId(secondOperatorId);
         }
@@ -100,7 +101,7 @@ public class InventoryAdjustmentServiceImpl implements InventoryAdjustmentServic
                 adjustment.getDrugId(), adjustment.getBatchNumber());
         
         if (inventory == null) {
-            throw new RuntimeException("库存不存在");
+            throw new ServiceException("库存不存在");
         }
         
         adjustment.setQuantityBefore(inventory.getQuantity());
@@ -111,7 +112,7 @@ public class InventoryAdjustmentServiceImpl implements InventoryAdjustmentServic
         
         // 验证调整后数量不能为负
         if (adjustment.getQuantityAfter() < 0) {
-            throw new RuntimeException("调整后数量不能为负");
+            throw new ServiceException("调整后数量不能为负");
         }
         
         // 使用重试机制创建库存调整记录
@@ -132,9 +133,9 @@ public class InventoryAdjustmentServiceImpl implements InventoryAdjustmentServic
             return created;
         } catch (Exception e) {
             if (e.getCause() instanceof DuplicateKeyException) {
-                throw new RuntimeException("当前库存调整操作过于繁忙，请稍后重试", e);
+                throw new ServiceException("当前库存调整操作过于繁忙，请稍后重试");
             }
-            throw new RuntimeException("创建库存调整失败：" + e.getMessage(), e);
+            throw new ServiceException("创建库存调整失败：" + e.getMessage());
         }
     }
 

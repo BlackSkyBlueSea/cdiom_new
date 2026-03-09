@@ -5,6 +5,9 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Safari 3+ 兼容：user-select 需配合 -webkit-user-select */
+  -webkit-user-select: inherit;
+  user-select: inherit;
 }
 
 html {
@@ -22,6 +25,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Safari 3+ 兼容 */
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 #root {

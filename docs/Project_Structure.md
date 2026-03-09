@@ -88,7 +88,7 @@ cdiom_backend/
     │   │   ├── PermissionServiceImpl.java        # 权限服务实现：权限查询、权限验证
     │   │   ├── BarcodeServiceImpl.java          # 条形码服务实现：订单条形码生成
     │   │   ├── EmailVerificationServiceImpl.java # 邮箱验证服务实现：验证码发送、验证
-    │   │   ├── ExcelExportService.java          # Excel导出服务：数据导出功能
+    │   │   ├── ExcelExportService.java          # Excel导出服务：已实现药品/库存/采购订单列表数据导出
     │   │   ├── IpLocationServiceImpl.java       # IP定位服务实现：登录地点识别
     │   │   ├── YuanyanyaoServiceImpl.java       # 万维易源API服务实现：药品信息查询
     │   │   ├── JisuApiServiceImpl.java          # 极速数据API服务实现：药品信息查询
@@ -531,6 +531,10 @@ docs/
 
 ---
 
-**文档版本**: v1.0.0  
-**最后更新**: 2026年1月20日
+**文档版本**: v1.1.0  
+**最后更新**: 2026年3月9日
+
+
+
+
 

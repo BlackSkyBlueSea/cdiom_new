@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, AutoComplete, message, Popconfirm, Tooltip, DatePicker } from 'antd'
 
 const { Compact } = Space
 import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, ScanOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 
 const { TextArea } = Input
@@ -66,11 +67,7 @@ const DrugManagement = () => {
     }))
   }, [drugs])
 
-  useEffect(() => {
-    fetchDrugs()
-  }, [filters])
-
-  const fetchDrugs = async () => {
+  const fetchDrugs = useCallback(async () => {
     setLoading(true)
     try {
       const res = await request.get('/drugs', {
@@ -87,7 +84,7 @@ const DrugManagement = () => {
         message.error(res.msg || '获取药品列表失败')
       }
     } catch (error) {
-      console.error('获取药品列表失败:', error)
+      logger.error('获取药品列表失败:', error)
       const errorMsg = error.response?.data?.msg || error.message || '获取药品列表失败'
       message.error(errorMsg)
       // 如果是401错误，可能是token过期
@@ -97,7 +94,11 @@ const DrugManagement = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters])
+
+  useEffect(() => {
+    fetchDrugs()
+  }, [fetchDrugs])
 
   const handleAdd = () => {
     setEditingDrug(null)
@@ -146,7 +147,7 @@ const DrugManagement = () => {
         message.warning(res.msg || '未找到药品信息')
       }
     } catch (error) {
-      console.error('扫描失败:', error)
+      logger.error('扫描失败:', error)
       const errorMsg = error.response?.data?.msg || error.message || '扫描失败'
       message.error(errorMsg)
     } finally {
@@ -174,7 +175,7 @@ const DrugManagement = () => {
         message.warning(res.msg || '未找到药品信息')
       }
     } catch (error) {
-      console.error('搜索失败:', error)
+      logger.error('搜索失败:', error)
       const errorMsg = error.response?.data?.msg || error.message || '搜索失败'
       message.error(errorMsg)
     } finally {
@@ -202,7 +203,7 @@ const DrugManagement = () => {
         message.warning(res.msg || '未找到药品信息')
       }
     } catch (error) {
-      console.error('搜索失败:', error)
+      logger.error('搜索失败:', error)
       const errorMsg = error.response?.data?.msg || error.message || '搜索失败'
       message.error(errorMsg)
     } finally {
@@ -299,7 +300,7 @@ const DrugManagement = () => {
       
       message.success('导出成功')
     } catch (error) {
-      console.error('导出失败:', error)
+      logger.error('导出失败:', error)
       message.error('导出失败: ' + (error.message || '未知错误'))
     } finally {
       setExporting(false)
@@ -418,17 +419,17 @@ const DrugManagement = () => {
             <Select.Option value={0}>普通药品</Select.Option>
             <Select.Option value={1}>特殊药品</Select.Option>
           </Select>
-          <Button 
-            icon={<DownloadOutlined />} 
-            onClick={handleExport}
-            loading={exporting}
-          >
-            导出Excel
-          </Button>
+          <Tooltip title="导出Excel">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              loading={exporting}
+            />
+          </Tooltip>
           <PermissionWrapper permission={PERMISSIONS.DRUG_CREATE}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增药品
-            </Button>
+            <Tooltip title="新增药品">
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+            </Tooltip>
           </PermissionWrapper>
         </div>
       </div>

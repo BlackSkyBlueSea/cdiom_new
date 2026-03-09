@@ -85,3 +85,7 @@ public class SupplierBlacklist {
     private Integer deleted;
 }
 
+
+
+
+

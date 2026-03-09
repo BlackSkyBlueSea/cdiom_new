@@ -8,15 +8,16 @@ import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.model.Supplier;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.mapper.PurchaseOrderMapper;
-import com.cdiom.backend.mapper.SupplierMapper;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.BarcodeService;
 import com.cdiom.backend.service.ExcelExportService;
 import com.cdiom.backend.service.PurchaseOrderService;
+import com.cdiom.backend.service.SupplierService;
 import com.cdiom.backend.util.JwtUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -48,7 +49,7 @@ public class PurchaseOrderController {
     private final PurchaseOrderService purchaseOrderService;
     private final BarcodeService barcodeService;
     private final AuthService authService;
-    private final SupplierMapper supplierMapper;
+    private final SupplierService supplierService;
     private final JwtUtil jwtUtil;
     private final ExcelExportService excelExportService;
     private final PurchaseOrderMapper purchaseOrderMapper;
@@ -74,19 +75,10 @@ public class PurchaseOrderController {
         
         // 如果是供应商角色，只能查看自己的订单
         if (currentUser.getRoleId() != null && currentUser.getRoleId() == 5L) {
-            // 通过supplier表的createBy字段查询供应商ID
-            LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Supplier::getCreateBy, currentUser.getId());
-            wrapper.eq(Supplier::getDeleted, 0);
-            List<Supplier> suppliers = supplierMapper.selectList(wrapper);
-            
-            if (suppliers != null && !suppliers.isEmpty()) {
-                // 取第一个供应商（通常一个供应商用户对应一个供应商记录）
-                Long mySupplierId = suppliers.get(0).getId();
-                // 强制使用供应商自己的ID，忽略传入的supplierId参数
-                supplierId = mySupplierId;
+            Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+            if (supplier != null) {
+                supplierId = supplier.getId();
             } else {
-                // 如果供应商用户没有关联的供应商记录，返回空列表
                 return Result.success(new Page<>(page, size));
             }
         }
@@ -120,7 +112,7 @@ public class PurchaseOrderController {
     @PostMapping
     @RequiresPermission({"drug:manage"})
     public Result<PurchaseOrder> createPurchaseOrder(
-            @RequestBody PurchaseOrderRequest request,
+            @Valid @RequestBody PurchaseOrderRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long purchaserId = getCurrentUserId(httpRequest);
@@ -145,7 +137,7 @@ public class PurchaseOrderController {
     @RequiresPermission({"drug:manage"})
     public Result<PurchaseOrder> updatePurchaseOrder(
             @PathVariable Long id,
-            @RequestBody PurchaseOrderRequest request) {
+            @Valid @RequestBody PurchaseOrderRequest request) {
         try {
             PurchaseOrder order = purchaseOrderService.getPurchaseOrderById(id);
             if (order == null) {
@@ -400,13 +392,9 @@ public class PurchaseOrderController {
             // 如果是供应商角色，只能查看自己的订单
             Long supplierId = null;
             if (currentUser.getRoleId() != null && currentUser.getRoleId() == 5L) {
-                LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(Supplier::getCreateBy, currentUser.getId());
-                wrapper.eq(Supplier::getDeleted, 0);
-                List<Supplier> suppliers = supplierMapper.selectList(wrapper);
-                
-                if (suppliers != null && !suppliers.isEmpty()) {
-                    supplierId = suppliers.get(0).getId();
+                Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+                if (supplier != null) {
+                    supplierId = supplier.getId();
                 } else {
                     return Result.success(new Page<>(page, size));
                 }
@@ -437,19 +425,11 @@ public class PurchaseOrderController {
             if (order == null) {
                 throw new RuntimeException("订单不存在");
             }
-            
-            // 通过supplier表的createBy字段查询供应商ID
-            LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Supplier::getCreateBy, currentUser.getId());
-            wrapper.eq(Supplier::getDeleted, 0);
-            List<Supplier> suppliers = supplierMapper.selectList(wrapper);
-            
-            if (suppliers == null || suppliers.isEmpty()) {
+            Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+            if (supplier == null) {
                 throw new RuntimeException("未找到关联的供应商信息");
             }
-            
-            Long mySupplierId = suppliers.get(0).getId();
-            if (!mySupplierId.equals(order.getSupplierId())) {
+            if (!supplier.getId().equals(order.getSupplierId())) {
                 throw new RuntimeException("无权操作此订单");
             }
         }
@@ -560,20 +540,11 @@ public class PurchaseOrderController {
             
             // 如果是供应商角色，只能查看自己的订单
             if (currentUser.getRoleId() != null && currentUser.getRoleId() == 5L) {
-                // 通过supplier表的createBy字段查询供应商ID
-                LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(Supplier::getCreateBy, currentUser.getId());
-                wrapper.eq(Supplier::getDeleted, 0);
-                List<Supplier> suppliers = supplierMapper.selectList(wrapper);
-                
-                if (suppliers != null && !suppliers.isEmpty()) {
-                    // 取第一个供应商（通常一个供应商用户对应一个供应商记录）
-                    Long mySupplierId = suppliers.get(0).getId();
-                    // 强制使用供应商自己的ID，忽略传入的supplierId参数
-                    supplierId = mySupplierId;
+                Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+                if (supplier != null) {
+                    supplierId = supplier.getId();
                 } else {
-                    // 如果供应商用户没有关联的供应商记录，返回空列表
-                    supplierId = -1L; // 设置为不存在的ID，查询结果为空
+                    supplierId = -1L;
                 }
             }
 

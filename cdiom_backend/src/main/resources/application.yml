@@ -126,6 +126,15 @@ jisuapi:
   api:
     base-url: https://api.jisuapi.com/medicine/detail  # API基础URL
 
+# 高德IP定位API配置（非敏感配置）
+amap:
+  ip:
+    base-url: https://restapi.amap.com/v3/ip  # IP定位接口基础URL
+
+# MyBatis-Plus：Mapper XML 位置（动态 SQL 放在 XML 中避免注解内 XML 解析问题）
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+
 # 注意：以下敏感配置在 application-local.yml 中：
 # - spring.mail.username 和 password
 # - spring.datasource.username 和 password

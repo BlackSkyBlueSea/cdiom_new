@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.Supplier;
+import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.model.vo.SupplierDrugVO;
+import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DrugInfoService;
 import com.cdiom.backend.service.SupplierService;
 import com.cdiom.backend.util.JwtUtil;
@@ -32,6 +35,7 @@ public class SupplierController {
 
     private final SupplierService supplierService;
     private final DrugInfoService drugInfoService;
+    private final AuthService authService;
     private final JwtUtil jwtUtil;
 
     /**
@@ -77,7 +81,7 @@ public class SupplierController {
             supplier.setLicenseImage(request.getLicenseImage());
             supplier.setLicenseExpiryDate(request.getLicenseExpiryDate());
             supplier.setRemark(request.getRemark());
-            supplier.setStatus(request.getStatus() != null ? request.getStatus() : 2); // 默认待审核
+            supplier.setStatus(request.getStatus() != null ? request.getStatus() : 0); // 新建默认禁用，审核通过后启用
             supplier.setAuditStatus(0); // 待审核
             supplier.setCreateBy(createBy);
 
@@ -167,17 +171,37 @@ public class SupplierController {
     }
 
     /**
-     * 获取供应商提供的药品列表
+     * 获取当前登录用户关联的供应商
+     * 供应商角色登录时使用：优先按 createBy，其次按手机号匹配
+     */
+    @GetMapping("/me")
+    public Result<Supplier> getMySupplier(HttpServletRequest httpRequest) {
+        try {
+            SysUser currentUser = authService.getCurrentUser();
+            if (currentUser == null) {
+                return Result.error("未登录");
+            }
+            Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+            if (supplier == null) {
+                return Result.error("未找到关联的供应商信息");
+            }
+            return Result.success(supplier);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 获取供应商提供的药品列表（含协议价），用于采购订单带价与供应商维护
      */
     @GetMapping("/{id}/drugs")
-    public Result<Page<com.cdiom.backend.model.DrugInfo>> getSupplierDrugs(
+    public Result<Page<SupplierDrugVO>> getSupplierDrugs(
             @PathVariable Long id,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword) {
         try {
-            Page<com.cdiom.backend.model.DrugInfo> drugPage = 
-                drugInfoService.getDrugInfoListBySupplierId(id, page, size, keyword);
+            Page<SupplierDrugVO> drugPage = drugInfoService.getSupplierDrugsWithPrice(id, page, size, keyword);
             return Result.success(drugPage);
         } catch (Exception e) {
             return Result.error(e.getMessage());

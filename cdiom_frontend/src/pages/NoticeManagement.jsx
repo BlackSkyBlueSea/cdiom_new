@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Descriptions } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, EyeOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, EyeOutlined, CloseOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import { getUser, getUserRoleId } from '../utils/auth'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
@@ -221,9 +221,9 @@ const NoticeManagement = () => {
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <h2 style={{ margin: 0 }}>通知公告</h2>
         {canCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增公告
-          </Button>
+          <Tooltip title="新增公告">
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+          </Tooltip>
         )}
       </div>
       <Table
@@ -292,12 +292,12 @@ const NoticeManagement = () => {
           setViewingNotice(null)
         }}
         footer={[
-          <Button key="close" onClick={() => {
-            setViewModalVisible(false)
-            setViewingNotice(null)
-          }}>
-            关闭
-          </Button>
+          <Tooltip key="close" title="关闭">
+            <Button icon={<CloseOutlined />} onClick={() => {
+              setViewModalVisible(false)
+              setViewingNotice(null)
+            }} />
+          </Tooltip>
         ]}
         width={800}
       >

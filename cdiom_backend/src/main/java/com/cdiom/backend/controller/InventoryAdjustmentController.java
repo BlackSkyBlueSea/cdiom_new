@@ -7,6 +7,7 @@ import com.cdiom.backend.model.InventoryAdjustment;
 import com.cdiom.backend.service.InventoryAdjustmentService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -64,7 +65,7 @@ public class InventoryAdjustmentController {
     @PostMapping
     @RequiresPermission({"drug:manage"})
     public Result<InventoryAdjustment> createInventoryAdjustment(
-            @RequestBody InventoryAdjustmentRequest request,
+            @Valid @RequestBody InventoryAdjustmentRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long operatorId = getCurrentUserId(httpRequest);
@@ -139,6 +140,10 @@ public class InventoryAdjustmentController {
         private String remark;
     }
 }
+
+
+
+
 
 
 

@@ -7,6 +7,7 @@ import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.OperationLogService;
 import com.cdiom.backend.service.SupplierApprovalService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,7 @@ public class SupplierApprovalController {
     @PostMapping
     @RequiresPermission({"supplier:approval:apply"})
     public Result<SupplierApprovalApplication> createApplication(
-            @RequestBody ApprovalApplicationRequest request,
+            @Valid @RequestBody ApprovalApplicationRequest request,
             HttpServletRequest httpRequest) {
         try {
             SysUser currentUser = authService.getCurrentUser();

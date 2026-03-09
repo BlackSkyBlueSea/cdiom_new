@@ -73,3 +73,7 @@ ADD COLUMN current_agreement_id BIGINT DEFAULT NULL COMMENT '当前生效的协�
 ADD KEY idx_agreement_id (current_agreement_id),
 ADD CONSTRAINT fk_supplier_drug_agreement FOREIGN KEY (current_agreement_id) REFERENCES supplier_drug_agreement(id) ON DELETE SET NULL;
 
+
+
+
+

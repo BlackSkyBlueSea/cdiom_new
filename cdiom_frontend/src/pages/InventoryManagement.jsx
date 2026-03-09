@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Tag, message, Modal, Form, InputNumber, Alert } from 'antd'
+import { useState, useEffect, useRef } from 'react'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, message, Modal, Form, InputNumber, Alert, Tooltip } from 'antd'
 import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 
 const { RangePicker } = DatePicker
@@ -33,10 +34,7 @@ const InventoryManagement = () => {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [adjustmentQuantity, setAdjustmentQuantity] = useState(0)
   const [exporting, setExporting] = useState(false)
-
-  useEffect(() => {
-    fetchInventory()
-  }, [pagination.current, pagination.pageSize, filters])
+  const fetchInventoryRef = useRef(null)
 
   const fetchInventory = async () => {
     setLoading(true)
@@ -63,12 +61,26 @@ const InventoryManagement = () => {
         message.error(res.msg || '获取库存列表失败')
       }
     } catch (error) {
-      console.error('获取库存列表失败:', error)
+      logger.error('获取库存列表失败:', error)
       message.error('获取库存列表失败')
     } finally {
       setLoading(false)
     }
   }
+  fetchInventoryRef.current = fetchInventory
+
+  useEffect(() => {
+    fetchInventory()
+  }, [pagination.current, pagination.pageSize, filters])
+
+  // 切回本页/本标签时刷新列表，以便执行出库后看到最新库存
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && fetchInventoryRef.current) fetchInventoryRef.current()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
 
   const handleTableChange = (newPagination) => {
     setPagination({
@@ -142,7 +154,7 @@ const InventoryManagement = () => {
       
       message.success('导出成功')
     } catch (error) {
-      console.error('导出失败:', error)
+      logger.error('导出失败:', error)
       message.error('导出失败: ' + (error.message || '未知错误'))
     } finally {
       setExporting(false)
@@ -171,7 +183,7 @@ const InventoryManagement = () => {
         setUsers(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取用户列表失败:', error)
+      logger.error('获取用户列表失败:', error)
     } finally {
       setLoadingUsers(false)
     }
@@ -186,7 +198,7 @@ const InventoryManagement = () => {
         return res.data
       }
     } catch (error) {
-      console.error('获取药品信息失败:', error)
+      logger.error('获取药品信息失败:', error)
       message.error('获取药品信息失败')
     }
     return null
@@ -336,14 +348,14 @@ const InventoryManagement = () => {
       render: (_, record) => (
         <Space size="small">
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleAdjust(record)}
-            >
-              调整
-            </Button>
+            <Tooltip title="调整">
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleAdjust(record)}
+              />
+            </Tooltip>
           )}
         </Space>
       ),
@@ -399,23 +411,23 @@ const InventoryManagement = () => {
               })
             }}
           />
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchInventory}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
-          <Button 
-            icon={<DownloadOutlined />} 
-            onClick={handleExport}
-            loading={exporting}
-          >
-            导出Excel
-          </Button>
+          <Tooltip title="查询">
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={fetchInventory}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
+          <Tooltip title="导出Excel">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              loading={exporting}
+            />
+          </Tooltip>
         </Space>
       </div>
 

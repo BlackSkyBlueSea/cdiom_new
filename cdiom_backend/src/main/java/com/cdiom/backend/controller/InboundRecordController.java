@@ -7,6 +7,7 @@ import com.cdiom.backend.model.InboundRecord;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -75,7 +76,7 @@ public class InboundRecordController {
      */
     @PostMapping("/from-order")
     public Result<InboundRecord> createInboundRecordFromOrder(
-            @RequestBody InboundRecordRequest request,
+            @Valid @RequestBody InboundRecordRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long operatorId = getCurrentUserId(httpRequest);
@@ -110,7 +111,7 @@ public class InboundRecordController {
      */
     @PostMapping("/temporary")
     public Result<InboundRecord> createInboundRecordTemporary(
-            @RequestBody InboundRecordRequest request,
+            @Valid @RequestBody InboundRecordRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long operatorId = getCurrentUserId(httpRequest);
@@ -253,6 +254,10 @@ public class InboundRecordController {
         private String message;
     }
 }
+
+
+
+
 
 
 

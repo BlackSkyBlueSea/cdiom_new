@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, List, Button, Alert } from 'antd'
+import { useState, useEffect, useCallback } from 'react'
+import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, List, Button, Alert, Tooltip } from 'antd'
 import { 
   UserOutlined, 
   TeamOutlined, 
@@ -18,10 +18,13 @@ import {
   CloseCircleFilled,
   DollarOutlined,
   ShopOutlined,
-  FileDoneOutlined
+  FileDoneOutlined,
+  EyeOutlined,
+  ReloadOutlined
 } from '@ant-design/icons'
 import { Column, Line } from '@ant-design/charts'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 import { getUserRoleId } from '../utils/auth'
 import { useNavigate } from 'react-router-dom'
@@ -32,6 +35,7 @@ const Dashboard = () => {
   const navigate = useNavigate()
   const roleId = getUserRoleId()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [statistics, setStatistics] = useState({})
   const [loginTrend, setLoginTrend] = useState({})
   const [operationStats, setOperationStats] = useState({})
@@ -69,16 +73,14 @@ const Dashboard = () => {
     totalAmount: 0,
     pendingAmount: 0,
     confirmedAmount: 0,
+    pendingOrders: 0,
     dates: [],
     orderCounts: []
   })
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    setLoading(true)
+  const fetchDashboardData = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true)
+    else setRefreshing(true)
     try {
       // 获取统计数据
       const statsRes = await request.get('/dashboard/statistics')
@@ -91,7 +93,16 @@ const Dashboard = () => {
         try {
           const warehouseRes = await request.get('/dashboard/warehouse')
           if (warehouseRes.code === 200 && warehouseRes.data) {
-            setWarehouseStats(warehouseRes.data)
+            const d = warehouseRes.data
+            setWarehouseStats({
+              nearExpiryWarning: { yellow: Number(d.nearExpiryWarning?.yellow ?? 0), red: Number(d.nearExpiryWarning?.red ?? 0) },
+              pendingTasks: { pendingInbound: Number(d.pendingTasks?.pendingInbound ?? 0), pendingOutbound: Number(d.pendingTasks?.pendingOutbound ?? 0) },
+              todayStats: { inbound: Number(d.todayStats?.inbound ?? 0), outbound: Number(d.todayStats?.outbound ?? 0) },
+              totalInventory: Number(d.totalInventory ?? 0),
+              dates: Array.isArray(d.dates) ? d.dates : [],
+              inboundCounts: Array.isArray(d.inboundCounts) ? d.inboundCounts.map(v => Number(v)) : [],
+              outboundCounts: Array.isArray(d.outboundCounts) ? d.outboundCounts.map(v => Number(v)) : []
+            })
           } else {
             setWarehouseStats({
               nearExpiryWarning: { yellow: 0, red: 0 },
@@ -104,12 +115,15 @@ const Dashboard = () => {
             })
           }
         } catch (error) {
-          console.warn('获取仓库管理员数据失败，使用默认数据:', error.message)
+          logger.warn('获取仓库管理员数据失败，使用默认数据:', error.message)
           setWarehouseStats({
             nearExpiryWarning: { yellow: 0, red: 0 },
             pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
             todayStats: { inbound: 0, outbound: 0 },
-            totalInventory: 0
+            totalInventory: 0,
+            dates: [],
+            inboundCounts: [],
+            outboundCounts: []
           })
         }
       }
@@ -122,7 +136,7 @@ const Dashboard = () => {
             setPurchaserStats(purchaserRes.data)
           }
         } catch (error) {
-          console.warn('获取采购专员数据失败:', error.message)
+          logger.warn('获取采购专员数据失败:', error.message)
         }
       }
 
@@ -134,7 +148,7 @@ const Dashboard = () => {
             setMedicalStaffStats(medicalRes.data)
           }
         } catch (error) {
-          console.warn('获取医护人员数据失败:', error.message)
+          logger.warn('获取医护人员数据失败:', error.message)
         }
       }
 
@@ -143,10 +157,43 @@ const Dashboard = () => {
         try {
           const supplierRes = await request.get('/dashboard/supplier')
           if (supplierRes.code === 200 && supplierRes.data) {
-            setSupplierStats(supplierRes.data)
+            const d = supplierRes.data
+            setSupplierStats({
+              totalOrders: Number(d.totalOrders ?? 0),
+              statusStats: Object.fromEntries(
+                Object.entries(d.statusStats || {}).map(([k, v]) => [k, Number(v)])
+              ),
+              totalAmount: Number(d.totalAmount ?? 0),
+              pendingAmount: Number(d.pendingAmount ?? 0),
+              confirmedAmount: Number(d.confirmedAmount ?? 0),
+              pendingOrders: Number(d.pendingOrders ?? 0),
+              dates: Array.isArray(d.dates) ? d.dates : [],
+              orderCounts: Array.isArray(d.orderCounts) ? d.orderCounts.map((v) => Number(v)) : []
+            })
+          } else {
+            setSupplierStats({
+              totalOrders: 0,
+              statusStats: {},
+              totalAmount: 0,
+              pendingAmount: 0,
+              confirmedAmount: 0,
+              pendingOrders: 0,
+              dates: [],
+              orderCounts: []
+            })
           }
         } catch (error) {
-          console.warn('获取供应商数据失败:', error.message)
+          logger.warn('获取供应商数据失败，使用默认数据:', error.message)
+          setSupplierStats({
+            totalOrders: 0,
+            statusStats: {},
+            totalAmount: 0,
+            pendingAmount: 0,
+            confirmedAmount: 0,
+            pendingOrders: 0,
+            dates: [],
+            orderCounts: []
+          })
         }
       }
 
@@ -158,7 +205,7 @@ const Dashboard = () => {
             setLoginTrend(trendRes.data)
           }
         } catch (error) {
-          console.warn('获取登录趋势失败:', error)
+          logger.warn('获取登录趋势失败:', error)
         }
       }
 
@@ -170,7 +217,7 @@ const Dashboard = () => {
             setOperationStats(operationRes.data)
           }
         } catch (error) {
-          console.warn('获取操作日志统计失败:', error)
+          logger.warn('获取操作日志统计失败:', error)
         }
 
         // 获取最近操作日志
@@ -185,15 +232,30 @@ const Dashboard = () => {
             setRecentLogs(logsRes.data?.records || [])
           }
         } catch (error) {
-          console.warn('获取最近操作日志失败:', error)
+          logger.warn('获取最近操作日志失败:', error)
         }
       }
     } catch (error) {
-      console.error('获取仪表盘数据失败:', error)
+      logger.error('获取仪表盘数据失败:', error)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [roleId])
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  // 仓库管理员：切回本页/本标签时刷新，以便审批或执行出库后看到最新待办与今日出库等
+  useEffect(() => {
+    if (roleId !== 2) return
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchDashboardData(true)
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [roleId, fetchDashboardData])
 
   // 登录趋势图表配置
   const loginTrendData = loginTrend.dates?.map((date, index) => [
@@ -371,6 +433,14 @@ const Dashboard = () => {
   if (roleId === 2) {
     return (
       <div>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <h2 style={{ margin: 0 }}>仓库管理员工作台</h2>
+          <Tooltip title="刷新数据">
+            <Button icon={<ReloadOutlined />} onClick={() => fetchDashboardData(true)} loading={refreshing}>
+              刷新
+            </Button>
+          </Tooltip>
+        </div>
         {/* 统计卡片 - 一行显示5个 */}
         <Row 
           gutter={[16, 16]} 
@@ -447,21 +517,21 @@ const Dashboard = () => {
         {/* 待办任务和今日统计 */}
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
           <Col xs={24} lg={12}>
-            <Card title="待办任务" extra={<Button type="link" onClick={() => navigate('/drugs')}>查看详情</Button>}>
+            <Card title="待办任务" extra={<Tooltip title="查看详情"><Button type="link" icon={<EyeOutlined />} onClick={() => navigate('/app/inbound')} /></Tooltip>}>
               <List
                 size="small"
                 dataSource={[
                   { 
                     title: '待入库订单', 
-                    count: warehouseStats.pendingTasks?.pendingInbound ?? 0,
+                    count: Number(warehouseStats.pendingTasks?.pendingInbound ?? 0),
                     icon: <InboxOutlined style={{ color: '#1890ff' }} />,
-                    path: '/drugs' // 待实现：入库管理页面
+                    path: '/app/inbound'
                   },
                   { 
                     title: '待审批出库', 
-                    count: warehouseStats.pendingTasks?.pendingOutbound ?? 0,
+                    count: Number(warehouseStats.pendingTasks?.pendingOutbound ?? 0),
                     icon: <ExportOutlined style={{ color: '#52c41a' }} />,
-                    path: '/drugs' // 待实现：出库管理页面
+                    path: '/app/outbound'
                   },
                 ]}
                 renderItem={(item) => (
@@ -544,9 +614,9 @@ const Dashboard = () => {
             icon={<WarningOutlined />}
             style={{ marginBottom: '24px' }}
             action={
-              <Button size="small" onClick={() => navigate('/drugs')}>
-                查看详情
-              </Button>
+              <Tooltip title="查看详情">
+                <Button size="small" icon={<EyeOutlined />} onClick={() => navigate('/app/inventory')} />
+              </Tooltip>
             }
           />
         )}
@@ -836,25 +906,40 @@ const Dashboard = () => {
 
     return (
       <div>
-        <h2 style={{ marginBottom: '24px', margin: 0 }}>供应商仪表盘</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <h2 style={{ margin: 0 }}>供应商仪表盘</h2>
+          <Button icon={<ReloadOutlined />} onClick={() => fetchDashboardData(true)} loading={refreshing}>
+            刷新
+          </Button>
+        </div>
 
         {/* 统计卡片 */}
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card>
               <Statistic
                 title="订单总数"
-                value={supplierStats.totalOrders || 0}
+                value={supplierStats.totalOrders ?? 0}
                 prefix={<ShoppingCartOutlined />}
                 valueStyle={{ color: '#1890ff' }}
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Card>
+              <Statistic
+                title="待处理订单"
+                value={supplierStats.pendingOrders ?? 0}
+                prefix={<WarningOutlined />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card>
               <Statistic
                 title="订单总金额"
-                value={supplierStats.totalAmount || 0}
+                value={supplierStats.totalAmount ?? 0}
                 prefix={<DollarOutlined />}
                 precision={2}
                 valueStyle={{ color: '#52c41a' }}
@@ -862,11 +947,11 @@ const Dashboard = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card>
               <Statistic
                 title="待确认金额"
-                value={supplierStats.pendingAmount || 0}
+                value={supplierStats.pendingAmount ?? 0}
                 prefix={<WarningOutlined />}
                 precision={2}
                 valueStyle={{ color: '#faad14' }}
@@ -874,11 +959,11 @@ const Dashboard = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8} lg={6}>
             <Card>
               <Statistic
                 title="已确认金额"
-                value={supplierStats.confirmedAmount || 0}
+                value={supplierStats.confirmedAmount ?? 0}
                 prefix={<CheckCircleOutlined />}
                 precision={2}
                 valueStyle={{ color: '#13c2c2' }}
@@ -891,7 +976,7 @@ const Dashboard = () => {
         {/* 图表区域 */}
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
           <Col xs={24} lg={12}>
-            <Card title="最近7天订单趋势" style={{ height: '350px' }}>
+            <Card title="最近30天订单趋势" style={{ height: '350px' }}>
               {supplierStats.dates && supplierStats.dates.length > 0 ? (
                 <Line {...orderTrendConfig} height={280} />
               ) : (
@@ -918,7 +1003,7 @@ const Dashboard = () => {
                 <Card size="small">
                   <Statistic
                     title={statusMap[status]?.text || status}
-                    value={count}
+                    value={Number(count) ?? 0}
                     valueStyle={{ color: statusMap[status]?.color || '#1890ff' }}
                   />
                 </Card>

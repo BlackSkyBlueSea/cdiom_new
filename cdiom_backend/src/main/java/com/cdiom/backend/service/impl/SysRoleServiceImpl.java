@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysRoleMapper;
 import com.cdiom.backend.model.SysRole;
 import com.cdiom.backend.service.SysRoleService;
@@ -55,7 +56,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysRole::getRoleCode, role.getRoleCode());
         if (sysRoleMapper.selectOne(wrapper) != null) {
-            throw new RuntimeException("角色代码已存在");
+            throw new ServiceException("角色代码已存在");
         }
         
         // 设置默认值
@@ -74,7 +75,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     public SysRole updateRole(SysRole role) {
         SysRole existRole = sysRoleMapper.selectById(role.getId());
         if (existRole == null) {
-            throw new RuntimeException("角色不存在");
+            throw new ServiceException("角色不存在");
         }
         
         // 如果修改了角色代码，检查是否重复
@@ -82,7 +83,7 @@ public class SysRoleServiceImpl implements SysRoleService {
             LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(SysRole::getRoleCode, role.getRoleCode());
             if (sysRoleMapper.selectOne(wrapper) != null) {
-                throw new RuntimeException("角色代码已存在");
+                throw new ServiceException("角色代码已存在");
             }
         }
         
@@ -102,13 +103,17 @@ public class SysRoleServiceImpl implements SysRoleService {
     public void updateRoleStatus(Long id, Integer status) {
         SysRole role = sysRoleMapper.selectById(id);
         if (role == null) {
-            throw new RuntimeException("角色不存在");
+            throw new ServiceException("角色不存在");
         }
         role.setStatus(status);
         role.setUpdateTime(LocalDateTime.now());
         sysRoleMapper.updateById(role);
     }
 }
+
+
+
+
 
 
 

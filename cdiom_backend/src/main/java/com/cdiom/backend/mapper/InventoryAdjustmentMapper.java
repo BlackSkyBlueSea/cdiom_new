@@ -16,3 +16,7 @@ public interface InventoryAdjustmentMapper extends BaseMapper<InventoryAdjustmen
 
 
 
+
+
+
+

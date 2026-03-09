@@ -62,7 +62,7 @@ public class Supplier {
     private String remark;
 
     /**
-     * 状态：0-禁用/1-启用/2-待审核
+     * 状态（启用/禁用）：0-禁用/1-启用。是否待审核由 auditStatus 表示。
      */
     private Integer status;
 

@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.model.DrugInfo;
+import com.cdiom.backend.model.SupplierDrug;
 import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.model.vo.SupplierDrugVO;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DrugInfoService;
 import com.cdiom.backend.service.JisuApiService;
@@ -20,6 +22,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 药品信息服务实现类
@@ -386,6 +390,36 @@ public class DrugInfoServiceImpl implements DrugInfoService {
         wrapper.orderByDesc(DrugInfo::getCreateTime);
         
         return drugInfoMapper.selectPage(pageParam, wrapper);
+    }
+
+    @Override
+    public Page<SupplierDrugVO> getSupplierDrugsWithPrice(Long supplierId, Integer page, Integer size, String keyword) {
+        Page<DrugInfo> drugPage = getDrugInfoListBySupplierId(supplierId, page, size, keyword);
+        List<SupplierDrug> supplierDrugs = supplierDrugService.getListBySupplierId(supplierId);
+        Map<Long, SupplierDrug> drugIdToSupplierDrug = supplierDrugs.stream()
+                .collect(Collectors.toMap(SupplierDrug::getDrugId, sd -> sd, (a, b) -> a));
+
+        List<SupplierDrugVO> voList = drugPage.getRecords().stream().map(drug -> {
+            SupplierDrugVO vo = new SupplierDrugVO();
+            vo.setId(drug.getId());
+            vo.setDrugName(drug.getDrugName());
+            vo.setSpecification(drug.getSpecification());
+            vo.setNationalCode(drug.getNationalCode());
+            vo.setDosageForm(drug.getDosageForm());
+            vo.setApprovalNumber(drug.getApprovalNumber());
+            vo.setManufacturer(drug.getManufacturer());
+            vo.setUnit(drug.getUnit());
+            SupplierDrug sd = drugIdToSupplierDrug.get(drug.getId());
+            if (sd != null) {
+                vo.setUnitPrice(sd.getUnitPrice());
+                vo.setSupplierDrugId(sd.getId());
+            }
+            return vo;
+        }).collect(Collectors.toList());
+
+        Page<SupplierDrugVO> voPage = new Page<>(drugPage.getCurrent(), drugPage.getSize(), drugPage.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 }
 

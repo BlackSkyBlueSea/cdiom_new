@@ -3,6 +3,7 @@ import { Modal, Form, Input, Button, message, Space, Tag, Alert } from 'antd'
 import { MailOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { getUser, removeToken } from '../utils/auth'
 import dayjs from 'dayjs'
 
@@ -56,7 +57,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         setStatus(res.data)
       }
     } catch (error) {
-      console.error('获取超级管理员状态失败:', error)
+      logger.error('获取超级管理员状态失败:', error)
     }
   }
 
@@ -84,7 +85,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         message.error(res.msg || '发送验证码失败')
       }
     } catch (error) {
-      console.error('发送验证码失败:', error)
+      logger.error('发送验证码失败:', error)
       message.error(error.response?.data?.msg || error.message || '发送验证码失败')
     } finally {
       setSendingCode(false)
@@ -108,7 +109,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         message.error(res.msg || '启用失败')
       }
     } catch (error) {
-      console.error('启用超级管理员失败:', error)
+      logger.error('启用超级管理员失败:', error)
       message.error(error.response?.data?.msg || error.message || '启用失败')
     } finally {
       setLoading(false)
@@ -149,7 +150,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         message.error(res.msg || '停用失败')
       }
     } catch (error) {
-      console.error('停用超级管理员失败:', error)
+      logger.error('停用超级管理员失败:', error)
       message.error(error.response?.data?.msg || error.message || '停用失败')
     } finally {
       setLoading(false)

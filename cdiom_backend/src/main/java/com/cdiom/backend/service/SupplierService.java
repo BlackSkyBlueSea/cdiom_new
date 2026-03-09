@@ -21,6 +21,18 @@ public interface SupplierService {
     Supplier getSupplierById(Long id);
 
     /**
+     * 根据创建人ID查询供应商（历史用法，尽量少用）
+     */
+    Supplier getSupplierByCreateBy(Long createBy);
+
+    /**
+     * 为当前登录用户查找关联的供应商：
+     * 1）优先按 createBy = userId
+     * 2）若未找到且提供了手机号，则按 phone = supplier.phone
+     */
+    Supplier findSupplierForUser(Long userId, String phone);
+
+    /**
      * 创建供应商
      */
     Supplier createSupplier(Supplier supplier);
@@ -45,6 +57,10 @@ public interface SupplierService {
      */
     void auditSupplier(Long id, Integer auditStatus, String auditReason, Long auditBy);
 }
+
+
+
+
 
 
 

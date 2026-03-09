@@ -10,6 +10,7 @@ import com.cdiom.backend.service.OperationLogService;
 import com.cdiom.backend.service.SupplierDrugService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class SupplierDrugController {
     @PostMapping
     @RequiresPermission({"drug:manage"})
     public Result<SupplierDrug> addSupplierDrug(
-            @RequestBody SupplierDrugRequest request,
+            @Valid @RequestBody SupplierDrugRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long createBy = getCurrentUserId(httpRequest);
@@ -79,7 +80,7 @@ public class SupplierDrugController {
     @PutMapping("/price")
     @RequiresPermission({"drug:manage"})
     public Result<SupplierDrug> updateSupplierDrugPrice(
-            @RequestBody SupplierDrugPriceRequest request,
+            @Valid @RequestBody SupplierDrugPriceRequest request,
             HttpServletRequest httpRequest) {
         OperationLog operationLog = null;
         try {

@@ -5,6 +5,7 @@ import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,7 +57,7 @@ public class SysConfigController {
      * 创建参数配置
      */
     @PostMapping
-    public Result<SysConfig> createConfig(@RequestBody SysConfig config) {
+    public Result<SysConfig> createConfig(@Valid @RequestBody SysConfig config) {
         try {
             SysConfig createdConfig = sysConfigService.createConfig(config);
             return Result.success("创建成功", createdConfig);
@@ -69,7 +70,7 @@ public class SysConfigController {
      * 更新参数配置
      */
     @PutMapping("/{id}")
-    public Result<SysConfig> updateConfig(@PathVariable Long id, @RequestBody SysConfig config) {
+    public Result<SysConfig> updateConfig(@PathVariable Long id, @Valid @RequestBody SysConfig config) {
         try {
             config.setId(id);
             SysConfig updatedConfig = sysConfigService.updateConfig(config);

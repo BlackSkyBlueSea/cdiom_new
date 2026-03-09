@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cdiom.backend.mapper.InventoryMapper">
+
+    <!-- 使用 JOIN 查询优化 N+1：根据关键字和条件查询库存列表 -->
+    <select id="selectInventoryListWithJoin" resultType="com.cdiom.backend.model.Inventory">
+        SELECT i.* FROM inventory i
+        INNER JOIN drug_info d ON i.drug_id = d.id
+        WHERE i.quantity &gt; 0 AND i.deleted = 0 AND d.deleted = 0
+        <if test="keyword != null and keyword != ''">
+            AND (d.drug_name LIKE CONCAT('%', #{keyword}, '%')
+            OR d.national_code LIKE CONCAT('%', #{keyword}, '%')
+            OR d.approval_number LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="drugId != null">
+            AND i.drug_id = #{drugId}
+        </if>
+        <if test="batchNumber != null and batchNumber != ''">
+            AND i.batch_number LIKE CONCAT('%', #{batchNumber}, '%')
+        </if>
+        <if test="storageLocation != null and storageLocation != ''">
+            AND i.storage_location LIKE CONCAT('%', #{storageLocation}, '%')
+        </if>
+        <if test="expiryDateStart != null">
+            AND i.expiry_date &gt;= #{expiryDateStart}
+        </if>
+        <if test="expiryDateEnd != null">
+            AND i.expiry_date &lt;= #{expiryDateEnd}
+        </if>
+        <if test="isSpecial != null">
+            AND d.is_special = #{isSpecial}
+        </if>
+        ORDER BY i.expiry_date ASC, i.create_time DESC
+    </select>
+
+</mapper>

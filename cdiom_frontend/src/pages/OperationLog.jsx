@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Table, Input, Select, Space, Button, message } from 'antd'
+import { Table, Input, Select, Space, Button, message, Tooltip } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 import { Navigate } from 'react-router-dom'
 
@@ -47,7 +49,7 @@ const OperationLog = () => {
         })
       }
     } catch (error) {
-      console.error('获取操作日志失败', error)
+      logger.error('获取操作日志失败', error)
     } finally {
       setLoading(false)
     }
@@ -164,7 +166,7 @@ const OperationLog = () => {
             <Select.Option value={1}>成功</Select.Option>
             <Select.Option value={0}>失败</Select.Option>
           </Select>
-          <Button onClick={handleReset}>重置</Button>
+          <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
         </Space>
       </div>
       <Table

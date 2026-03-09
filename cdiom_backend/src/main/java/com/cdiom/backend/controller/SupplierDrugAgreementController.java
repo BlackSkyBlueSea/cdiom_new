@@ -8,6 +8,7 @@ import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.OperationLogService;
 import com.cdiom.backend.service.SupplierDrugAgreementService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,7 @@ public class SupplierDrugAgreementController {
     @PostMapping
     @RequiresPermission({"price:agreement:manage"})
     public Result<SupplierDrugAgreement> createAgreement(
-            @RequestBody AgreementRequest request,
+            @Valid @RequestBody AgreementRequest request,
             HttpServletRequest httpRequest) {
         OperationLog operationLog = null;
         try {
@@ -155,7 +156,7 @@ public class SupplierDrugAgreementController {
     @RequiresPermission({"price:agreement:manage"})
     public Result<SupplierDrugAgreement> updateAgreement(
             @PathVariable Long id,
-            @RequestBody AgreementRequest request,
+            @Valid @RequestBody AgreementRequest request,
             HttpServletRequest httpRequest) {
         OperationLog operationLog = null;
         try {

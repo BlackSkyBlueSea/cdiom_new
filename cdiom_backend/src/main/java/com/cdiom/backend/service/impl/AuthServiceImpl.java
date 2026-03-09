@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysRoleMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
 import com.cdiom.backend.model.LoginLog;
@@ -144,7 +145,7 @@ public class AuthServiceImpl implements AuthService {
                 loginLog.setMsg(String.format("用户已被锁定，剩余解锁时间：%d 分钟", remainingMinutes));
                 loginLog.setUserId(user.getId());
                 loginLogService.saveLog(loginLog);
-                throw new RuntimeException(loginLog.getMsg());
+                throw new ServiceException(loginLog.getMsg());
             }
 
             // 4. 校验用户状态（是否禁用）
@@ -153,7 +154,7 @@ public class AuthServiceImpl implements AuthService {
                 loginLog.setMsg("用户已被禁用");
                 loginLog.setUserId(user.getId());
                 loginLogService.saveLog(loginLog);
-                throw new RuntimeException("用户已被禁用");
+                throw new ServiceException("用户已被禁用");
             }
         }
 
@@ -184,7 +185,7 @@ public class AuthServiceImpl implements AuthService {
                     loginLog.setStatus(0);
                     loginLog.setMsg("用户不存在");
                     loginLogService.saveLog(loginLog);
-                    throw new RuntimeException("用户不存在");
+                    throw new ServiceException("用户不存在");
                 }
                 
                 // 动态获取配置规则
@@ -329,7 +330,7 @@ public class AuthServiceImpl implements AuthService {
             
             // 在抛出异常之前，确保独立事务已完全提交
             // 虽然使用了REQUIRES_NEW，但为了确保数据持久化，我们在这里再次验证
-            throw new RuntimeException(loginLog.getMsg());
+            throw new ServiceException(loginLog.getMsg());
         }
 
         // 6. 登录成功：重置失败/锁定状态（核心）

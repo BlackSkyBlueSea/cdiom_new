@@ -197,9 +197,9 @@ const RoleManagement = () => {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <h2 style={{ margin: 0 }}>角色管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增角色
-        </Button>
+        <Tooltip title="新增角色">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+        </Tooltip>
       </div>
       <Table
         columns={columns}

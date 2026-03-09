@@ -17,6 +17,7 @@ import {
   message,
   Empty,
   Modal,
+  Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -33,8 +34,10 @@ import {
   GlobalOutlined,
   ToolOutlined,
   LinkOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import request from '../utils/request';
+import logger from '../utils/logger';
 import './BackendMonitor.less';
 
 const { Header, Content } = Layout;
@@ -172,7 +175,7 @@ function BackendMonitor() {
       ws.onopen = () => {
         setWsConnected(true);
         reconnectAttemptsRef.current = 0; // 连接成功，重置重连次数
-        console.log('WebSocket连接成功');
+        logger.log('WebSocket连接成功');
         // 只在首次连接成功时显示消息，避免重复提示
         if (reconnectAttemptsRef.current === 0) {
           message.success('日志流连接成功');
@@ -202,13 +205,13 @@ function BackendMonitor() {
       };
       
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        logger.error('WebSocket error:', error);
         setWsConnected(false);
       };
       
       ws.onclose = (event) => {
         setWsConnected(false);
-        console.log('WebSocket连接关闭', event.code, event.reason);
+        logger.log('WebSocket连接关闭', event.code, event.reason);
         
         // 如果自动刷新开启，尝试重连（指数退避策略）
         if (autoRefresh && event.code !== 1000) { // 1000是正常关闭，不重连
@@ -216,7 +219,7 @@ function BackendMonitor() {
           const reconnectDelay = Math.min(3000 * reconnectAttemptsRef.current, 30000);
           setTimeout(() => {
             if (autoRefresh) { // 再次检查，防止在等待期间关闭了自动刷新
-              console.log(`尝试重连WebSocket (第${reconnectAttemptsRef.current}次)...`);
+              logger.log(`尝试重连WebSocket (第${reconnectAttemptsRef.current}次)...`);
               connectWebSocket();
             }
           }, reconnectDelay);
@@ -228,7 +231,7 @@ function BackendMonitor() {
       
       wsRef.current = ws;
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      logger.error('WebSocket connection failed:', error);
       setWsConnected(false);
       
       // 如果自动刷新开启，尝试重连
@@ -305,7 +308,7 @@ function BackendMonitor() {
         });
       }
     } catch (error) {
-      console.error('获取日志失败:', error);
+      logger.error('获取日志失败:', error);
       // 如果后端没有日志API，只在首次失败时添加提示日志
       setLogs(prevLogs => {
         if (prevLogs.length === 0) {
@@ -1487,34 +1490,34 @@ management:
           open={linkModalVisible}
           onCancel={() => setLinkModalVisible(false)}
           footer={[
-            <Button key="copy" icon={<CopyOutlined />} onClick={() => {
-              const text = linkModalType === 'config' ? getSystemConfigInfo() :
-                          linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
-              copyInfo(text);
-            }}>
-              复制
-            </Button>,
-            <Button key="word" icon={<FileTextOutlined />} onClick={() => {
-              const text = linkModalType === 'config' ? getSystemConfigInfo() :
-                          linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
-              const filename = linkModalType === 'config' ? '系统配置信息' :
-                              linkModalType === 'api' ? 'API接口文档' : '监控工具信息';
-              downloadAsWord(text, filename);
-            }}>
-              下载Word
-            </Button>,
-            <Button key="pdf" type="primary" icon={<FileTextOutlined />} onClick={() => {
-              const text = linkModalType === 'config' ? getSystemConfigInfo() :
-                          linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
-              const filename = linkModalType === 'config' ? '系统配置信息' :
-                              linkModalType === 'api' ? 'API接口文档' : '监控工具信息';
-              downloadAsPDF(text, filename);
-            }}>
-              下载PDF
-            </Button>,
-            <Button key="close" onClick={() => setLinkModalVisible(false)}>
-              关闭
-            </Button>,
+            <Tooltip key="copy" title="复制">
+              <Button icon={<CopyOutlined />} onClick={() => {
+                const text = linkModalType === 'config' ? getSystemConfigInfo() :
+                            linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
+                copyInfo(text);
+              }} />
+            </Tooltip>,
+            <Tooltip key="word" title="下载Word">
+              <Button icon={<FileTextOutlined />} onClick={() => {
+                const text = linkModalType === 'config' ? getSystemConfigInfo() :
+                            linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
+                const filename = linkModalType === 'config' ? '系统配置信息' :
+                                linkModalType === 'api' ? 'API接口文档' : '监控工具信息';
+                downloadAsWord(text, filename);
+              }} />
+            </Tooltip>,
+            <Tooltip key="pdf" title="下载PDF">
+              <Button type="primary" icon={<FileTextOutlined />} onClick={() => {
+                const text = linkModalType === 'config' ? getSystemConfigInfo() :
+                            linkModalType === 'api' ? getApiDocInfo() : getMonitorInfo();
+                const filename = linkModalType === 'config' ? '系统配置信息' :
+                                linkModalType === 'api' ? 'API接口文档' : '监控工具信息';
+                downloadAsPDF(text, filename);
+              }} />
+            </Tooltip>,
+            <Tooltip key="close" title="关闭">
+              <Button icon={<CloseOutlined />} onClick={() => setLinkModalVisible(false)} />
+            </Tooltip>,
           ]}
           width={700}
         >

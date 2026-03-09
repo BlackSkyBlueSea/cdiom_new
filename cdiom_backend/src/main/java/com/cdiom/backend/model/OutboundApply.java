@@ -31,6 +31,18 @@ public class OutboundApply {
     private Long applicantId;
 
     /**
+     * 申请人姓名（非表字段，列表/详情展示用，来自 sys_user.username）
+     */
+    @TableField(exist = false)
+    private String applicantName;
+
+    /**
+     * 申请人角色名称（非表字段，列表/详情展示用，来自 sys_role.role_name，便于区分同名或易混用户）
+     */
+    @TableField(exist = false)
+    private String applicantRoleName;
+
+    /**
      * 所属科室
      */
     private String department;
@@ -49,6 +61,18 @@ public class OutboundApply {
      * 审批人ID（仓库管理员）
      */
     private Long approverId;
+
+    /**
+     * 审批人姓名（非表字段，列表/详情展示用，来自 sys_user.username）
+     */
+    @TableField(exist = false)
+    private String approverName;
+
+    /**
+     * 审批人角色名称（非表字段，列表/详情展示用，来自 sys_role.role_name）
+     */
+    @TableField(exist = false)
+    private String approverRoleName;
 
     /**
      * 第二审批人ID（特殊药品）
@@ -87,6 +111,10 @@ public class OutboundApply {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 }
+
+
+
+
 
 
 

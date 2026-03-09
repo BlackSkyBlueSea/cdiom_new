@@ -263,6 +263,8 @@ cdiom_new/
 
 > 💻 **开发指南**：详细的开发指南请参考 [Development_Guide.md](./docs/Development_Guide.md)，包含如何添加新业务模块、前端页面开发、开发规范、代码规范、贡献指南等完整的开发指南内容。
 
+> 📖 **文档目录**：查看所有文档请参考 [docs/README.md](./docs/README.md)
+
 ---
 
 ## 📊 项目进度

@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.PurchaseOrderItemMapper;
 import com.cdiom.backend.mapper.PurchaseOrderMapper;
 import com.cdiom.backend.mapper.SupplierMapper;
@@ -101,27 +102,34 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrder createPurchaseOrder(PurchaseOrder purchaseOrder, List<PurchaseOrderItem> items) {
-        if (items == null || items.isEmpty()) {
-            throw new RuntimeException("订单明细不能为空");
-        }
-        
-        // 若未指定单号，使用重试机制生成并创建订单
-        if (!StringUtils.hasText(purchaseOrder.getOrderNumber())) {
-            try {
-                return RetryUtil.executeWithRetry(() -> createOrderWithGeneratedNumber(purchaseOrder, items));
-            } catch (Exception e) {
-                if (e.getCause() instanceof DuplicateKeyException) {
-                    throw new RuntimeException("当前订单创建过于繁忙，请稍后重试", e);
+        try {
+            if (items == null || items.isEmpty()) {
+                throw new ServiceException("订单明细不能为空");
+            }
+            
+            // 若未指定单号，使用重试机制生成并创建订单
+            if (!StringUtils.hasText(purchaseOrder.getOrderNumber())) {
+                try {
+                    return RetryUtil.executeWithRetry(() -> createOrderWithGeneratedNumber(purchaseOrder, items));
+                } catch (Exception e) {
+                    if (e.getCause() instanceof DuplicateKeyException) {
+                        throw new ServiceException("当前订单创建过于繁忙，请稍后重试");
+                    }
+                    throw new ServiceException("创建订单失败：" + e.getMessage());
                 }
-                throw new RuntimeException("创建订单失败：" + e.getMessage(), e);
+            } else {
+                // 手动指定单号，先校验唯一性
+                PurchaseOrder existing = getPurchaseOrderByOrderNumber(purchaseOrder.getOrderNumber());
+                if (existing != null) {
+                    throw new ServiceException("订单编号已存在");
+                }
+                return createOrderDirectly(purchaseOrder, items);
             }
-        } else {
-            // 手动指定单号，先校验唯一性
-            PurchaseOrder existing = getPurchaseOrderByOrderNumber(purchaseOrder.getOrderNumber());
-            if (existing != null) {
-                throw new RuntimeException("订单编号已存在");
-            }
-            return createOrderDirectly(purchaseOrder, items);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("创建采购订单异常：订单编号={}", purchaseOrder.getOrderNumber(), e);
+            throw new ServiceException("创建订单失败：" + e.getMessage());
         }
     }
 
@@ -175,22 +183,29 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PurchaseOrder updatePurchaseOrder(PurchaseOrder purchaseOrder) {
-        PurchaseOrder existing = purchaseOrderMapper.selectById(purchaseOrder.getId());
-        if (existing == null) {
-            throw new RuntimeException("采购订单不存在");
-        }
-        
-        // 如果修改了订单编号，检查是否重复
-        if (StringUtils.hasText(purchaseOrder.getOrderNumber()) 
-                && !purchaseOrder.getOrderNumber().equals(existing.getOrderNumber())) {
-            PurchaseOrder duplicate = getPurchaseOrderByOrderNumber(purchaseOrder.getOrderNumber());
-            if (duplicate != null) {
-                throw new RuntimeException("订单编号已存在");
+        try {
+            PurchaseOrder existing = purchaseOrderMapper.selectById(purchaseOrder.getId());
+            if (existing == null) {
+                throw new ServiceException("采购订单不存在");
             }
+            
+            // 如果修改了订单编号，检查是否重复
+            if (StringUtils.hasText(purchaseOrder.getOrderNumber()) 
+                    && !purchaseOrder.getOrderNumber().equals(existing.getOrderNumber())) {
+                PurchaseOrder duplicate = getPurchaseOrderByOrderNumber(purchaseOrder.getOrderNumber());
+                if (duplicate != null) {
+                    throw new ServiceException("订单编号已存在");
+                }
+            }
+            
+            purchaseOrderMapper.updateById(purchaseOrder);
+            return purchaseOrder;
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("更新采购订单异常：订单ID={}", purchaseOrder.getId(), e);
+            throw new ServiceException("更新订单失败：" + e.getMessage());
         }
-        
-        purchaseOrderMapper.updateById(purchaseOrder);
-        return purchaseOrder;
     }
 
     @Override
@@ -208,20 +223,27 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOrderStatus(Long id, String status, String reason) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            
+            order.setStatus(status);
+            if ("REJECTED".equals(status) && StringUtils.hasText(reason)) {
+                order.setRejectReason(reason);
+            }
+            if ("SHIPPED".equals(status)) {
+                order.setShipDate(java.time.LocalDateTime.now());
+            }
+            
+            purchaseOrderMapper.updateById(order);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("更新订单状态异常：订单ID={}, 状态={}", id, status, e);
+            throw new ServiceException("更新订单状态失败：" + e.getMessage());
         }
-        
-        order.setStatus(status);
-        if ("REJECTED".equals(status) && StringUtils.hasText(reason)) {
-            order.setRejectReason(reason);
-        }
-        if ("SHIPPED".equals(status)) {
-            order.setShipDate(java.time.LocalDateTime.now());
-        }
-        
-        purchaseOrderMapper.updateById(order);
     }
 
     @Override
@@ -275,50 +297,65 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirmOrder(Long id) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            if (!"PENDING".equals(order.getStatus())) {
+                throw new ServiceException("只有待确认状态的订单才能确认");
+            }
+            order.setStatus("CONFIRMED");
+            purchaseOrderMapper.updateById(order);
+            log.info("确认采购订单：订单ID={}, 订单编号={}", id, order.getOrderNumber());
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("确认采购订单异常：订单ID={}", id, e);
+            throw new ServiceException("确认订单失败：" + e.getMessage());
         }
-        if (!"PENDING".equals(order.getStatus())) {
-            throw new RuntimeException("只有待确认状态的订单才能确认");
-        }
-        order.setStatus("CONFIRMED");
-        purchaseOrderMapper.updateById(order);
-        log.info("确认采购订单：订单ID={}, 订单编号={}", id, order.getOrderNumber());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void rejectOrder(Long id, String reason) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            if (!"PENDING".equals(order.getStatus())) {
+                throw new ServiceException("只有待确认状态的订单才能拒绝");
+            }
+            if (!StringUtils.hasText(reason)) {
+                throw new ServiceException("拒绝理由不能为空");
+            }
+            order.setStatus("REJECTED");
+            order.setRejectReason(reason);
+            purchaseOrderMapper.updateById(order);
+            log.info("拒绝采购订单：订单ID={}, 订单编号={}, 拒绝理由={}", id, order.getOrderNumber(), reason);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("拒绝采购订单异常：订单ID={}", id, e);
+            throw new ServiceException("拒绝订单失败：" + e.getMessage());
         }
-        if (!"PENDING".equals(order.getStatus())) {
-            throw new RuntimeException("只有待确认状态的订单才能拒绝");
-        }
-        if (!StringUtils.hasText(reason)) {
-            throw new RuntimeException("拒绝理由不能为空");
-        }
-        order.setStatus("REJECTED");
-        order.setRejectReason(reason);
-        purchaseOrderMapper.updateById(order);
-        log.info("拒绝采购订单：订单ID={}, 订单编号={}, 拒绝理由={}", id, order.getOrderNumber(), reason);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void shipOrder(Long id, String logisticsNumber) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
-        }
-        if (!"CONFIRMED".equals(order.getStatus())) {
-            throw new RuntimeException("只有待发货状态的订单才能发货");
-        }
-        if (!StringUtils.hasText(logisticsNumber)) {
-            throw new RuntimeException("物流单号不能为空");
-        }
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            if (!"CONFIRMED".equals(order.getStatus())) {
+                throw new ServiceException("只有待发货状态的订单才能发货");
+            }
+            if (!StringUtils.hasText(logisticsNumber)) {
+                throw new ServiceException("物流单号不能为空");
+            }
         order.setStatus("SHIPPED");
         order.setLogisticsNumber(logisticsNumber);
         order.setShipDate(java.time.LocalDateTime.now());
@@ -347,54 +384,74 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             log.warn("创建待入库提醒通知失败：订单ID={}, 错误={}", id, e.getMessage());
         }
         
-        log.info("发货采购订单：订单ID={}, 订单编号={}, 物流单号={}", id, order.getOrderNumber(), logisticsNumber);
+            log.info("发货采购订单：订单ID={}, 订单编号={}, 物流单号={}", id, order.getOrderNumber(), logisticsNumber);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("发货采购订单异常：订单ID={}", id, e);
+            throw new ServiceException("发货失败：" + e.getMessage());
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelOrder(Long id, String reason) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            // 已入库或已取消的订单不能取消
+            if ("RECEIVED".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+                throw new ServiceException("已入库或已取消的订单不能取消");
+            }
+            // 已拒绝的订单不能取消
+            if ("REJECTED".equals(order.getStatus())) {
+                throw new ServiceException("已拒绝的订单不能取消");
+            }
+            order.setStatus("CANCELLED");
+            if (StringUtils.hasText(reason)) {
+                order.setRemark((StringUtils.hasText(order.getRemark()) ? order.getRemark() + "\n" : "") + "取消原因：" + reason);
+            }
+            purchaseOrderMapper.updateById(order);
+            log.info("取消采购订单：订单ID={}, 订单编号={}, 取消原因={}", id, order.getOrderNumber(), reason);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("取消采购订单异常：订单ID={}", id, e);
+            throw new ServiceException("取消订单失败：" + e.getMessage());
         }
-        // 已入库或已取消的订单不能取消
-        if ("RECEIVED".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
-            throw new RuntimeException("已入库或已取消的订单不能取消");
-        }
-        // 已拒绝的订单不能取消
-        if ("REJECTED".equals(order.getStatus())) {
-            throw new RuntimeException("已拒绝的订单不能取消");
-        }
-        order.setStatus("CANCELLED");
-        if (StringUtils.hasText(reason)) {
-            order.setRemark((StringUtils.hasText(order.getRemark()) ? order.getRemark() + "\n" : "") + "取消原因：" + reason);
-        }
-        purchaseOrderMapper.updateById(order);
-        log.info("取消采购订单：订单ID={}, 订单编号={}, 取消原因={}", id, order.getOrderNumber(), reason);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateLogisticsNumber(Long id, String logisticsNumber) {
-        PurchaseOrder order = purchaseOrderMapper.selectById(id);
-        if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+        try {
+            PurchaseOrder order = purchaseOrderMapper.selectById(id);
+            if (order == null) {
+                throw new ServiceException("采购订单不存在");
+            }
+            // 只有已发货或已确认的订单才能更新物流单号
+            if (!"SHIPPED".equals(order.getStatus()) && !"CONFIRMED".equals(order.getStatus())) {
+                throw new ServiceException("只有待发货或已发货状态的订单才能更新物流单号");
+            }
+            if (!StringUtils.hasText(logisticsNumber)) {
+                throw new ServiceException("物流单号不能为空");
+            }
+            order.setLogisticsNumber(logisticsNumber);
+            // 如果订单是待发货状态，更新物流单号后自动变为已发货
+            if ("CONFIRMED".equals(order.getStatus())) {
+                order.setStatus("SHIPPED");
+                order.setShipDate(java.time.LocalDateTime.now());
+            }
+            purchaseOrderMapper.updateById(order);
+            log.info("更新物流单号：订单ID={}, 订单编号={}, 物流单号={}", id, order.getOrderNumber(), logisticsNumber);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("更新物流单号异常：订单ID={}", id, e);
+            throw new ServiceException("更新物流单号失败：" + e.getMessage());
         }
-        // 只有已发货或已确认的订单才能更新物流单号
-        if (!"SHIPPED".equals(order.getStatus()) && !"CONFIRMED".equals(order.getStatus())) {
-            throw new RuntimeException("只有待发货或已发货状态的订单才能更新物流单号");
-        }
-        if (!StringUtils.hasText(logisticsNumber)) {
-            throw new RuntimeException("物流单号不能为空");
-        }
-        order.setLogisticsNumber(logisticsNumber);
-        // 如果订单是待发货状态，更新物流单号后自动变为已发货
-        if ("CONFIRMED".equals(order.getStatus())) {
-            order.setStatus("SHIPPED");
-            order.setShipDate(java.time.LocalDateTime.now());
-        }
-        purchaseOrderMapper.updateById(order);
-        log.info("更新物流单号：订单ID={}, 订单编号={}, 物流单号={}", id, order.getOrderNumber(), logisticsNumber);
     }
 
     /**

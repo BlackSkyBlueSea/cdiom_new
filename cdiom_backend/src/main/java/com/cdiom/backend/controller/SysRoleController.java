@@ -5,6 +5,7 @@ import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysRole;
 import com.cdiom.backend.service.SysRoleService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +49,7 @@ public class SysRoleController {
      * 创建角色
      */
     @PostMapping
-    public Result<SysRole> createRole(@RequestBody SysRole role) {
+    public Result<SysRole> createRole(@Valid @RequestBody SysRole role) {
         try {
             SysRole createdRole = sysRoleService.createRole(role);
             return Result.success("创建成功", createdRole);
@@ -61,7 +62,7 @@ public class SysRoleController {
      * 更新角色
      */
     @PutMapping("/{id}")
-    public Result<SysRole> updateRole(@PathVariable Long id, @RequestBody SysRole role) {
+    public Result<SysRole> updateRole(@PathVariable Long id, @Valid @RequestBody SysRole role) {
         try {
             role.setId(id);
             SysRole updatedRole = sysRoleService.updateRole(role);

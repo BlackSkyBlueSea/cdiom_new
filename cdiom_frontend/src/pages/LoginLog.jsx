@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Table, Input, Select, Space, Button, Tag } from 'antd'
-import { EnvironmentOutlined } from '@ant-design/icons'
+import { Table, Input, Select, Space, Button, Tag, Tooltip } from 'antd'
+import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import dayjs from 'dayjs'
 
 const LoginLog = () => {
@@ -39,7 +40,7 @@ const LoginLog = () => {
         })
       }
     } catch (error) {
-      console.error('获取登录日志失败', error)
+      logger.error('获取登录日志失败', error)
     } finally {
       setLoading(false)
     }
@@ -152,7 +153,7 @@ const LoginLog = () => {
             <Select.Option value={1}>成功</Select.Option>
             <Select.Option value={0}>失败</Select.Option>
           </Select>
-          <Button onClick={handleReset}>重置</Button>
+          <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
         </Space>
       </div>
       <Table

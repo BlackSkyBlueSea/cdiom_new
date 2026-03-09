@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.InboundRecordMapper;
 import com.cdiom.backend.mapper.PurchaseOrderItemMapper;
@@ -110,22 +111,22 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         // 验证订单是否存在且状态为SHIPPED
         PurchaseOrder order = purchaseOrderMapper.selectById(orderId);
         if (order == null) {
-            throw new RuntimeException("采购订单不存在");
+            throw new ServiceException("采购订单不存在");
         }
         if (!"SHIPPED".equals(order.getStatus())) {
-            throw new RuntimeException("订单状态不是已发货，无法入库");
+            throw new ServiceException("订单状态不是已发货，无法入库");
         }
         
         // 验证药品是否存在
         DrugInfo drug = drugInfoMapper.selectById(drugId);
         if (drug == null) {
-            throw new RuntimeException("药品信息不存在");
+            throw new ServiceException("药品信息不存在");
         }
         
         // 检查是否特殊药品，需要第二操作人
         if (drug.getIsSpecial() != null && drug.getIsSpecial() == 1) {
             if (inboundRecord.getSecondOperatorId() == null) {
-                throw new RuntimeException("特殊药品入库需要第二操作人确认");
+                throw new ServiceException("特殊药品入库需要第二操作人确认");
             }
         }
         
@@ -137,7 +138,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         PurchaseOrderItem orderItem = purchaseOrderItemMapper.selectOne(itemWrapper);
         
         if (orderItem == null) {
-            throw new RuntimeException("订单中不存在该药品的明细信息");
+            throw new ServiceException("订单中不存在该药品的明细信息");
         }
         
         // 获取已入库数量（只统计验收合格的）
@@ -149,7 +150,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         // 检查本次入库数量加上已入库数量是否超过订单采购数量
         Integer totalInboundQuantity = existingInboundQuantity + inboundRecord.getQuantity();
         if (totalInboundQuantity > orderItem.getQuantity()) {
-            throw new RuntimeException(String.format(
+            throw new ServiceException(String.format(
                 "入库数量超过订单采购数量。订单采购数量：%d，已入库数量：%d，本次入库数量：%d，总计：%d",
                 orderItem.getQuantity(), existingInboundQuantity, inboundRecord.getQuantity(), totalInboundQuantity
             ));
@@ -170,7 +171,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         
         // 如果效期不足，需要填写原因
         if ("FORCE".equals(expiryCheckStatus) && !StringUtils.hasText(inboundRecord.getExpiryCheckReason())) {
-            throw new RuntimeException("有效期不足90天，需要填写强制入库原因");
+            throw new ServiceException("有效期不足90天，需要填写强制入库原因");
         }
         
         // 设置默认验收状态
@@ -202,9 +203,9 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             return created;
         } catch (Exception e) {
             if (e.getCause() instanceof DuplicateKeyException) {
-                throw new RuntimeException("当前入库操作过于繁忙，请稍后重试", e);
+                throw new ServiceException("当前入库操作过于繁忙，请稍后重试");
             }
-            throw new RuntimeException("创建入库记录失败：" + e.getMessage(), e);
+            throw new ServiceException("创建入库记录失败：" + e.getMessage());
         }
     }
 
@@ -214,13 +215,13 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         // 验证药品是否存在
         DrugInfo drug = drugInfoMapper.selectById(drugId);
         if (drug == null) {
-            throw new RuntimeException("药品信息不存在");
+            throw new ServiceException("药品信息不存在");
         }
         
         // 检查是否特殊药品，需要第二操作人
         if (drug.getIsSpecial() != null && drug.getIsSpecial() == 1) {
             if (inboundRecord.getSecondOperatorId() == null) {
-                throw new RuntimeException("特殊药品入库需要第二操作人确认");
+                throw new ServiceException("特殊药品入库需要第二操作人确认");
             }
         }
         
@@ -239,7 +240,7 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         
         // 如果效期不足，需要填写原因
         if ("FORCE".equals(expiryCheckStatus) && !StringUtils.hasText(inboundRecord.getExpiryCheckReason())) {
-            throw new RuntimeException("有效期不足90天，需要填写强制入库原因");
+            throw new ServiceException("有效期不足90天，需要填写强制入库原因");
         }
         
         // 设置默认验收状态
@@ -268,9 +269,9 @@ public class InboundRecordServiceImpl implements InboundRecordService {
             return created;
         } catch (Exception e) {
             if (e.getCause() instanceof DuplicateKeyException) {
-                throw new RuntimeException("当前入库操作过于繁忙，请稍后重试", e);
+                throw new ServiceException("当前入库操作过于繁忙，请稍后重试");
             }
-            throw new RuntimeException("创建入库记录失败：" + e.getMessage(), e);
+            throw new ServiceException("创建入库记录失败：" + e.getMessage());
         }
     }
 

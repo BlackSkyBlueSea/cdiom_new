@@ -159,3 +159,7 @@ INSERT INTO price_warning_config (drug_id, reference_price_type, warning_thresho
 (NULL, 'MARKET', NULL, 10.00, 20.00, 1, NULL)
 ON DUPLICATE KEY UPDATE warning_threshold=VALUES(warning_threshold), critical_threshold=VALUES(critical_threshold);
 
+
+
+
+

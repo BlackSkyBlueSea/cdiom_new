@@ -57,7 +57,16 @@ public interface InventoryService {
      * 获取药品的可用批次列表（按FIFO排序，优先返回最早到期的批次）
      */
     java.util.List<Inventory> getAvailableBatches(Long drugId, Integer requiredQuantity);
+
+    /**
+     * 获取某药品的可用库存总量（未过期且数量>0的批次合计，用于出库审批前校验）
+     */
+    int getTotalAvailableQuantity(Long drugId);
 }
+
+
+
+
 
 
 

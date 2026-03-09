@@ -1,5 +1,6 @@
 import { getUserRoleId, getUser } from './auth'
 import request from './request'
+import logger from './logger'
 
 /**
  * 权限代码定义
@@ -156,6 +157,20 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.SUPPLIER_AUDIT, // 供应商审核权限
     PERMISSIONS.NOTICE_VIEW,
     PERMISSIONS.NOTICE_CREATE,
+    // 出库管理（查看、审核、执行、驳回、特殊药品审核）
+    PERMISSIONS.OUTBOUND_VIEW,
+    PERMISSIONS.OUTBOUND_APPROVE,
+    PERMISSIONS.OUTBOUND_APPROVE_SPECIAL,
+    PERMISSIONS.OUTBOUND_EXECUTE,
+    PERMISSIONS.OUTBOUND_REJECT,
+    // 入库管理
+    PERMISSIONS.INBOUND_VIEW,
+    PERMISSIONS.INBOUND_CREATE,
+    PERMISSIONS.INBOUND_APPROVE,
+    PERMISSIONS.INBOUND_EXECUTE,
+    // 库存管理
+    PERMISSIONS.INVENTORY_VIEW,
+    PERMISSIONS.INVENTORY_ADJUST,
     // 供应商审批流程权限
     PERMISSIONS.SUPPLIER_APPROVAL_QUALITY, // 资质核验
     PERMISSIONS.SUPPLIER_APPROVAL_PRICE,   // 价格审核
@@ -184,6 +199,9 @@ const ROLE_PERMISSIONS = {
   4: [ // 医护人员
     PERMISSIONS.NOTICE_VIEW,
     PERMISSIONS.NOTICE_CREATE,
+    // 医护人员出库申领相关权限
+    PERMISSIONS.OUTBOUND_VIEW,
+    PERMISSIONS.OUTBOUND_APPLY,
   ],
   5: [ // 供应商
     PERMISSIONS.NOTICE_VIEW,
@@ -218,7 +236,7 @@ export const fetchUserPermissions = async () => {
     }
     return []
   } catch (error) {
-    console.error('获取用户权限失败:', error)
+    logger.error('获取用户权限失败:', error)
     // 如果后端请求失败，回退到基于角色的权限判断
     const roleId = getUserRoleId()
     if (!roleId) {

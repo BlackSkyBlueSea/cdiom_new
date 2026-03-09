@@ -58,10 +58,13 @@ public class BackendMonitorService {
         jvmInfo.put("uptime", runtimeBean.getUptime() / 1000); // 秒
         jvmInfo.put("startTime", new Date(runtimeBean.getStartTime()));
         
-        // 内存信息
+        // 内存信息（getMax() 可能返回 -1，需避免除零）
         Map<String, Object> memoryInfo = new HashMap<>();
         long totalMemory = memoryBean.getHeapMemoryUsage().getMax();
         long usedMemory = memoryBean.getHeapMemoryUsage().getUsed();
+        if (totalMemory <= 0) {
+            totalMemory = 1;
+        }
         long freeMemory = totalMemory - usedMemory;
         memoryInfo.put("total", totalMemory);
         memoryInfo.put("used", usedMemory);
@@ -82,10 +85,13 @@ public class BackendMonitorService {
         health.put("status", "UP");
         health.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
         
-        // 检查内存使用率
+        // 检查内存使用率（getMax() 可能返回 -1 表示未定义，需避免除零）
         MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
         long totalMemory = memoryBean.getHeapMemoryUsage().getMax();
         long usedMemory = memoryBean.getHeapMemoryUsage().getUsed();
+        if (totalMemory <= 0) {
+            totalMemory = 1;
+        }
         double usagePercent = (usedMemory * 100.0 / totalMemory);
         
         Map<String, Object> details = new HashMap<>();
@@ -106,16 +112,18 @@ public class BackendMonitorService {
      */
     public List<Map<String, Object>> getRecentLogs(Integer limit, String level) {
         List<Map<String, Object>> logs = new ArrayList<>();
-        
+        if (limit == null || limit <= 0) {
+            limit = 100;
+        }
         try {
             // 尝试从日志文件读取（如果存在）
-            String logPath = System.getProperty("user.dir") + "/logs";
+            String logPath = System.getProperty("user.dir") != null ? System.getProperty("user.dir") + "/logs" : "logs";
             File logDir = new File(logPath);
             
             if (logDir.exists() && logDir.isDirectory()) {
                 // 查找最新的日志文件
-                File[] logFiles = logDir.listFiles((dir, name) -> 
-                    name.endsWith(".log") || name.endsWith(".txt")
+                File[] logFiles = logDir.listFiles((dir, name) ->
+                    name != null && (name.endsWith(".log") || name.endsWith(".txt"))
                 );
                 
                 if (logFiles != null && logFiles.length > 0) {

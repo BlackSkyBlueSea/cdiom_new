@@ -60,3 +60,7 @@ public interface SupplierApprovalService {
     boolean isSupplierInBlacklist(String supplierName, String creditCode);
 }
 
+
+
+
+

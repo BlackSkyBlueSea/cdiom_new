@@ -18,6 +18,45 @@
 
 ---
 
+## v1.7.0 (2026-03-09)
+
+> 🔗 **GitHub版本链接**：[查看v1.7.0版本](https://github.com/BlackSkyBlueSea/cdiom_new/commits/main)
+
+### ✅ 安全性和代码质量优化
+
+#### 安全性增强
+- ✅ 文件上传安全性增强（MIME类型验证 + 文件魔数验证）
+- ✅ Controller参数验证完善（所有POST/PUT方法已添加@Valid注解）
+- ✅ 前端console日志清理（所有console调用已替换为logger工具）
+
+#### 性能优化
+- ✅ N+1查询问题优化（使用JOIN查询优化）
+- ✅ 数据库索引优化（所有联合索引已存在）
+- ✅ 前端代码优化（使用useCallback和useMemo优化性能）
+
+#### 错误处理完善
+- ✅ 统一使用ServiceException替代RuntimeException
+- ✅ 为关键方法添加异常捕获和转换
+- ✅ 异常信息统一为用户友好的中文提示
+
+#### 代码质量优化
+- ✅ 全面检查前后端代码，未发现严重问题
+- ✅ 代码风格统一，符合规范
+
+### ✅ 功能完善
+
+#### 数据导出功能
+- ✅ Excel导出：药品列表、库存列表、采购订单列表
+- ✅ 导出文件包含导出人和导出时间水印
+- ✅ 已在前后端联调验证通过
+
+#### IP定位服务
+- ✅ 集成高德地图API实现IP地理位置查询
+- ✅ 登录日志自动记录地理位置
+- ✅ 内网IP识别（返回"内网IP"）
+
+---
+
 ## v1.6.0 (2026-01-20)
 
 > 🔗 **GitHub版本链接**：[查看v1.6.0版本](https://github.com/BlackSkyBlueSea/cdiom_new/commit/4638187) | [查看所有提交](https://github.com/BlackSkyBlueSea/cdiom_new/commits/main)

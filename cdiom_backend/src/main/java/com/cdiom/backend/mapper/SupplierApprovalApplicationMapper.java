@@ -13,3 +13,7 @@ import org.apache.ibatis.annotations.Mapper;
 public interface SupplierApprovalApplicationMapper extends BaseMapper<SupplierApprovalApplication> {
 }
 
+
+
+
+

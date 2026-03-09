@@ -20,6 +20,7 @@ import PurchaseOrderManagement from './pages/PurchaseOrderManagement'
 import SupplierManagement from './pages/SupplierManagement'
 import SupplierDashboard from './pages/SupplierDashboard'
 import SupplierOrderManagement from './pages/SupplierOrderManagement'
+import SupplierDrugManage from './pages/SupplierDrugManage'
 import IndexRedirect from './components/IndexRedirect'
 import PrivateRoute from './components/PrivateRoute'
 import './App.css'
@@ -48,6 +49,7 @@ function App() {
             <Route index element={<IndexRedirect />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="supplier-dashboard" element={<SupplierDashboard />} />
+            <Route path="supplier-drugs" element={<SupplierDrugManage />} />
             <Route path="supplier-orders" element={<SupplierOrderManagement />} />
             <Route path="drugs" element={<DrugManagement />} />
             <Route path="inventory" element={<InventoryManagement />} />

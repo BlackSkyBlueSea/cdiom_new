@@ -1,6 +1,7 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.*;
 import com.cdiom.backend.model.*;
 import com.cdiom.backend.service.PriceWarningService;
@@ -36,7 +37,7 @@ public class SupplierApprovalServiceImpl implements SupplierApprovalService {
                                                           Long applicantId, String applicantName) {
         // 检查黑名单
         if (isSupplierInBlacklist(application.getSupplierName(), application.getCreditCode())) {
-            throw new RuntimeException("该供应商已被列入黑名单，无法创建申请");
+            throw new ServiceException("该供应商已被列入黑名单，无法创建申请");
         }
 
         // 设置申请人信息
@@ -86,10 +87,10 @@ public class SupplierApprovalServiceImpl implements SupplierApprovalService {
                             Long checkerId, String checkerName, String ipAddress) {
         SupplierApprovalApplication application = applicationMapper.selectById(applicationId);
         if (application == null) {
-            throw new RuntimeException("申请不存在");
+            throw new ServiceException("申请不存在");
         }
         if (!"PENDING".equals(application.getStatus())) {
-            throw new RuntimeException("当前状态不允许进行资质核验");
+            throw new ServiceException("当前状态不允许进行资质核验");
         }
 
         application.setQualityCheckerId(checkerId);
@@ -112,11 +113,11 @@ public class SupplierApprovalServiceImpl implements SupplierApprovalService {
                            Long reviewerId, String reviewerName, String ipAddress) {
         SupplierApprovalApplication application = applicationMapper.selectById(applicationId);
         if (application == null) {
-            throw new RuntimeException("申请不存在");
+            throw new ServiceException("申请不存在");
         }
         if (!"QUALITY_CHECKED".equals(application.getStatus()) || 
             !"PASS".equals(application.getQualityCheckResult())) {
-            throw new RuntimeException("当前状态不允许进行价格审核");
+            throw new ServiceException("当前状态不允许进行价格审核");
         }
 
         application.setPriceReviewerId(reviewerId);
@@ -139,11 +140,11 @@ public class SupplierApprovalServiceImpl implements SupplierApprovalService {
                             Long approverId, String approverName, String ipAddress) {
         SupplierApprovalApplication application = applicationMapper.selectById(applicationId);
         if (application == null) {
-            throw new RuntimeException("申请不存在");
+            throw new ServiceException("申请不存在");
         }
         if (!"PRICE_REVIEWED".equals(application.getStatus()) || 
             !"PASS".equals(application.getPriceReviewResult())) {
-            throw new RuntimeException("当前状态不允许进行最终审批");
+            throw new ServiceException("当前状态不允许进行最终审批");
         }
 
         application.setFinalApproverId(approverId);
@@ -169,7 +170,7 @@ public class SupplierApprovalServiceImpl implements SupplierApprovalService {
                                  String operatorName, String ipAddress) {
         SupplierApprovalApplication application = applicationMapper.selectById(applicationId);
         if (application == null) {
-            throw new RuntimeException("申请不存在");
+            throw new ServiceException("申请不存在");
         }
 
         application.setStatus("REJECTED");

@@ -51,6 +51,12 @@ const Layout = () => {
         roles: [5],
       },
       {
+        key: 'supplier-drugs',
+        icon: <MedicineBoxOutlined />,
+        label: '可供应药品',
+        roles: [5],
+      },
+      {
         key: 'supplier-orders',
         icon: <ShoppingCartOutlined />,
         label: '订单管理',

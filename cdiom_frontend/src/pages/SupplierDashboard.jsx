@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, Button, Alert } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, Button, Alert, Tooltip } from 'antd'
 import { 
   ShoppingCartOutlined,
   WarningOutlined,
   CheckCircleOutlined,
   SendOutlined,
   EyeOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { Column } from '@ant-design/charts'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 
 const SupplierDashboard = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [dashboardData, setDashboardData] = useState({
     totalOrders: 0,
     statusStats: {},
@@ -28,22 +31,52 @@ const SupplierDashboard = () => {
   const [shippedOrders, setShippedOrders] = useState([])
   const [shippedOrdersLoading, setShippedOrdersLoading] = useState(false)
 
+  const setDashboardEmpty = () => {
+    setDashboardData({
+      totalOrders: 0,
+      statusStats: {},
+      totalAmount: 0,
+      pendingAmount: 0,
+      confirmedAmount: 0,
+      pendingOrders: 0,
+      dates: [],
+      orderCounts: []
+    })
+  }
+
   useEffect(() => {
     fetchDashboardData()
     fetchShippedOrders()
   }, [])
 
-  const fetchDashboardData = async () => {
-    setLoading(true)
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true)
+    else setRefreshing(true)
     try {
       const res = await request.get('/dashboard/supplier')
-      if (res.code === 200) {
-        setDashboardData(res.data)
+      if (res.code === 200 && res.data) {
+        const d = res.data
+        setDashboardData({
+          totalOrders: Number(d.totalOrders ?? 0),
+          statusStats: Object.fromEntries(
+            Object.entries(d.statusStats || {}).map(([k, v]) => [k, Number(v)])
+          ),
+          totalAmount: Number(d.totalAmount ?? 0),
+          pendingAmount: Number(d.pendingAmount ?? 0),
+          confirmedAmount: Number(d.confirmedAmount ?? 0),
+          pendingOrders: Number(d.pendingOrders ?? 0),
+          dates: Array.isArray(d.dates) ? d.dates : [],
+          orderCounts: Array.isArray(d.orderCounts) ? d.orderCounts.map((v) => Number(v)) : []
+        })
+      } else {
+        setDashboardEmpty()
       }
     } catch (error) {
-      console.error('获取供应商仪表盘数据失败:', error)
+      logger.error('获取供应商仪表盘数据失败，使用默认数据:', error)
+      setDashboardEmpty()
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -57,7 +90,7 @@ const SupplierDashboard = () => {
         setShippedOrders(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取已发货订单失败:', error)
+      logger.error('获取已发货订单失败:', error)
     } finally {
       setShippedOrdersLoading(false)
     }
@@ -77,9 +110,9 @@ const SupplierDashboard = () => {
   }
 
   const chartConfig = {
-    data: dashboardData.dates.map((date, index) => ({
+    data: (dashboardData.dates || []).map((date, index) => ({
       date,
-      count: dashboardData.orderCounts[index] || 0
+      count: Number(dashboardData.orderCounts?.[index] ?? 0)
     })),
     xField: 'date',
     yField: 'count',
@@ -162,12 +195,17 @@ const SupplierDashboard = () => {
 
   return (
     <div>
-      <h2 style={{ marginBottom: '24px', margin: 0 }}>供应商工作台</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 style={{ margin: 0 }}>供应商工作台</h2>
+        <Button icon={<ReloadOutlined />} onClick={() => fetchDashboardData(true)} loading={refreshing}>
+          刷新
+        </Button>
+      </div>
 
       {/* 待处理订单提醒卡片 */}
-      {dashboardData.pendingOrders > 0 && (
+      {(dashboardData.pendingOrders ?? 0) > 0 && (
         <Alert
-          message={`您有 ${dashboardData.pendingOrders} 个待处理订单，请及时处理`}
+          message={`您有 ${dashboardData.pendingOrders ?? 0} 个待处理订单，请及时处理`}
           type="warning"
           showIcon
           icon={<WarningOutlined />}
@@ -190,7 +228,7 @@ const SupplierDashboard = () => {
           <Card>
             <Statistic
               title="订单总数"
-              value={dashboardData.totalOrders || 0}
+              value={dashboardData.totalOrders ?? 0}
               prefix={<ShoppingCartOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -200,7 +238,7 @@ const SupplierDashboard = () => {
           <Card>
             <Statistic
               title="待处理订单"
-              value={dashboardData.pendingOrders || 0}
+              value={dashboardData.pendingOrders ?? 0}
               prefix={<WarningOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -210,7 +248,7 @@ const SupplierDashboard = () => {
           <Card>
             <Statistic
               title="订单总金额"
-              value={dashboardData.totalAmount || 0}
+              value={dashboardData.totalAmount ?? 0}
               precision={2}
               valueStyle={{ color: '#52c41a' }}
               suffix="元"
@@ -221,9 +259,20 @@ const SupplierDashboard = () => {
           <Card>
             <Statistic
               title="待确认金额"
-              value={dashboardData.pendingAmount || 0}
+              value={dashboardData.pendingAmount ?? 0}
               precision={2}
-              valueStyle={{ color: '#ff4d4f' }}
+              valueStyle={{ color: '#faad14' }}
+              suffix="元"
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="已确认金额"
+              value={dashboardData.confirmedAmount ?? 0}
+              precision={2}
+              valueStyle={{ color: '#13c2c2' }}
               suffix="元"
             />
           </Card>
@@ -232,7 +281,7 @@ const SupplierDashboard = () => {
 
       {/* 近30天订单统计图表 */}
       <Card title="近30天订单统计" style={{ marginBottom: '24px' }}>
-        {dashboardData.dates && dashboardData.dates.length > 0 ? (
+        {(dashboardData.dates?.length ?? 0) > 0 ? (
           <Column {...chartConfig} height={300} />
         ) : (
           <Empty description="暂无数据" />
@@ -243,9 +292,9 @@ const SupplierDashboard = () => {
       <Card 
         title="已发货订单跟踪" 
         extra={
-          <Button type="link" onClick={() => navigate('/supplier-orders?status=SHIPPED')}>
-            查看全部
-          </Button>
+          <Tooltip title="查看全部">
+            <Button type="link" icon={<EyeOutlined />} onClick={() => navigate('/supplier-orders?status=SHIPPED')} />
+          </Tooltip>
         }
       >
         <Table

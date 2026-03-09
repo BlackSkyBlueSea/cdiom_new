@@ -11,12 +11,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -39,6 +43,72 @@ public class FileUploadController {
 
     @Value("${spring.servlet.multipart.max-file-size:10MB}")
     private DataSize maxFileSize;
+
+    // 允许的MIME类型映射
+    private static final Map<String, String[]> ALLOWED_MIME_TYPES = new HashMap<>();
+    static {
+        ALLOWED_MIME_TYPES.put(".jpg", new String[]{"image/jpeg"});
+        ALLOWED_MIME_TYPES.put(".jpeg", new String[]{"image/jpeg"});
+        ALLOWED_MIME_TYPES.put(".png", new String[]{"image/png"});
+        ALLOWED_MIME_TYPES.put(".gif", new String[]{"image/gif"});
+        ALLOWED_MIME_TYPES.put(".bmp", new String[]{"image/bmp", "image/x-ms-bmp"});
+        ALLOWED_MIME_TYPES.put(".webp", new String[]{"image/webp"});
+        ALLOWED_MIME_TYPES.put(".pdf", new String[]{"application/pdf"});
+        ALLOWED_MIME_TYPES.put(".doc", new String[]{"application/msword"});
+        ALLOWED_MIME_TYPES.put(".docx", new String[]{"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    }
+
+    // 文件魔数（文件头）映射
+    private static final Map<String, byte[][]> FILE_MAGIC_NUMBERS = new HashMap<>();
+    static {
+        FILE_MAGIC_NUMBERS.put(".jpg", new byte[][]{{(byte)0xFF, (byte)0xD8, (byte)0xFF}});
+        FILE_MAGIC_NUMBERS.put(".jpeg", new byte[][]{{(byte)0xFF, (byte)0xD8, (byte)0xFF}});
+        FILE_MAGIC_NUMBERS.put(".png", new byte[][]{{(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}});
+        FILE_MAGIC_NUMBERS.put(".gif", new byte[][]{{0x47, 0x49, 0x46, 0x38, 0x37, 0x61}, {0x47, 0x49, 0x46, 0x38, 0x39, 0x61}});
+        FILE_MAGIC_NUMBERS.put(".bmp", new byte[][]{{0x42, 0x4D}});
+        FILE_MAGIC_NUMBERS.put(".webp", new byte[][]{{0x52, 0x49, 0x46, 0x46}}); // RIFF header
+        FILE_MAGIC_NUMBERS.put(".pdf", new byte[][]{{0x25, 0x50, 0x44, 0x46}}); // %PDF
+        FILE_MAGIC_NUMBERS.put(".doc", new byte[][]{{(byte)0xD0, (byte)0xCF, 0x11, (byte)0xE0, (byte)0xA1, (byte)0xB1, 0x1A, (byte)0xE1}}); // OLE2 header
+        FILE_MAGIC_NUMBERS.put(".docx", new byte[][]{{0x50, 0x4B, 0x03, 0x04}}); // ZIP header (docx is a zip file)
+    }
+
+    /**
+     * 验证文件魔数（文件头）
+     */
+    private boolean validateFileMagicNumber(InputStream inputStream, String extension) throws IOException {
+        byte[][] expectedMagicNumbers = FILE_MAGIC_NUMBERS.get(extension);
+        if (expectedMagicNumbers == null) {
+            return false;
+        }
+
+        // 读取文件前几个字节
+        byte[] fileHeader = new byte[8];
+        int bytesRead = inputStream.read(fileHeader);
+        if (bytesRead < 2) {
+            return false;
+        }
+
+        // 重置流以便后续使用
+        inputStream.reset();
+
+        // 检查是否匹配任一预期的魔数
+        for (byte[] magicNumber : expectedMagicNumbers) {
+            if (bytesRead >= magicNumber.length) {
+                boolean matches = true;
+                for (int i = 0; i < magicNumber.length; i++) {
+                    if (fileHeader[i] != magicNumber[i]) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
     /**
      * 上传文件
@@ -69,6 +139,32 @@ public class FileUploadController {
 
             if (!isAllowed) {
                 return Result.error("仅支持以下格式：jpg, jpeg, png, gif, bmp, webp, pdf, doc, docx");
+            }
+
+            // 验证MIME类型
+            String contentType = file.getContentType();
+            if (contentType == null) {
+                return Result.error("无法识别文件类型");
+            }
+            String[] allowedMimeTypes = ALLOWED_MIME_TYPES.get(extension);
+            if (allowedMimeTypes == null) {
+                return Result.error("不支持的文件类型");
+            }
+            boolean mimeTypeValid = Arrays.asList(allowedMimeTypes).contains(contentType);
+            if (!mimeTypeValid) {
+                log.warn("文件MIME类型不匹配：扩展名={}, 声明MIME类型={}, 允许的MIME类型={}", 
+                    extension, contentType, Arrays.toString(allowedMimeTypes));
+                return Result.error("文件类型验证失败：MIME类型与文件扩展名不匹配");
+            }
+
+            // 验证文件魔数（文件头）
+            InputStream inputStream = file.getInputStream();
+            inputStream.mark(16); // 标记以便重置
+            boolean magicNumberValid = validateFileMagicNumber(inputStream, extension);
+            inputStream.reset(); // 重置流以便后续使用
+            if (!magicNumberValid) {
+                log.warn("文件魔数验证失败：扩展名={}, 文件名={}", extension, originalFilename);
+                return Result.error("文件类型验证失败：文件内容与扩展名不匹配");
             }
 
             // 验证文件大小（从配置读取）

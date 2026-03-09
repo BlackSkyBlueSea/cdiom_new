@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Alert } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Alert, Tooltip } from 'antd'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EyeOutlined, RollbackOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, fetchUserPermissions } from '../utils/permission'
 import { getUserRoleId, getUser } from '../utils/auth'
 
@@ -41,6 +42,10 @@ const OutboundManagement = () => {
   const [hasSpecialDrug, setHasSpecialDrug] = useState(false) // 是否包含特殊药品
   const [users, setUsers] = useState([]) // 用户列表（用于选择第二审批人）
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [departmentOptions, setDepartmentOptions] = useState([]) // 已有科室列表（新建出库申请时下拉选择）
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [detailItems, setDetailItems] = useState([]) // 查看详情时的申请明细
+  const [stockCheckResult, setStockCheckResult] = useState(null) // 审批前库存校验结果 { sufficient, message, details }
 
   useEffect(() => {
     fetchOutboundApplies()
@@ -66,7 +71,7 @@ const OutboundManagement = () => {
         setUsers(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取用户列表失败:', error)
+      logger.error('获取用户列表失败:', error)
     } finally {
       setLoadingUsers(false)
     }
@@ -90,7 +95,19 @@ const OutboundManagement = () => {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取药品列表失败:', error)
+      logger.error('获取药品列表失败:', error)
+    }
+  }
+
+  // 获取已有科室列表（供新建出库申请时下拉选择，无则仍可手动输入）
+  const fetchDepartmentOptions = async () => {
+    try {
+      const res = await request.get('/outbound/departments')
+      if (res.code === 200 && Array.isArray(res.data)) {
+        setDepartmentOptions(res.data.filter(Boolean))
+      }
+    } catch (error) {
+      logger.error('获取科室列表失败:', error)
     }
   }
 
@@ -114,13 +131,13 @@ const OutboundManagement = () => {
               batchesMap[item.drugId] = inventoryRes.data.records || []
             }
           } catch (error) {
-            console.error(`获取药品${item.drugId}的库存批次失败:`, error)
+            logger.error(`获取药品${item.drugId}的库存批次失败:`, error)
           }
         }
         setInventoryBatches(batchesMap)
       }
     } catch (error) {
-      console.error('获取申请明细失败:', error)
+      logger.error('获取申请明细失败:', error)
       message.error('获取申请明细失败')
     }
   }
@@ -150,7 +167,7 @@ const OutboundManagement = () => {
         message.error(res.msg || '获取出库申请失败')
       }
     } catch (error) {
-      console.error('获取出库申请失败:', error)
+      logger.error('获取出库申请失败:', error)
       message.error('获取出库申请失败')
     } finally {
       setLoading(false)
@@ -175,7 +192,7 @@ const OutboundManagement = () => {
       startDate: undefined,
       endDate: undefined,
     })
-    setPagination({ ...pagination, current: 1 })
+    setPagination(prev => ({ ...prev, current: 1 }))
   }
 
   // 检查申请是否包含特殊药品
@@ -199,9 +216,56 @@ const OutboundManagement = () => {
         return hasSpecial
       }
     } catch (error) {
-      console.error('获取申请明细失败:', error)
+      logger.error('获取申请明细失败:', error)
     }
     return false
+  }
+
+  // 审批前拉取库存校验结果（用于弹窗内友好提示，不足时禁止通过）
+  const fetchStockCheckForApply = async (applyId) => {
+    try {
+      const res = await request.get(`/outbound/${applyId}/stock-check`)
+      if (res.code === 200 && res.data) {
+        setStockCheckResult(res.data)
+      } else {
+        setStockCheckResult({ sufficient: true, message: '', details: [] })
+      }
+    } catch (e) {
+      logger.error('库存校验请求失败:', e)
+      setStockCheckResult({ sufficient: true, message: '', details: [] })
+    }
+  }
+
+  // 打开查看详情弹窗（拉取申请明细）
+  const openDetailModal = async (record) => {
+    setCurrentRecord(record)
+    setDetailItems([])
+    setDetailModalVisible(true)
+    try {
+      const res = await request.get(`/outbound/${record.id}/items`)
+      if (res.code === 200) {
+        setDetailItems(res.data || [])
+      }
+    } catch (e) {
+      logger.error('获取申请明细失败:', e)
+      message.error('获取申请明细失败')
+    }
+  }
+
+  // 申请人撤回出库申请（仅待审批状态）
+  const handleWithdraw = async (id) => {
+    try {
+      const res = await request.post(`/outbound/${id}/withdraw`)
+      if (res.code === 200) {
+        message.success('已撤回')
+        setDetailModalVisible(false)
+        fetchOutboundApplies()
+      } else {
+        message.error(res.msg || '撤回失败')
+      }
+    } catch (error) {
+      message.error(error.response?.data?.msg || error.message || '撤回失败')
+    }
   }
 
   const handleApprove = async (values) => {
@@ -212,9 +276,14 @@ const OutboundManagement = () => {
         return
       }
 
+      const currentUser = getUser()
+      // 验证：第一审批人（当前用户）与第二审批人不能是同一人
+      if (hasSpecialDrug && values.secondApproverId && currentUser && values.secondApproverId === currentUser.id) {
+        message.error('第一审批人和第二审批人不能为同一人')
+        return
+      }
       // 验证：申请人和审批人不能是同一人（后端也会验证，这里提前提示）
       if (currentRecord && currentRecord.applicantId) {
-        const currentUser = getUser()
         if (currentUser && currentUser.id === currentRecord.applicantId) {
           message.error('申请人和审批人不能是同一人')
           return
@@ -256,7 +325,7 @@ const OutboundManagement = () => {
         message.error(res.msg || '驳回失败')
       }
     } catch (error) {
-      console.error('驳回失败:', error)
+      logger.error('驳回失败:', error)
       message.error('驳回失败')
     }
   }
@@ -313,7 +382,7 @@ const OutboundManagement = () => {
         message.error(res.msg || '创建出库申请失败')
       }
     } catch (error) {
-      console.error('创建出库申请失败:', error)
+      logger.error('创建出库申请失败:', error)
       message.error(error.response?.data?.msg || error.message || '创建出库申请失败')
     }
   }
@@ -353,7 +422,7 @@ const OutboundManagement = () => {
         message.error(res.msg || '出库执行失败')
       }
     } catch (error) {
-      console.error('出库执行失败:', error)
+      logger.error('出库执行失败:', error)
       message.error(error.response?.data?.msg || error.message || '出库执行失败')
     }
   }
@@ -399,8 +468,12 @@ const OutboundManagement = () => {
       title: <span style={{ whiteSpace: 'nowrap' }}>申请人</span>,
       dataIndex: 'applicantName',
       key: 'applicantName',
-      width: 100,
+      width: 120,
       ellipsis: true,
+      render: (name, record) => {
+        if (record.applicantRoleName) return `${name || '-'} (${record.applicantRoleName})`
+        return name ?? '-'
+      },
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>所属科室</span>,
@@ -452,57 +525,92 @@ const OutboundManagement = () => {
       render: (_, record) => {
         const canApprove = hasPermission([PERMISSIONS.OUTBOUND_APPROVE, PERMISSIONS.OUTBOUND_APPROVE_SPECIAL])
         const canExecute = hasPermission(PERMISSIONS.OUTBOUND_EXECUTE)
-        
+        const canViewDetail = hasPermission(PERMISSIONS.OUTBOUND_VIEW) || hasPermission(PERMISSIONS.OUTBOUND_APPLY)
+        const currentUser = getUser()
+        const isApplicant = currentUser && record.applicantId === currentUser.id
+        const canWithdraw = hasPermission(PERMISSIONS.OUTBOUND_APPLY) && record.status === 'PENDING' && isApplicant
+
         return (
           <Space>
-            {record.status === 'PENDING' && canApprove && (
-              <>
+            {canViewDetail && (
+              <Tooltip title="查看详情">
                 <Button
                   type="link"
                   size="small"
-                  onClick={async () => {
-                    setCurrentRecord(record)
-                    await checkSpecialDrugs(record.id)
-                    setApproveModalVisible(true)
-                  }}
-                >
-                  审批
-                </Button>
+                  icon={<EyeOutlined />}
+                  onClick={() => openDetailModal(record)}
+                />
+              </Tooltip>
+            )}
+            {canWithdraw && (
+              <Tooltip title="撤回申请">
                 <Button
                   type="link"
                   size="small"
                   danger
+                  icon={<RollbackOutlined />}
                   onClick={() => {
                     Modal.confirm({
-                      title: '确认驳回',
-                      content: '请输入驳回理由',
-                      onOk: (close) => {
-                        const reason = prompt('请输入驳回理由:')
-                        if (reason) {
-                          handleReject(reason)
-                          close()
-                        }
-                      },
+                      title: '确认撤回',
+                      content: '撤回后该申请将变为已取消，确定要撤回吗？',
+                      onOk: () => handleWithdraw(record.id),
                     })
                   }}
-                >
-                  驳回
-                </Button>
+                />
+              </Tooltip>
+            )}
+            {record.status === 'PENDING' && canApprove && (
+              <>
+                <Tooltip title="审批">
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    onClick={async () => {
+                      setCurrentRecord(record)
+                      setStockCheckResult(null)
+                      await checkSpecialDrugs(record.id)
+                      await fetchStockCheckForApply(record.id)
+                      setApproveModalVisible(true)
+                    }}
+                  />
+                </Tooltip>
+                <Tooltip title="驳回">
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: '确认驳回',
+                        content: '请输入驳回理由',
+                        onOk: (close) => {
+                          const reason = prompt('请输入驳回理由:')
+                          if (reason) {
+                            handleReject(reason)
+                            close()
+                          }
+                        },
+                      })
+                    }}
+                  />
+                </Tooltip>
               </>
             )}
             {record.status === 'APPROVED' && canExecute && (
-              <Button
-                type="link"
-                size="small"
-                icon={<PlayCircleOutlined />}
-                onClick={async () => {
-                  setCurrentRecord(record)
-                  await fetchApplyItems(record.id)
-                  setExecuteModalVisible(true)
-                }}
-              >
-                执行出库
-              </Button>
+              <Tooltip title="执行出库">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<PlayCircleOutlined />}
+                  onClick={async () => {
+                    setCurrentRecord(record)
+                    await fetchApplyItems(record.id)
+                    setExecuteModalVisible(true)
+                  }}
+                />
+              </Tooltip>
             )}
           </Space>
         )
@@ -555,28 +663,29 @@ const OutboundManagement = () => {
               })
             }}
           />
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchOutboundApplies}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
-          {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
+          <Tooltip title="查询">
             <Button
               type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setModalVisible(true)
-                form.resetFields()
-                setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
-              }}
-            >
-              新建出库申请
-            </Button>
+              icon={<SearchOutlined />}
+              onClick={fetchOutboundApplies}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
+          {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
+            <Tooltip title="新建出库申请">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={async () => {
+                  await fetchDepartmentOptions()
+                  setModalVisible(true)
+                  form.resetFields()
+                  setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       </div>
@@ -617,11 +726,17 @@ const OutboundManagement = () => {
             name="department"
             label="所属科室"
             rules={[
-              { required: true, message: '请输入所属科室' },
+              { required: true, message: '请选择或输入所属科室' },
               { max: 100, message: '所属科室长度不能超过100个字符' },
             ]}
           >
-            <Input placeholder="请输入所属科室" />
+            <AutoComplete
+              options={departmentOptions.map((d) => ({ value: d }))}
+              placeholder="请选择已有科室或直接输入新科室名称"
+              filterOption={(inputValue, option) =>
+                (option?.value ?? '').toLowerCase().includes((inputValue || '').toLowerCase())
+              }
+            />
           </Form.Item>
 
           <Form.Item
@@ -651,13 +766,28 @@ const OutboundManagement = () => {
                       <AutoComplete
                         options={drugOptions}
                         placeholder="请输入或选择药品"
+                        value={
+                          item.drugId
+                            ? (() => {
+                                const d = drugs.find((x) => x.id === item.drugId)
+                                return d ? `${d.drugName}${d.specification ? ` (${d.specification})` : ''}` : ''
+                              })()
+                            : undefined
+                        }
                         filterOption={(inputValue, option) =>
-                          option.label.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                          (option?.label ?? '').toString().toUpperCase().indexOf((inputValue || '').toUpperCase()) !== -1
                         }
                         onSelect={(value, option) => {
                           const newItems = [...applyFormItems]
                           newItems[index].drugId = value
                           setApplyFormItems(newItems)
+                        }}
+                        onChange={(value) => {
+                          if (value == null || String(value).trim() === '') {
+                            const newItems = [...applyFormItems]
+                            newItems[index].drugId = undefined
+                            setApplyFormItems(newItems)
+                          }
                         }}
                         style={{ width: 300 }}
                       />
@@ -699,14 +829,14 @@ const OutboundManagement = () => {
                     </Form.Item>
 
                     {applyFormItems.length > 1 && (
-                      <Button
-                        type="link"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => removeApplyFormItem(index)}
-                      >
-                        删除
-                      </Button>
+                      <Tooltip title="删除">
+                        <Button
+                          type="link"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => removeApplyFormItem(index)}
+                        />
+                      </Tooltip>
                     )}
                   </Space>
                 </Space>
@@ -745,14 +875,45 @@ const OutboundManagement = () => {
           approveForm.resetFields()
           setApproveItems([])
           setHasSpecialDrug(false)
+          setStockCheckResult(null)
         }}
         onOk={() => approveForm.submit()}
+        okButtonProps={{ disabled: stockCheckResult && stockCheckResult.sufficient === false }}
         width={600}
       >
+        {stockCheckResult && stockCheckResult.sufficient === false && (
+          <Alert
+            message="库存不足，无法审批通过"
+            description={
+              <div>
+                <p style={{ marginBottom: 8 }}>{stockCheckResult.message}</p>
+                {Array.isArray(stockCheckResult.details) && stockCheckResult.details.length > 0 && (
+                  <ul style={{ marginBottom: 0 }}>
+                    {stockCheckResult.details.filter(d => !d.sufficient).map((d, i) => (
+                      <li key={i}>
+                        {d.drugName}：需要 {d.required}，可用 {d.available}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            }
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {stockCheckResult && stockCheckResult.sufficient === true && (
+          <Alert message="当前库存充足，可审批通过。" type="success" showIcon style={{ marginBottom: 16 }} />
+        )}
         {currentRecord && (
           <div style={{ marginBottom: 16 }}>
             <p><strong>申领单号：</strong>{currentRecord.applyNumber}</p>
-            <p><strong>申请人：</strong>{currentRecord.applicantName}</p>
+            <p><strong>申请人：</strong>
+              {currentRecord.applicantRoleName
+                ? `${currentRecord.applicantName || '-'}（${currentRecord.applicantRoleName}）`
+                : (currentRecord.applicantName ?? '-')}
+            </p>
             <p><strong>所属科室：</strong>{currentRecord.department}</p>
             <p><strong>用途：</strong>{currentRecord.purpose}</p>
           </div>
@@ -809,9 +970,8 @@ const OutboundManagement = () => {
               }
                   options={users
                 .filter(user => {
-                  // 只显示有出库审核权限的用户（仓库管理员或特殊药品审核人）
-                  // 这里需要从后端获取用户权限，暂时先过滤仓库管理员
-                  // 实际应该调用API获取有审核权限的用户列表
+                  const currentUser = getUser()
+                  if (currentUser && user.id === currentUser.id) return false // 第二审批人不能选自己（第一审批人）
                   return user.roleId === 2 || user.roleId === 4 // 仓库管理员或医护人员（可能拥有特殊药品审核权限）
                 })
                 .map(user => ({
@@ -821,6 +981,72 @@ const OutboundManagement = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 查看详情模态框（只读，申请人可在此查看自己申请的内容） */}
+      <Modal
+        title="出库申请详情"
+        open={detailModalVisible}
+        onCancel={() => {
+          setDetailModalVisible(false)
+          setDetailItems([])
+        }}
+        footer={[
+          currentRecord?.status === 'PENDING' && currentRecord?.applicantId === getUser()?.id && hasPermission(PERMISSIONS.OUTBOUND_APPLY) ? (
+            <Button
+              key="withdraw"
+              danger
+              icon={<RollbackOutlined />}
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认撤回',
+                  content: '撤回后该申请将变为已取消，确定要撤回吗？',
+                  onOk: () => handleWithdraw(currentRecord.id),
+                })
+              }}
+            >
+              撤回申请
+            </Button>
+          ) : null,
+          <Button key="close" type="primary" onClick={() => { setDetailModalVisible(false); setDetailItems([]) }}>
+            关闭
+          </Button>,
+        ].filter(Boolean)}
+        width={560}
+      >
+        {currentRecord && (
+          <div>
+            <p><strong>申领单号：</strong>{currentRecord.applyNumber}</p>
+            <p><strong>申请人：</strong>
+              {currentRecord.applicantRoleName
+                ? `${currentRecord.applicantName || '-'}（${currentRecord.applicantRoleName}）`
+                : (currentRecord.applicantName ?? '-')}
+            </p>
+            <p><strong>所属科室：</strong>{currentRecord.department}</p>
+            <p><strong>用途：</strong>{currentRecord.purpose}</p>
+            {currentRecord.remark ? <p><strong>备注：</strong>{currentRecord.remark}</p> : null}
+            <p><strong>申请状态：</strong>{getStatusTag(currentRecord.status)}</p>
+            {detailItems.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <strong>申请明细：</strong>
+                <ul style={{ marginTop: 8, marginBottom: 0 }}>
+                  {detailItems.map((item, index) => {
+                    const drug = drugs.find(d => d.id === item.drugId)
+                    return (
+                      <li key={index}>
+                        {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
+                        {' '}× {item.quantity}
+                        {drug && drug.isSpecial === 1 && (
+                          <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       {/* 执行出库模态框 */}

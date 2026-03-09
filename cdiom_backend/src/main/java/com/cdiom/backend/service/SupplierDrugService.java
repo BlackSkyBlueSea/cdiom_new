@@ -17,6 +17,11 @@ public interface SupplierDrugService {
     List<Long> getDrugIdsBySupplierId(Long supplierId);
 
     /**
+     * 根据供应商ID查询该供应商的供应商-药品关联列表（含单价）
+     */
+    List<SupplierDrug> getListBySupplierId(Long supplierId);
+
+    /**
      * 根据药品ID查询提供该药品的供应商ID列表
      */
     List<Long> getSupplierIdsByDrugId(Long drugId);

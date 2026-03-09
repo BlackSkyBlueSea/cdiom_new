@@ -7,6 +7,7 @@ import com.cdiom.backend.model.OutboundApply;
 import com.cdiom.backend.service.OutboundApplyService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -52,13 +53,33 @@ public class OutboundApplyController {
     }
 
     /**
-     * 根据ID查询出库申请
+     * 获取已有科室列表（供新建出库申请时下拉选择，无则仍可手动输入）
+     */
+    @GetMapping("/departments")
+    @RequiresPermission({"outbound:view", "outbound:apply"})
+    public Result<List<String>> listDepartments() {
+        List<String> list = outboundApplyService.listDepartments();
+        return Result.success(list);
+    }
+
+    /**
+     * 根据ID查询出库申请（列表查看、申请人查看详情等）
      */
     @GetMapping("/{id}")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({"drug:view", "drug:manage", "outbound:view", "outbound:apply"})
     public Result<OutboundApply> getOutboundApplyById(@PathVariable Long id) {
         OutboundApply apply = outboundApplyService.getOutboundApplyById(id);
         return Result.success(apply);
+    }
+
+    /**
+     * 校验出库申请所需库存是否充足（审批前在界面展示，不足时禁止通过）
+     */
+    @GetMapping("/{id}/stock-check")
+    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:approve", "outbound:approve:special"})
+    public Result<Map<String, Object>> checkStockForApply(@PathVariable Long id) {
+        Map<String, Object> data = outboundApplyService.checkStockForApply(id);
+        return Result.success(data);
     }
 
     /**
@@ -77,7 +98,7 @@ public class OutboundApplyController {
     @PostMapping
     @RequiresPermission({"outbound:apply"})
     public Result<OutboundApply> createOutboundApply(
-            @RequestBody OutboundApplyRequest request,
+            @Valid @RequestBody OutboundApplyRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long applicantId = getCurrentUserId(httpRequest);
@@ -148,13 +169,28 @@ public class OutboundApplyController {
     }
 
     /**
-     * 取消出库申请
+     * 取消出库申请（需 drug:manage 权限）
      */
     @PostMapping("/{id}/cancel")
     @RequiresPermission({"drug:manage"})
     public Result<Void> cancelOutboundApply(@PathVariable Long id) {
         try {
             outboundApplyService.cancelOutboundApply(id);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 申请人撤回出库申请（仅待审批状态下本人可撤回）
+     */
+    @PostMapping("/{id}/withdraw")
+    @RequiresPermission({"outbound:apply"})
+    public Result<Void> withdrawOutboundApply(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long applicantId = getCurrentUserId(httpRequest);
+            outboundApplyService.withdrawOutboundApply(id, applicantId);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -182,10 +218,10 @@ public class OutboundApplyController {
     }
 
     /**
-     * 获取出库申请明细列表
+     * 获取出库申请明细列表（列表查看、申请人查看详情等）
      */
     @GetMapping("/{id}/items")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({"drug:view", "drug:manage", "outbound:view", "outbound:apply"})
     public Result<List<Map<String, Object>>> getOutboundApplyItems(@PathVariable Long id) {
         try {
             List<com.cdiom.backend.model.OutboundApplyItem> items = outboundApplyService.getOutboundApplyItems(id);
@@ -223,9 +259,13 @@ public class OutboundApplyController {
     }
 
     /**
-     * 从请求中获取Token
+     * 从请求中获取Token（与 JwtAuthenticationFilter 一致：优先 Header，其次 Cookie）
      */
     private String getTokenFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
         jakarta.servlet.http.Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (jakarta.servlet.http.Cookie cookie : cookies) {
@@ -233,10 +273,6 @@ public class OutboundApplyController {
                     return cookie.getValue();
                 }
             }
-        }
-        String bearerToken = request.getHeader("Authorization");
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
         }
         return null;
     }

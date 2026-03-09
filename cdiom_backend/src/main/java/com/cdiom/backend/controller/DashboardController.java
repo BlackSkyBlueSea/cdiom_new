@@ -1,19 +1,17 @@
 package com.cdiom.backend.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
-import com.cdiom.backend.mapper.SupplierMapper;
 import com.cdiom.backend.model.Supplier;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DashboardService;
+import com.cdiom.backend.service.SupplierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,7 +26,7 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
     private final AuthService authService;
-    private final SupplierMapper supplierMapper;
+    private final SupplierService supplierService;
 
     /**
      * 获取统计数据
@@ -64,10 +62,10 @@ public class DashboardController {
 
     /**
      * 获取仓库管理员仪表盘数据
-     * 仓库管理员可以访问
+     * 仓库管理员可访问（具备入库/出库/药品任一相关权限即可）
      */
     @GetMapping("/warehouse")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({"drug:view", "drug:manage", "inbound:view", "outbound:view"})
     public Result<Map<String, Object>> getWarehouseDashboard() {
         Map<String, Object> data = dashboardService.getWarehouseDashboard();
         return Result.success(data);
@@ -111,18 +109,12 @@ public class DashboardController {
         if (currentUser == null) {
             return Result.error("未登录");
         }
-        // 通过supplier表的createBy字段查询供应商ID
-        LambdaQueryWrapper<Supplier> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Supplier::getCreateBy, currentUser.getId());
-        wrapper.eq(Supplier::getDeleted, 0);
-        List<Supplier> suppliers = supplierMapper.selectList(wrapper);
-        
-        if (suppliers == null || suppliers.isEmpty()) {
+        Supplier supplier = supplierService.findSupplierForUser(currentUser.getId(), currentUser.getPhone());
+        if (supplier == null) {
             return Result.error("未找到关联的供应商信息");
         }
         
-        // 取第一个供应商（通常一个供应商用户对应一个供应商记录）
-        Long supplierId = suppliers.get(0).getId();
+        Long supplierId = supplier.getId();
         Map<String, Object> data = dashboardService.getSupplierDashboard(supplierId);
         return Result.success(data);
     }

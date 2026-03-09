@@ -2,6 +2,7 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysConfigMapper;
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
@@ -67,7 +68,7 @@ public class SysConfigServiceImpl implements SysConfigService {
         LambdaQueryWrapper<SysConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysConfig::getConfigKey, config.getConfigKey());
         if (sysConfigMapper.selectOne(wrapper) != null) {
-            throw new RuntimeException("参数键名已存在");
+            throw new ServiceException("参数键名已存在");
         }
         
         // 设置默认值
@@ -86,7 +87,7 @@ public class SysConfigServiceImpl implements SysConfigService {
     public SysConfig updateConfig(SysConfig config) {
         SysConfig existConfig = sysConfigMapper.selectById(config.getId());
         if (existConfig == null) {
-            throw new RuntimeException("参数配置不存在");
+            throw new ServiceException("参数配置不存在");
         }
         
         // 如果修改了参数键名，检查是否重复
@@ -94,7 +95,7 @@ public class SysConfigServiceImpl implements SysConfigService {
             LambdaQueryWrapper<SysConfig> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(SysConfig::getConfigKey, config.getConfigKey());
             if (sysConfigMapper.selectOne(wrapper) != null) {
-                throw new RuntimeException("参数键名已存在");
+                throw new ServiceException("参数键名已存在");
             }
         }
         

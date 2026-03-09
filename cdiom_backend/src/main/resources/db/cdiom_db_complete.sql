@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS `supplier` (
     `credit_code` VARCHAR(100) DEFAULT NULL COMMENT '统一社会信用代码',
     `license_image` VARCHAR(500) DEFAULT NULL COMMENT '营业执照图片路径',
     `license_expiry_date` DATE DEFAULT NULL COMMENT '营业执照到期日期',
-    `status` TINYINT DEFAULT 1 COMMENT '0-禁用/1-启用/2-待审核',
+    `status` TINYINT DEFAULT 0 COMMENT '状态：0-禁用/1-启用（待审核由 audit_status 表示）',
     `audit_status` TINYINT DEFAULT 0 COMMENT '0-待审核/1-已通过/2-已驳回',
     `audit_reason` VARCHAR(500) DEFAULT NULL COMMENT '审核理由',
     `audit_by` BIGINT DEFAULT NULL COMMENT '审核人ID',

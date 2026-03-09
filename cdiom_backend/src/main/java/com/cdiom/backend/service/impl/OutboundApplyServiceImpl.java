@@ -2,13 +2,18 @@ package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.OutboundApplyItemMapper;
 import com.cdiom.backend.mapper.OutboundApplyMapper;
+import com.cdiom.backend.mapper.SysRoleMapper;
+import com.cdiom.backend.mapper.SysUserMapper;
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.Inventory;
 import com.cdiom.backend.model.OutboundApply;
 import com.cdiom.backend.model.OutboundApplyItem;
+import com.cdiom.backend.model.SysRole;
+import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.InventoryService;
 import com.cdiom.backend.service.OutboundApplyService;
 import com.cdiom.backend.util.RetryUtil;
@@ -39,6 +44,8 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     private final OutboundApplyItemMapper outboundApplyItemMapper;
     private final DrugInfoMapper drugInfoMapper;
     private final InventoryService inventoryService;
+    private final SysUserMapper sysUserMapper;
+    private final SysRoleMapper sysRoleMapper;
 
     @Override
     public Page<OutboundApply> getOutboundApplyList(Integer page, Integer size, String keyword, Long applicantId, Long approverId, String department, String status, LocalDate startDate, LocalDate endDate) {
@@ -76,13 +83,52 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         }
         
         wrapper.orderByDesc(OutboundApply::getCreateTime);
-        
-        return outboundApplyMapper.selectPage(pageParam, wrapper);
+
+        Page<OutboundApply> pageResult = outboundApplyMapper.selectPage(pageParam, wrapper);
+        for (OutboundApply apply : pageResult.getRecords()) {
+            fillApplicantAndApproverNames(apply);
+        }
+        return pageResult;
+    }
+
+    @Override
+    public List<String> listDepartments() {
+        return outboundApplyMapper.listDistinctDepartments();
     }
 
     @Override
     public OutboundApply getOutboundApplyById(Long id) {
-        return outboundApplyMapper.selectById(id);
+        OutboundApply apply = outboundApplyMapper.selectById(id);
+        if (apply != null) {
+            fillApplicantAndApproverNames(apply);
+        }
+        return apply;
+    }
+
+    /**
+     * 填充申请人、审批人的姓名与角色名（用于列表/详情展示，避免仅显示用户名与角色混淆）
+     */
+    private void fillApplicantAndApproverNames(OutboundApply apply) {
+        if (apply.getApplicantId() != null) {
+            SysUser applicant = sysUserMapper.selectById(apply.getApplicantId());
+            if (applicant != null) {
+                apply.setApplicantName(applicant.getUsername());
+                if (applicant.getRoleId() != null) {
+                    SysRole role = sysRoleMapper.selectById(applicant.getRoleId());
+                    apply.setApplicantRoleName(role != null ? role.getRoleName() : null);
+                }
+            }
+        }
+        if (apply.getApproverId() != null) {
+            SysUser approver = sysUserMapper.selectById(apply.getApproverId());
+            if (approver != null) {
+                apply.setApproverName(approver.getUsername());
+                if (approver.getRoleId() != null) {
+                    SysRole role = sysRoleMapper.selectById(approver.getRoleId());
+                    apply.setApproverRoleName(role != null ? role.getRoleName() : null);
+                }
+            }
+        }
     }
 
     @Override
@@ -96,7 +142,7 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     @Transactional(rollbackFor = Exception.class)
     public OutboundApply createOutboundApply(OutboundApply outboundApply, List<Map<String, Object>> items) {
         if (items == null || items.isEmpty()) {
-            throw new RuntimeException("出库申请明细不能为空");
+            throw new ServiceException("出库申请明细不能为空");
         }
         
         outboundApply.setStatus("PENDING");
@@ -108,9 +154,9 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             return created;
         } catch (Exception e) {
             if (e.getCause() instanceof DuplicateKeyException) {
-                throw new RuntimeException("当前出库申请创建过于繁忙，请稍后重试", e);
+                throw new ServiceException("当前出库申请创建过于繁忙，请稍后重试");
             }
-            throw new RuntimeException("创建出库申请失败：" + e.getMessage(), e);
+            throw new ServiceException("创建出库申请失败：" + e.getMessage());
         }
     }
 
@@ -119,16 +165,16 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     public void approveOutboundApply(Long id, Long approverId, Long secondApproverId) {
         OutboundApply apply = outboundApplyMapper.selectById(id);
         if (apply == null) {
-            throw new RuntimeException("出库申请不存在");
+            throw new ServiceException("出库申请不存在");
         }
         
         if (!"PENDING".equals(apply.getStatus())) {
-            throw new RuntimeException("申请状态不是待审批，无法审批");
+            throw new ServiceException("申请状态不是待审批，无法审批");
         }
         
         // 验证：申请人和审批人不能是同一人
         if (apply.getApplicantId() != null && apply.getApplicantId().equals(approverId)) {
-            throw new RuntimeException("申请人和审批人不能是同一人");
+            throw new ServiceException("申请人和审批人不能是同一人");
         }
         
         // 检查是否包含特殊药品，需要第二审批人
@@ -144,16 +190,31 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         
         if (hasSpecialDrug) {
             if (secondApproverId == null) {
-                throw new RuntimeException("申请包含特殊药品，需要第二审批人确认");
+                throw new ServiceException("申请包含特殊药品，需要第二审批人确认");
             }
             // 验证：特殊药品的申请人和第二审批人不能是同一人
             if (apply.getApplicantId() != null && apply.getApplicantId().equals(secondApproverId)) {
-                throw new RuntimeException("特殊药品申请人和第二审批人不能是同一人");
+                throw new ServiceException("特殊药品申请人和第二审批人不能是同一人");
             }
             // 验证：第一审批人和第二审批人不能是同一人
             if (approverId.equals(secondApproverId)) {
-                throw new RuntimeException("第一审批人和第二审批人不能是同一人");
+                throw new ServiceException("第一审批人和第二审批人不能是同一人");
             }
+        }
+
+        // 审批前校验库存：无货或不足时不允许通过，避免只走流程无实际意义
+        List<String> insufficientList = new java.util.ArrayList<>();
+        for (OutboundApplyItem item : items) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) continue;
+            int available = inventoryService.getTotalAvailableQuantity(item.getDrugId());
+            if (available < item.getQuantity()) {
+                DrugInfo drug = drugInfoMapper.selectById(item.getDrugId());
+                String name = drug != null ? (drug.getDrugName() + (StringUtils.hasText(drug.getSpecification()) ? " " + drug.getSpecification() : "")) : "药品ID:" + item.getDrugId();
+                insufficientList.add(name + " 需要" + item.getQuantity() + " 可用" + available);
+            }
+        }
+        if (!insufficientList.isEmpty()) {
+            throw new ServiceException("以下药品库存不足，无法审批通过：" + String.join("；", insufficientList));
         }
         
         apply.setStatus("APPROVED");
@@ -171,11 +232,11 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     public void rejectOutboundApply(Long id, Long approverId, String rejectReason) {
         OutboundApply apply = outboundApplyMapper.selectById(id);
         if (apply == null) {
-            throw new RuntimeException("出库申请不存在");
+            throw new ServiceException("出库申请不存在");
         }
         
         if (!"PENDING".equals(apply.getStatus())) {
-            throw new RuntimeException("申请状态不是待审批，无法驳回");
+            throw new ServiceException("申请状态不是待审批，无法驳回");
         }
         
         apply.setStatus("REJECTED");
@@ -193,11 +254,11 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     public void executeOutbound(Long id, List<Map<String, Object>> outboundItems) {
         OutboundApply apply = outboundApplyMapper.selectById(id);
         if (apply == null) {
-            throw new RuntimeException("出库申请不存在");
+            throw new ServiceException("出库申请不存在");
         }
         
         if (!"APPROVED".equals(apply.getStatus())) {
-            throw new RuntimeException("申请状态不是已通过，无法出库");
+            throw new ServiceException("申请状态不是已通过，无法出库");
         }
         
         List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(id);
@@ -209,14 +270,14 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             // 验证并转换 drugId
             Object drugIdObj = outboundItem.get("drugId");
             if (drugIdObj == null) {
-                throw new RuntimeException("出库明细第" + (i + 1) + "项：药品ID不能为空");
+                throw new ServiceException("出库明细第" + (i + 1) + "项：药品ID不能为空");
             }
             Long drugId;
             try {
                 drugId = Long.valueOf(drugIdObj.toString());
             } catch (NumberFormatException e) {
                 log.error("出库明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
-                throw new RuntimeException("出库明细第" + (i + 1) + "项：药品ID格式不正确");
+                throw new ServiceException("出库明细第" + (i + 1) + "项：药品ID格式不正确");
             }
             
             String batchNumber = outboundItem.get("batchNumber") != null ? outboundItem.get("batchNumber").toString() : null;
@@ -224,17 +285,17 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             // 验证并转换 actualQuantity
             Object actualQuantityObj = outboundItem.get("actualQuantity");
             if (actualQuantityObj == null) {
-                throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量不能为空");
+                throw new ServiceException("出库明细第" + (i + 1) + "项：实际出库数量不能为空");
             }
             Integer actualQuantity;
             try {
                 actualQuantity = Integer.valueOf(actualQuantityObj.toString());
                 if (actualQuantity <= 0) {
-                    throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量必须大于0");
+                    throw new ServiceException("出库明细第" + (i + 1) + "项：实际出库数量必须大于0");
                 }
             } catch (NumberFormatException e) {
                 log.error("出库明细第{}项：实际出库数量类型转换失败，值={}, 错误={}", i + 1, actualQuantityObj, e.getMessage());
-                throw new RuntimeException("出库明细第" + (i + 1) + "项：实际出库数量格式不正确");
+                throw new ServiceException("出库明细第" + (i + 1) + "项：实际出库数量格式不正确");
             }
             
             // 查找对应的申请明细
@@ -257,7 +318,7 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                         .mapToInt(Inventory::getQuantity)
                         .sum();
                 if (totalAvailableQuantity < actualQuantity) {
-                    throw new RuntimeException("库存不足，药品ID=" + drugId + "，需要出库：" + actualQuantity + "，可用数量：" + totalAvailableQuantity);
+                    throw new ServiceException("库存不足，药品ID=" + drugId + "，需要出库：" + actualQuantity + "，可用数量：" + totalAvailableQuantity);
                 }
                 
                 // 按FIFO顺序扣减库存
@@ -273,7 +334,7 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 
                 // 理论上不应该到达这里（因为已经验证过），但保留作为最后一道防线
                 if (remainingQuantity > 0) {
-                    throw new RuntimeException("库存扣减异常，药品ID=" + drugId + "，剩余未扣减数量：" + remainingQuantity);
+                    throw new ServiceException("库存扣减异常，药品ID=" + drugId + "，剩余未扣减数量：" + remainingQuantity);
                 }
             }
             
@@ -295,17 +356,35 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     public void cancelOutboundApply(Long id) {
         OutboundApply apply = outboundApplyMapper.selectById(id);
         if (apply == null) {
-            throw new RuntimeException("出库申请不存在");
+            throw new ServiceException("出库申请不存在");
         }
         
         if ("OUTBOUND".equals(apply.getStatus())) {
-            throw new RuntimeException("申请已出库，无法取消");
+            throw new ServiceException("申请已出库，无法取消");
         }
         
         apply.setStatus("CANCELLED");
         outboundApplyMapper.updateById(apply);
         
         log.info("取消出库申请：申请ID={}", id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void withdrawOutboundApply(Long id, Long applicantUserId) {
+        OutboundApply apply = outboundApplyMapper.selectById(id);
+        if (apply == null) {
+            throw new ServiceException("出库申请不存在");
+        }
+        if (!applicantUserId.equals(apply.getApplicantId())) {
+            throw new ServiceException("仅申请人本人可撤回");
+        }
+        if (!"PENDING".equals(apply.getStatus())) {
+            throw new ServiceException("仅待审批状态的申请可撤回");
+        }
+        apply.setStatus("CANCELLED");
+        outboundApplyMapper.updateById(apply);
+        log.info("申请人撤回出库申请：申请ID={}, 申请人ID={}", id, applicantUserId);
     }
 
     @Override
@@ -324,6 +403,34 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     @Override
     public List<OutboundApplyItem> getOutboundApplyItems(Long applyId) {
         return outboundApplyItemMapper.selectByApplyId(applyId);
+    }
+
+    @Override
+    public Map<String, Object> checkStockForApply(Long applyId) {
+        List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(applyId);
+        List<Map<String, Object>> details = new java.util.ArrayList<>();
+        boolean sufficient = true;
+        for (OutboundApplyItem item : items) {
+            int required = item.getQuantity() != null ? item.getQuantity() : 0;
+            int available = inventoryService.getTotalAvailableQuantity(item.getDrugId());
+            boolean itemOk = available >= required;
+            if (!itemOk) sufficient = false;
+            DrugInfo drug = drugInfoMapper.selectById(item.getDrugId());
+            String drugName = drug != null ? (drug.getDrugName() + (StringUtils.hasText(drug.getSpecification()) ? " " + drug.getSpecification() : "")) : "药品ID:" + item.getDrugId();
+            Map<String, Object> row = new java.util.HashMap<>();
+            row.put("drugId", item.getDrugId());
+            row.put("drugName", drugName);
+            row.put("required", required);
+            row.put("available", available);
+            row.put("sufficient", itemOk);
+            details.add(row);
+        }
+        String message = sufficient ? "当前库存充足，可审批通过。" : "以下药品库存不足，无法审批通过，请补货或驳回申请。";
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("sufficient", sufficient);
+        result.put("message", message);
+        result.put("details", details);
+        return result;
     }
 
     /**
@@ -346,14 +453,14 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             // 验证并转换 drugId
             Object drugIdObj = item.get("drugId");
             if (drugIdObj == null) {
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID不能为空");
+                throw new ServiceException("出库申请明细第" + (i + 1) + "项：药品ID不能为空");
             }
             try {
                 Long drugId = Long.valueOf(drugIdObj.toString());
                 applyItem.setDrugId(drugId);
             } catch (NumberFormatException e) {
                 log.error("出库申请明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：药品ID格式不正确");
+                throw new ServiceException("出库申请明细第" + (i + 1) + "项：药品ID格式不正确");
             }
             
             if (item.get("batchNumber") != null) {
@@ -363,17 +470,17 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             // 验证并转换 quantity
             Object quantityObj = item.get("quantity");
             if (quantityObj == null) {
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量不能为空");
+                throw new ServiceException("出库申请明细第" + (i + 1) + "项：数量不能为空");
             }
             try {
                 Integer quantity = Integer.valueOf(quantityObj.toString());
                 if (quantity <= 0) {
-                    throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量必须大于0");
+                    throw new ServiceException("出库申请明细第" + (i + 1) + "项：数量必须大于0");
                 }
                 applyItem.setQuantity(quantity);
             } catch (NumberFormatException e) {
                 log.error("出库申请明细第{}项：数量类型转换失败，值={}, 错误={}", i + 1, quantityObj, e.getMessage());
-                throw new RuntimeException("出库申请明细第" + (i + 1) + "项：数量格式不正确");
+                throw new ServiceException("出库申请明细第" + (i + 1) + "项：数量格式不正确");
             }
             
             if (item.get("remark") != null) {

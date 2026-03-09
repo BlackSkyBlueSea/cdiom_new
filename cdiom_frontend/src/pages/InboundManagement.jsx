@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Tooltip } from 'antd'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, BarcodeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 
 const { RangePicker } = DatePicker
@@ -56,13 +57,13 @@ const InboundManagement = () => {
     }))
   }, [drugs])
 
-  // 采购订单选项（用于Select）
+  // 采购订单选项（用于Select）：显示「订单编号 - 供应商名称」，无供应商时只显示订单编号
   const orderOptions = useMemo(() => {
     return orders
       .filter(order => order.status === 'SHIPPED')
       .map(order => ({
         value: order.id,
-        label: `${order.orderNumber} - ${order.supplierName || ''}`,
+        label: order.supplierName ? `${order.orderNumber} - ${order.supplierName}` : (order.orderNumber || `订单#${order.id}`),
         order: order
       }))
   }, [orders])
@@ -94,7 +95,7 @@ const InboundManagement = () => {
         message.error(res.msg || '获取入库记录失败')
       }
     } catch (error) {
-      console.error('获取入库记录失败:', error)
+      logger.error('获取入库记录失败:', error)
       message.error('获取入库记录失败')
     } finally {
       setLoading(false)
@@ -133,7 +134,7 @@ const InboundManagement = () => {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取药品列表失败:', error)
+      logger.error('获取药品列表失败:', error)
     }
   }
 
@@ -146,7 +147,7 @@ const InboundManagement = () => {
         setOrders(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取采购订单列表失败:', error)
+      logger.error('获取采购订单列表失败:', error)
     }
   }
 
@@ -157,19 +158,62 @@ const InboundManagement = () => {
       form.setFieldsValue({ drugId: undefined })
       return
     }
-    
+
     try {
-      const order = orders.find(o => o.id === orderId)
+      let order = orders.find(o => o.id === orderId)
+      if (!order) {
+        const res = await request.get(`/purchase-orders/${orderId}`)
+        if (res.code === 200 && res.data) order = res.data
+      }
+      if (!order) {
+        message.error('未找到该订单')
+        return
+      }
       setSelectedOrder(order)
-      
-      // 获取订单明细
+      form.setFieldsValue({ drugId: undefined, quantity: undefined })
+      setSelectedDrug(null)
+
       const res = await request.get(`/purchase-orders/${orderId}/items`)
       if (res.code === 200) {
         setOrderItems(res.data || [])
       }
     } catch (error) {
-      console.error('获取订单明细失败:', error)
+      logger.error('获取订单明细失败:', error)
       message.error('获取订单明细失败')
+    }
+  }
+
+  // 扫描/输入订单编号识别订单（条形码内容为订单编号）
+  const [barcodeOrderNumber, setBarcodeOrderNumber] = useState('')
+  const [barcodeLoading, setBarcodeLoading] = useState(false)
+  const handleBarcodeRecognize = async () => {
+    const num = (barcodeOrderNumber || '').trim()
+    if (!num) {
+      message.warning('请输入或扫描订单编号')
+      return
+    }
+    setBarcodeLoading(true)
+    try {
+      const res = await request.get(`/purchase-orders/order-number/${encodeURIComponent(num)}`)
+      if (res.code !== 200 || !res.data) {
+        message.error('未找到该订单编号')
+        return
+      }
+      const order = res.data
+      if (order.status !== 'SHIPPED') {
+        message.warning('仅支持已发货订单入库，当前订单状态：' + (order.status === 'PENDING' ? '待确认' : order.status === 'CONFIRMED' ? '待发货' : order.status === 'REJECTED' ? '已拒绝' : order.status === 'RECEIVED' ? '已入库' : order.status === 'CANCELLED' ? '已取消' : order.status))
+        return
+      }
+      setOrders(prev => (prev.some(o => o.id === order.id) ? prev : [...prev, order]))
+      form.setFieldsValue({ orderId: order.id })
+      await handleOrderChange(order.id)
+      setBarcodeOrderNumber('')
+      message.success('已识别订单：' + order.orderNumber)
+    } catch (e) {
+      logger.error('根据订单编号查询失败', e)
+      message.error(e?.response?.data?.msg || '识别订单失败')
+    } finally {
+      setBarcodeLoading(false)
     }
   }
 
@@ -271,7 +315,7 @@ const InboundManagement = () => {
         message.error(res.msg || '入库失败')
       }
     } catch (error) {
-      console.error('入库失败:', error)
+      logger.error('入库失败:', error)
       message.error(error.response?.data?.msg || error.message || '入库失败')
     }
   }
@@ -419,39 +463,39 @@ const InboundManagement = () => {
               })
             }}
           />
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchInboundRecords}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+          <Tooltip title="查询">
             <Button
               type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setModalVisible(true)
-                setInboundType('order')
-              }}
-            >
-              采购订单入库
-            </Button>
+              icon={<SearchOutlined />}
+              onClick={fetchInboundRecords}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Tooltip title="采购订单入库">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setModalVisible(true)
+                  setInboundType('order')
+                }}
+              />
+            </Tooltip>
           )}
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setModalVisible(true)
-                setInboundType('temporary')
-              }}
-            >
-              临时入库
-            </Button>
+            <Tooltip title="临时入库">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setModalVisible(true)
+                  setInboundType('temporary')
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       </div>
@@ -480,6 +524,7 @@ const InboundManagement = () => {
           setSelectedDrug(null)
           setSelectedOrder(null)
           setOrderItems([])
+          setBarcodeOrderNumber('')
         }}
         onOk={() => form.submit()}
         width={800}
@@ -490,51 +535,76 @@ const InboundManagement = () => {
           onFinish={handleCreateInbound}
         >
           {inboundType === 'order' && (
-            <Form.Item
-              name="orderId"
-              label="采购订单"
-              rules={[
-                { required: true, message: '请选择采购订单' },
-              ]}
-            >
-              <Select
-                placeholder="请选择采购订单（仅显示已发货订单）"
-                showSearch
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                onChange={handleOrderChange}
-                options={orderOptions}
-              />
-            </Form.Item>
+            <>
+              <Form.Item label="扫描订单条形码">
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    prefix={<BarcodeOutlined style={{ color: '#999' }} />}
+                    placeholder="将扫码枪对准此处扫描，或输入订单编号后回车"
+                    value={barcodeOrderNumber}
+                    onChange={(e) => setBarcodeOrderNumber(e.target.value)}
+                    onPressEnter={(e) => { e.preventDefault(); handleBarcodeRecognize() }}
+                    allowClear
+                  />
+                  <Tooltip title="根据订单编号识别并带出订单信息">
+                    <Button type="primary" loading={barcodeLoading} onClick={handleBarcodeRecognize}>
+                      识别
+                    </Button>
+                  </Tooltip>
+                </Space.Compact>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                  条形码内容为订单编号，扫描后自动带出订单及药品明细
+                </div>
+              </Form.Item>
+              <Form.Item
+                name="orderId"
+                label="采购订单"
+                rules={[
+                  { required: true, message: '请选择采购订单' },
+                ]}
+              >
+                <Select
+                  placeholder="或从下拉选择采购订单（仅显示已发货订单）"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  onChange={handleOrderChange}
+                  options={orderOptions}
+                />
+              </Form.Item>
+            </>
           )}
           
           {inboundType === 'order' && selectedOrder && orderItems.length > 0 && (
-            <Form.Item label="订单药品">
+            <Form.Item
+              name="drugId"
+              label="订单药品"
+              rules={[{ required: true, message: '请选择药品' }]}
+            >
               <Select
                 placeholder="请选择订单中的药品"
+                optionFilterProp="label"
                 onChange={(drugId) => {
-                  const item = orderItems.find(i => i.drugId === drugId)
+                  const item = orderItems.find(i => Number(i.drugId) === Number(drugId))
                   if (item) {
-                    form.setFieldsValue({
-                      drugId: drugId,
-                      quantity: item.quantity,
-                    })
-                    const drug = drugs.find(d => d.id === drugId)
+                    form.setFieldsValue({ quantity: item.quantity })
+                    const drug = drugs.find(d => Number(d.id) === Number(drugId))
                     if (drug) {
                       setSelectedDrug(drug)
-                      form.setFieldsValue({
-                        manufacturer: drug.manufacturer || '',
-                      })
+                      form.setFieldsValue({ manufacturer: drug.manufacturer || '' })
                     }
                   }
                 }}
               >
                 {orderItems.map(item => {
-                  const drug = drugs.find(d => d.id === item.drugId)
+                  const drug = drugs.find(d => Number(d.id) === Number(item.drugId))
+                  const label = drug
+                    ? `${drug.drugName || '未知'}${drug.specification ? ` (${drug.specification})` : ''} - 订单数量: ${item.quantity}`
+                    : `药品ID: ${item.drugId} - 数量: ${item.quantity}`
                   return (
-                    <Select.Option key={item.drugId} value={item.drugId}>
-                      {drug ? `${drug.drugName} (${drug.specification || ''}) - 订单数量: ${item.quantity}` : `药品ID: ${item.drugId} - 数量: ${item.quantity}`}
+                    <Select.Option key={item.drugId} value={item.drugId} label={label}>
+                      {label}
                     </Select.Option>
                   )
                 })}
@@ -564,17 +634,6 @@ const InboundManagement = () => {
                   }
                 }}
               />
-            </Form.Item>
-          )}
-
-          {inboundType === 'order' && (
-            <Form.Item
-              name="drugId"
-              label="药品ID"
-              rules={[{ required: true, message: '请选择药品' }]}
-              hidden
-            >
-              <Input />
             </Form.Item>
           )}
 

@@ -212,3 +212,7 @@ SHOW INDEX FROM inventory_adjustment WHERE Key_name = 'uk_adjustment_number';
 **文档版本**：v1.0
 
 
+
+
+
+

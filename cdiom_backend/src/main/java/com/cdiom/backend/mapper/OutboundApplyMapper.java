@@ -5,6 +5,7 @@ import com.cdiom.backend.model.OutboundApply;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
 import java.time.LocalDateTime;
 
 /**
@@ -26,7 +27,17 @@ public interface OutboundApplyMapper extends BaseMapper<OutboundApply> {
      */
     @Select("SELECT COUNT(*) FROM outbound_apply WHERE outbound_time >= #{todayStart} AND outbound_time < #{todayEnd} AND status = 'OUTBOUND'")
     Long countTodayOutbound(LocalDateTime todayStart, LocalDateTime todayEnd);
+
+    /**
+     * 查询已有科室列表（出库申请中已使用过的科室，去重、非空、按名称排序）
+     */
+    @Select("SELECT DISTINCT department FROM outbound_apply WHERE department IS NOT NULL AND TRIM(department) != '' ORDER BY department")
+    List<String> listDistinctDepartments();
 }
+
+
+
+
 
 
 

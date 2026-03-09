@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete, Popconfirm, Image } from 'antd'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, InputNumber, AutoComplete, Popconfirm, Image, Tooltip } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, EyeOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, SendOutlined, StopOutlined, EditOutlined, BarcodeOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 import { getUserRoleId } from '../utils/auth'
 
@@ -27,7 +28,7 @@ const PurchaseOrderManagement = () => {
   const [suppliers, setSuppliers] = useState([])
   const [drugs, setDrugs] = useState([])
   const [selectedSupplierId, setSelectedSupplierId] = useState(undefined)
-  const [orderFormItems, setOrderFormItems] = useState([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+  const [orderFormItems, setOrderFormItems] = useState([{ drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
   const [rejectModalVisible, setRejectModalVisible] = useState(false)
   const [shipModalVisible, setShipModalVisible] = useState(false)
   const [cancelModalVisible, setCancelModalVisible] = useState(false)
@@ -69,11 +70,13 @@ const PurchaseOrderManagement = () => {
       }))
   }, [suppliers])
 
-  // 药品选项
+  // 药品选项（选中供应商时含 unitPrice，用于自动带出单价）
+  // value 使用字符串，避免 AutoComplete 在 combobox 场景下报 number type 警告
   const drugOptions = useMemo(() => {
     return drugs.map(drug => ({
-      value: drug.id,
-      label: `${drug.drugName} (${drug.specification || ''})`,
+      value: String(drug.id),
+      label: `${drug.drugName || ''} (${drug.specification || ''})`.replace(/\s*\(\s*\)$/, '').trim() || String(drug.id),
+      unitPrice: drug.unitPrice,
       drug: drug
     }))
   }, [drugs])
@@ -87,7 +90,7 @@ const PurchaseOrderManagement = () => {
         setSuppliers(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取供应商列表失败:', error)
+      logger.error('获取供应商列表失败:', error)
     }
   }
 
@@ -100,7 +103,7 @@ const PurchaseOrderManagement = () => {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取药品列表失败:', error)
+      logger.error('获取药品列表失败:', error)
     }
   }
 
@@ -113,7 +116,7 @@ const PurchaseOrderManagement = () => {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      console.error('获取供应商药品列表失败:', error)
+      logger.error('获取供应商药品列表失败:', error)
       message.error('获取供应商药品列表失败')
     }
   }
@@ -140,7 +143,7 @@ const PurchaseOrderManagement = () => {
         message.error(res.msg || '获取采购订单失败')
       }
     } catch (error) {
-      console.error('获取采购订单失败:', error)
+      logger.error('获取采购订单失败:', error)
       message.error('获取采购订单失败')
     } finally {
       setLoading(false)
@@ -207,7 +210,7 @@ const PurchaseOrderManagement = () => {
       
       message.success('导出成功')
     } catch (error) {
-      console.error('导出失败:', error)
+      logger.error('导出失败:', error)
       message.error('导出失败: ' + (error.message || '未知错误'))
     } finally {
       setExporting(false)
@@ -268,19 +271,19 @@ const PurchaseOrderManagement = () => {
         message.success('采购订单创建成功')
         setModalVisible(false)
         form.resetFields()
-        setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+        setOrderFormItems([{ drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
         fetchOrders()
       } else {
         message.error(res.msg || '创建采购订单失败')
       }
     } catch (error) {
-      console.error('创建采购订单失败:', error)
+      logger.error('创建采购订单失败:', error)
       message.error(error.response?.data?.msg || error.message || '创建采购订单失败')
     }
   }
 
   const addOrderFormItem = () => {
-    setOrderFormItems([...orderFormItems, { drugId: undefined, quantity: undefined, unitPrice: undefined }])
+    setOrderFormItems([...orderFormItems, { drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
   }
 
   const removeOrderFormItem = (index) => {
@@ -414,27 +417,27 @@ const PurchaseOrderManagement = () => {
       render: (text, record) => (
         <Space>
           <span>{text}</span>
-          <Button
-            type="link"
-            size="small"
-            icon={<BarcodeOutlined />}
-            onClick={async () => {
-              try {
-                const res = await request.get(`/purchase-orders/${record.id}/barcode`)
-                if (res.code === 200) {
-                  setCurrentBarcode(res.data)
-                  setCurrentBarcodeOrderId(record.id)
-                  setBarcodeModalVisible(true)
-                } else {
-                  message.error(res.msg || '获取条形码失败')
+          <Tooltip title="条形码">
+            <Button
+              type="link"
+              size="small"
+              icon={<BarcodeOutlined />}
+              onClick={async () => {
+                try {
+                  const res = await request.get(`/purchase-orders/${record.id}/barcode`)
+                  if (res.code === 200) {
+                    setCurrentBarcode(res.data)
+                    setCurrentBarcodeOrderId(record.id)
+                    setBarcodeModalVisible(true)
+                  } else {
+                    message.error(res.msg || '获取条形码失败')
+                  }
+                } catch (error) {
+                  message.error('获取条形码失败')
                 }
-              } catch (error) {
-                message.error('获取条形码失败')
-              }
-            }}
-          >
-            条形码
-          </Button>
+              }}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -488,94 +491,40 @@ const PurchaseOrderManagement = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space wrap>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={async () => {
-              try {
-                const res = await request.get(`/purchase-orders/${record.id}/items`)
-                if (res.code === 200) {
-                  setCurrentOrder({ ...record, items: res.data })
-                  setDetailModalVisible(true)
+          <Tooltip title="查看明细">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={async () => {
+                try {
+                  const res = await request.get(`/purchase-orders/${record.id}/items`)
+                  if (res.code === 200) {
+                    setCurrentOrder({ ...record, items: res.data })
+                    setDetailModalVisible(true)
+                  }
+                } catch (error) {
+                  message.error('获取订单明细失败')
                 }
-              } catch (error) {
-                message.error('获取订单明细失败')
-              }
-            }}
-          >
-            查看明细
-          </Button>
-          {record.status === 'PENDING' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <>
-              <Popconfirm
-                title="确认订单"
-                description="确定要确认此订单吗？"
-                onConfirm={() => handleConfirmOrder(record.id)}
-                okText="确认"
-                cancelText="取消"
-              >
-                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>
-                  确认
-                </Button>
-              </Popconfirm>
+              }}
+            />
+          </Tooltip>
+          {/* 采购专员：仅可取消订单申请，不可确认/拒绝/发货/填物流（由供应商操作） */}
+          {record.status !== 'RECEIVED' && record.status !== 'CANCELLED' && record.status !== 'REJECTED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && getUserRoleId() !== 5 && (
+            <Tooltip title="取消">
               <Button
                 type="link"
                 size="small"
-                icon={<CloseOutlined />}
+                icon={<StopOutlined />}
                 danger
                 onClick={() => {
                   setActionOrderId(record.id)
-                  setRejectModalVisible(true)
+                  setCancelModalVisible(true)
                 }}
-              >
-                拒绝
-              </Button>
-            </>
+              />
+            </Tooltip>
           )}
-          {record.status === 'CONFIRMED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<SendOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                shipForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
-                setShipModalVisible(true)
-              }}
-            >
-              发货
-            </Button>
-          )}
-          {(record.status === 'SHIPPED' || record.status === 'CONFIRMED') && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
-                setLogisticsModalVisible(true)
-              }}
-            >
-              物流
-            </Button>
-          )}
-          {record.status !== 'RECEIVED' && record.status !== 'CANCELLED' && record.status !== 'REJECTED' && hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Button
-              type="link"
-              size="small"
-              icon={<StopOutlined />}
-              danger
-              onClick={() => {
-                setActionOrderId(record.id)
-                setCancelModalVisible(true)
-              }}
-            >
-              取消
-            </Button>
-          )}
-          {/* 供应商可以操作自己的订单 */}
+          {/* 供应商：确认/拒绝/发货/物流（仅对自己的订单） */}
           {getUserRoleId() === 5 && record.status === 'PENDING' && (
             <>
               <Popconfirm
@@ -585,51 +534,51 @@ const PurchaseOrderManagement = () => {
                 okText="确认"
                 cancelText="取消"
               >
-                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>
-                  确认
-                </Button>
+                <Tooltip title="确认">
+                  <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }} />
+                </Tooltip>
               </Popconfirm>
-              <Button
-                type="link"
-                size="small"
-                icon={<CloseOutlined />}
-                danger
-                onClick={() => {
-                  setActionOrderId(record.id)
-                  setRejectModalVisible(true)
-                }}
-              >
-                拒绝
-              </Button>
+              <Tooltip title="拒绝">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  danger
+                  onClick={() => {
+                    setActionOrderId(record.id)
+                    setRejectModalVisible(true)
+                  }}
+                />
+              </Tooltip>
             </>
           )}
           {getUserRoleId() === 5 && record.status === 'CONFIRMED' && (
-            <Button
-              type="link"
-              size="small"
-              icon={<SendOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                shipForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
-                setShipModalVisible(true)
-              }}
-            >
-              发货
-            </Button>
+            <Tooltip title="发货">
+              <Button
+                type="link"
+                size="small"
+                icon={<SendOutlined />}
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  shipForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                  setShipModalVisible(true)
+                }}
+              />
+            </Tooltip>
           )}
           {getUserRoleId() === 5 && (record.status === 'SHIPPED' || record.status === 'CONFIRMED') && (
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setActionOrderId(record.id)
-                logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
-                setLogisticsModalVisible(true)
-              }}
-            >
-              物流
-            </Button>
+            <Tooltip title="物流">
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setActionOrderId(record.id)
+                  logisticsForm.setFieldsValue({ logisticsNumber: record.logisticsNumber || '' })
+                  setLogisticsModalVisible(true)
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       ),
@@ -662,37 +611,37 @@ const PurchaseOrderManagement = () => {
             <Select.Option value="RECEIVED">已入库</Select.Option>
             <Select.Option value="CANCELLED">已取消</Select.Option>
           </Select>
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchOrders}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
-          <Button 
-            icon={<DownloadOutlined />} 
-            onClick={handleExport}
-            loading={exporting}
-          >
-            导出Excel
-          </Button>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+          <Tooltip title="查询">
             <Button
               type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setModalVisible(true)
-                form.resetFields()
-                setSelectedSupplierId(undefined)
-                setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
-                fetchDrugs() // 重置时加载所有药品
-              }}
-            >
-              新建采购订单
-            </Button>
+              icon={<SearchOutlined />}
+              onClick={fetchOrders}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
+          <Tooltip title="导出Excel">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              loading={exporting}
+            />
+          </Tooltip>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Tooltip title="新建采购订单">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setModalVisible(true)
+                  form.resetFields()
+                  setSelectedSupplierId(undefined)
+                  setOrderFormItems([{ drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
+                  fetchDrugs()
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       </div>
@@ -720,8 +669,8 @@ const PurchaseOrderManagement = () => {
           setModalVisible(false)
           form.resetFields()
           setSelectedSupplierId(undefined)
-          setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
-          fetchDrugs() // 取消时重置药品列表
+          setOrderFormItems([{ drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
+          fetchDrugs()
         }}
         onOk={() => form.submit()}
         width={900}
@@ -747,8 +696,7 @@ const PurchaseOrderManagement = () => {
               options={supplierOptions}
               onChange={(value) => {
                 setSelectedSupplierId(value)
-                // 清空已选择的药品
-                setOrderFormItems([{ drugId: undefined, quantity: undefined, unitPrice: undefined }])
+                setOrderFormItems([{ drugId: undefined, drugNameDisplay: '', quantity: undefined, unitPrice: undefined }])
               }}
             />
           </Form.Item>
@@ -778,13 +726,23 @@ const PurchaseOrderManagement = () => {
                     >
                       <AutoComplete
                         options={drugOptions}
-                        placeholder="请输入或选择药品"
+                        placeholder="请输入或选择药品（选中后自动带出协议价）"
+                        value={orderFormItems[index].drugNameDisplay ?? ''}
                         filterOption={(inputValue, option) =>
-                          option.label.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                          (option?.label ?? '').toUpperCase().indexOf((inputValue || '').toUpperCase()) !== -1
                         }
-                        onSelect={(value) => {
+                        onSelect={(value, option) => {
                           const newItems = [...orderFormItems]
-                          newItems[index].drugId = value
+                          newItems[index].drugId = value ? Number(value) : undefined
+                          newItems[index].drugNameDisplay = option?.label ?? ''
+                          if (option?.unitPrice != null) newItems[index].unitPrice = Number(option.unitPrice)
+                          setOrderFormItems(newItems)
+                        }}
+                        onChange={(e) => {
+                          const v = e?.target?.value ?? ''
+                          const newItems = [...orderFormItems]
+                          newItems[index].drugNameDisplay = v
+                          if (!v) newItems[index].drugId = undefined
                           setOrderFormItems(newItems)
                         }}
                         style={{ width: 300 }}
@@ -804,6 +762,7 @@ const PurchaseOrderManagement = () => {
                         placeholder="数量"
                         min={1}
                         precision={0}
+                        value={orderFormItems[index].quantity}
                         onChange={(value) => {
                           const newItems = [...orderFormItems]
                           newItems[index].quantity = value
@@ -825,6 +784,7 @@ const PurchaseOrderManagement = () => {
                         placeholder="单价"
                         min={0.01}
                         precision={2}
+                        value={orderFormItems[index].unitPrice}
                         onChange={(value) => {
                           const newItems = [...orderFormItems]
                           newItems[index].unitPrice = value
@@ -892,9 +852,9 @@ const PurchaseOrderManagement = () => {
           setCurrentOrder(null)
         }}
         footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
-            关闭
-          </Button>,
+          <Tooltip key="close" title="关闭">
+            <Button icon={<CloseOutlined />} onClick={() => setDetailModalVisible(false)} />
+          </Tooltip>,
         ]}
         width={800}
       >
@@ -1071,41 +1031,41 @@ const PurchaseOrderManagement = () => {
           setCurrentBarcodeOrderId(null)
         }}
         footer={[
-          <Button key="download" type="primary" icon={<DownloadOutlined />} onClick={async () => {
-            if (currentBarcodeOrderId && currentBarcode && currentBarcode.orderNumber) {
-              try {
-                const response = await fetch(`/api/v1/purchase-orders/${currentBarcodeOrderId}/barcode/download`, {
-                  method: 'GET',
-                  credentials: 'include',
-                })
-                if (response.ok) {
-                  const blob = await response.blob()
-                  const url = window.URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `barcode_${currentBarcode.orderNumber}.png`
-                  document.body.appendChild(a)
-                  a.click()
-                  window.URL.revokeObjectURL(url)
-                  document.body.removeChild(a)
-                  message.success('条形码下载成功')
-                } else {
+          <Tooltip key="download" title="下载条形码">
+            <Button type="primary" icon={<DownloadOutlined />} onClick={async () => {
+              if (currentBarcodeOrderId && currentBarcode && currentBarcode.orderNumber) {
+                try {
+                  const response = await fetch(`/api/v1/purchase-orders/${currentBarcodeOrderId}/barcode/download`, {
+                    method: 'GET',
+                    credentials: 'include',
+                  })
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `barcode_${currentBarcode.orderNumber}.png`
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                    document.body.removeChild(a)
+                    message.success('条形码下载成功')
+                  } else {
+                    message.error('下载条形码失败')
+                  }
+                } catch (error) {
                   message.error('下载条形码失败')
                 }
-              } catch (error) {
-                message.error('下载条形码失败')
               }
-            }
-          }}>
-            下载条形码
-          </Button>,
-          <Button key="close" onClick={() => {
-            setBarcodeModalVisible(false)
-            setCurrentBarcode(null)
-            setCurrentBarcodeOrderId(null)
-          }}>
-            关闭
-          </Button>,
+            }} />
+          </Tooltip>,
+          <Tooltip key="close" title="关闭">
+            <Button icon={<CloseOutlined />} onClick={() => {
+              setBarcodeModalVisible(false)
+              setCurrentBarcode(null)
+              setCurrentBarcodeOrderId(null)
+            }} />
+          </Tooltip>,
         ]}
         width={500}
       >

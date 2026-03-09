@@ -5,6 +5,7 @@ import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysNotice;
 import com.cdiom.backend.service.SysNoticeService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -49,7 +50,7 @@ public class SysNoticeController {
      * 创建通知公告
      */
     @PostMapping
-    public Result<SysNotice> createNotice(@RequestBody SysNotice notice) {
+    public Result<SysNotice> createNotice(@Valid @RequestBody SysNotice notice) {
         try {
             SysNotice createdNotice = sysNoticeService.createNotice(notice);
             return Result.success("创建成功", createdNotice);
@@ -62,7 +63,7 @@ public class SysNoticeController {
      * 更新通知公告
      */
     @PutMapping("/{id}")
-    public Result<SysNotice> updateNotice(@PathVariable Long id, @RequestBody SysNotice notice) {
+    public Result<SysNotice> updateNotice(@PathVariable Long id, @Valid @RequestBody SysNotice notice) {
         try {
             notice.setId(id);
             SysNotice updatedNotice = sysNoticeService.updateNotice(notice);

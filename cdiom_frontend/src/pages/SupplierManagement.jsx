@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Upload, Image } from 'antd'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Upload, Image, Tooltip } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 
 const SupplierManagement = () => {
@@ -35,8 +36,8 @@ const SupplierManagement = () => {
         page: pagination.current,
         size: pagination.pageSize,
         keyword: filters.keyword || undefined,
-        status: filters.status,
-        auditStatus: filters.auditStatus,
+        status: filters.status !== undefined && filters.status !== null ? Number(filters.status) : undefined,
+        auditStatus: filters.auditStatus !== undefined && filters.auditStatus !== null ? Number(filters.auditStatus) : undefined,
       }
       const res = await request.get('/suppliers', { params })
       if (res.code === 200) {
@@ -49,7 +50,7 @@ const SupplierManagement = () => {
         message.error(res.msg || '获取供应商列表失败')
       }
     } catch (error) {
-      console.error('获取供应商列表失败:', error)
+      logger.error('获取供应商列表失败:', error)
       message.error('获取供应商列表失败')
     } finally {
       setLoading(false)
@@ -75,13 +76,14 @@ const SupplierManagement = () => {
 
   const handleSubmit = async (values) => {
     try {
-      // 处理日期格式
+      // 处理日期格式；状态为字符串 Option 时转为数字
       const submitData = {
         ...values,
         licenseExpiryDate: values.licenseExpiryDate 
           ? dayjs(values.licenseExpiryDate).format('YYYY-MM-DD') 
           : undefined,
         licenseImage: values.licenseImage || undefined,
+        status: values.status !== undefined && values.status !== null ? Number(values.status) : values.status,
       }
       const url = editingSupplier 
         ? `/suppliers/${editingSupplier.id}` 
@@ -99,7 +101,7 @@ const SupplierManagement = () => {
         message.error(res.msg || '操作失败')
       }
     } catch (error) {
-      console.error('操作失败:', error)
+      logger.error('操作失败:', error)
       message.error('操作失败')
     }
   }
@@ -131,7 +133,7 @@ const SupplierManagement = () => {
         return false
       }
     } catch (error) {
-      console.error('文件上传失败:', error)
+      logger.error('文件上传失败:', error)
       message.error('文件上传失败')
       return false
     } finally {
@@ -147,7 +149,7 @@ const SupplierManagement = () => {
           params: { url: licenseImage },
         })
       } catch (error) {
-        console.error('删除文件失败:', error)
+        logger.error('删除文件失败:', error)
       }
     }
     form.setFieldsValue({ licenseImage: undefined })
@@ -164,7 +166,7 @@ const SupplierManagement = () => {
         message.error(res.msg || '删除失败')
       }
     } catch (error) {
-      console.error('删除失败:', error)
+      logger.error('删除失败:', error)
       message.error('删除失败')
     }
   }
@@ -189,14 +191,14 @@ const SupplierManagement = () => {
         message.error(res.msg || '审核失败')
       }
     } catch (error) {
-      console.error('审核失败:', error)
+      logger.error('审核失败:', error)
       message.error('审核失败')
     }
   }
 
   const handleAuditSubmit = (values) => {
     if (currentAuditSupplier) {
-      handleAudit(currentAuditSupplier.id, values.auditStatus, values.auditReason || '')
+      handleAudit(currentAuditSupplier.id, Number(values.auditStatus), values.auditReason || '')
     }
   }
 
@@ -204,9 +206,11 @@ const SupplierManagement = () => {
     const statusMap = {
       0: { color: 'default', text: '禁用' },
       1: { color: 'green', text: '启用' },
+      // 兼容历史数据：库中可能仍存在 status=2（旧“待审核”），未执行迁移脚本时会显示此项
       2: { color: 'orange', text: '待审核' },
     }
-    const statusInfo = statusMap[status] || { color: 'default', text: status }
+    const n = status === null || status === undefined ? 0 : Number(status)
+    const statusInfo = statusMap[n] ?? { color: 'default', text: '禁用' }
     return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>
   }
 
@@ -254,7 +258,7 @@ const SupplierManagement = () => {
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status) => getStatusTag(status),
+      render: (_, record) => getStatusTag(record?.status),
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>审核状态</span>,
@@ -334,73 +338,75 @@ const SupplierManagement = () => {
         <Space>
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
             <>
-              <Button
-                type="link"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => {
-                  setEditingSupplier(record)
-                  const formValues = {
-                    ...record,
-                    licenseExpiryDate: record.licenseExpiryDate ? dayjs(record.licenseExpiryDate) : undefined,
-                  }
-                  form.setFieldsValue(formValues)
-                  // 设置文件列表
-                  if (record.licenseImage) {
-                    setFileList([{
-                      uid: '-1',
-                      name: '许可证图片',
-                      status: 'done',
-                      url: record.licenseImage,
-                    }])
-                  } else {
-                    setFileList([])
-                  }
-                  setModalVisible(true)
-                }}
-              >
-                编辑
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  Modal.confirm({
-                    title: '确认删除',
-                    content: '确定要删除该供应商吗？',
-                    onOk: () => handleDelete(record.id),
-                  })
-                }}
-              >
-                删除
-              </Button>
+              <Tooltip title="编辑">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setEditingSupplier(record)
+                    const formValues = {
+                      ...record,
+                      licenseExpiryDate: record.licenseExpiryDate ? dayjs(record.licenseExpiryDate) : undefined,
+                      status: record.status !== undefined && record.status !== null ? String(record.status) : record.status,
+                    }
+                    form.setFieldsValue(formValues)
+                    if (record.licenseImage) {
+                      setFileList([{
+                        uid: '-1',
+                        name: '许可证图片',
+                        status: 'done',
+                        url: record.licenseImage,
+                      }])
+                    } else {
+                      setFileList([])
+                    }
+                    setModalVisible(true)
+                  }}
+                />
+              </Tooltip>
+              <Tooltip title="删除">
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: '确认删除',
+                      content: '确定要删除该供应商吗？',
+                      onOk: () => handleDelete(record.id),
+                    })
+                  }}
+                />
+              </Tooltip>
               {record.auditStatus === 0 && hasPermission(PERMISSIONS.SUPPLIER_AUDIT) && (
                 <>
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => {
-                      setCurrentAuditSupplier(record)
-                      auditForm.setFieldsValue({ auditStatus: 1, auditReason: '审核通过' })
-                      setAuditModalVisible(true)
-                    }}
-                  >
-                    通过
-                  </Button>
-                  <Button
-                    type="link"
-                    size="small"
-                    danger
-                    onClick={() => {
-                      setCurrentAuditSupplier(record)
-                      auditForm.setFieldsValue({ auditStatus: 2, auditReason: '' })
-                      setAuditModalVisible(true)
-                    }}
-                  >
-                    驳回
-                  </Button>
+                  <Tooltip title="通过">
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => {
+                        setCurrentAuditSupplier(record)
+                        auditForm.setFieldsValue({ auditStatus: '1', auditReason: '审核通过' })
+                        setAuditModalVisible(true)
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title="驳回">
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => {
+                        setCurrentAuditSupplier(record)
+                        auditForm.setFieldsValue({ auditStatus: '2', auditReason: '' })
+                        setAuditModalVisible(true)
+                      }}
+                    />
+                  </Tooltip>
                 </>
               )}
             </>
@@ -429,9 +435,8 @@ const SupplierManagement = () => {
             style={{ width: 120 }}
             allowClear
           >
-            <Select.Option value={0}>禁用</Select.Option>
-            <Select.Option value={1}>启用</Select.Option>
-            <Select.Option value={2}>待审核</Select.Option>
+            <Select.Option value="0">禁用</Select.Option>
+            <Select.Option value="1">启用</Select.Option>
           </Select>
           <Select
             placeholder="审核状态"
@@ -440,33 +445,33 @@ const SupplierManagement = () => {
             style={{ width: 120 }}
             allowClear
           >
-            <Select.Option value={0}>待审核</Select.Option>
-            <Select.Option value={1}>已通过</Select.Option>
-            <Select.Option value={2}>已驳回</Select.Option>
+            <Select.Option value="0">待审核</Select.Option>
+            <Select.Option value="1">已通过</Select.Option>
+            <Select.Option value="2">已驳回</Select.Option>
           </Select>
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={fetchSuppliers}
-          >
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            重置
-          </Button>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+          <Tooltip title="查询">
             <Button
               type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setEditingSupplier(null)
-                form.resetFields()
-                setFileList([])
-                setModalVisible(true)
-              }}
-            >
-              新建供应商
-            </Button>
+              icon={<SearchOutlined />}
+              onClick={fetchSuppliers}
+            />
+          </Tooltip>
+          <Tooltip title="重置">
+            <Button icon={<ReloadOutlined />} onClick={handleReset} />
+          </Tooltip>
+          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+            <Tooltip title="新建供应商">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingSupplier(null)
+                  form.resetFields()
+                  setFileList([])
+                  setModalVisible(true)
+                }}
+              />
+            </Tooltip>
           )}
         </Space>
       </div>
@@ -551,10 +556,7 @@ const SupplierManagement = () => {
           >
             <Input placeholder="请输入统一社会信用代码（18位）" maxLength={18} />
           </Form.Item>
-          <Form.Item
-            name="licenseImage"
-            label="许可证图片"
-          >
+          <Form.Item name="licenseImage" label="许可证图片">
             <Upload
               name="file"
               listType="picture-card"
@@ -571,22 +573,20 @@ const SupplierManagement = () => {
                 </div>
               )}
             </Upload>
-            <div style={{ marginTop: 8, color: '#999', fontSize: '12px' }}>
-              支持格式：JPG、PNG、GIF等，最大10MB
-            </div>
-            {fileList.length > 0 && fileList[0].url && (
-              <div style={{ marginTop: 8 }}>
-                <Image
-                  src={fileList[0].url}
-                  alt="许可证图片"
-                  style={{ maxWidth: '100%', maxHeight: '200px' }}
-                  preview={{
-                    mask: '预览',
-                  }}
-                />
-              </div>
-            )}
           </Form.Item>
+          <div style={{ marginTop: -8, marginBottom: 8, color: '#999', fontSize: '12px' }}>
+            支持格式：JPG、PNG、GIF等，最大10MB
+          </div>
+          {fileList.length > 0 && fileList[0].url && (
+            <div style={{ marginBottom: 16 }}>
+              <Image
+                src={fileList[0].url}
+                alt="许可证图片"
+                style={{ maxWidth: '100%', maxHeight: '200px' }}
+                preview={{ mask: '预览' }}
+              />
+            </div>
+          )}
           <Form.Item
             name="licenseExpiryDate"
             label="许可证到期日期"
@@ -616,10 +616,9 @@ const SupplierManagement = () => {
               name="status"
               label="状态"
             >
-              <Select>
-                <Select.Option value={0}>禁用</Select.Option>
-                <Select.Option value={1}>启用</Select.Option>
-                <Select.Option value={2}>待审核</Select.Option>
+              <Select placeholder="请选择启用或禁用">
+                <Select.Option value="0">禁用</Select.Option>
+                <Select.Option value="1">启用</Select.Option>
               </Select>
             </Form.Item>
           )}
@@ -648,8 +647,8 @@ const SupplierManagement = () => {
             rules={[{ required: true, message: '请选择审核结果' }]}
           >
             <Select placeholder="请选择审核结果">
-              <Select.Option value={1}>通过</Select.Option>
-              <Select.Option value={2}>驳回</Select.Option>
+              <Select.Option value="1">通过</Select.Option>
+              <Select.Option value="2">驳回</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
