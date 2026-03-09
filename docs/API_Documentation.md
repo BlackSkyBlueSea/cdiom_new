@@ -744,7 +744,45 @@
 ### 获取出库申请详情
 
 - **接口**: `GET /api/v1/outbound/{id}`
-- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **权限**: 需要 `drug:view`、`drug:manage`、`outbound:view` 或 `outbound:apply` 权限
+- **说明**: 列表查看、申请人查看详情等场景使用；返回数据含申请人/审批人姓名及角色名（applicantName、applicantRoleName、approverName、approverRoleName）
+
+### 获取已有科室列表
+
+- **接口**: `GET /api/v1/outbound/departments`
+- **权限**: 需要 `outbound:view` 或 `outbound:apply` 权限
+- **说明**: 返回出库申请中已使用过的科室去重列表，供新建申请时下拉选择；无匹配时仍可手动输入
+
+### 校验出库申请库存（审批前）
+
+- **接口**: `GET /api/v1/outbound/{id}/stock-check`
+- **权限**: 需要 `outbound:view`、`outbound:apply`、`outbound:approve` 或 `outbound:approve:special` 权限
+- **响应**:
+```json
+{
+  "code": 200,
+  "data": {
+    "sufficient": false,
+    "message": "以下药品库存不足，无法审批通过，请补货或驳回申请。",
+    "details": [
+      {
+        "drugId": 1,
+        "drugName": "阿莫西林 0.5g*24粒",
+        "required": 10,
+        "available": 3,
+        "sufficient": false
+      }
+    ]
+  }
+}
+```
+- **说明**: 审批弹窗打开时调用，用于界面展示；审批提交时后端会再次校验，不足则拒绝通过
+
+### 申请人撤回出库申请
+
+- **接口**: `POST /api/v1/outbound/{id}/withdraw`
+- **权限**: 需要 `outbound:apply` 权限
+- **说明**: 仅申请人本人且状态为待审批（PENDING）时可撤回，撤回后状态变为已取消（CANCELLED）
 
 ### 根据申领单号查询出库申请
 
@@ -782,7 +820,7 @@
   "secondApproverId": 2
 }
 ```
-- **说明**: 特殊药品需要提供 `secondApproverId`（第二审批人ID）
+- **说明**: 特殊药品需要提供 `secondApproverId`（第二审批人ID）；**审批通过前会校验库存**，任一项药品可用库存不足则拒绝通过并返回友好提示（药品名、需要量、可用量）
 
 ### 审批出库申请（驳回）
 
@@ -816,8 +854,8 @@
 ### 取消出库申请
 
 - **接口**: `POST /api/v1/outbound/{id}/cancel`
-- **权限**: 需要 `outbound:apply` 权限
-- **说明**: 取消待审批的出库申请
+- **权限**: 需要 `drug:manage` 权限
+- **说明**: 管理员取消出库申请（与申请人「撤回」接口 `POST /outbound/{id}/withdraw` 不同，撤回仅限本人且 PENDING）
 
 ### 获取待审批数量
 
@@ -834,8 +872,8 @@
 ### 获取出库申请明细
 
 - **接口**: `GET /api/v1/outbound/{id}/items`
-- **权限**: 需要 `outbound:view` 权限
-- **说明**: 获取指定出库申请的所有明细项
+- **权限**: 需要 `drug:view`、`drug:manage`、`outbound:view` 或 `outbound:apply` 权限
+- **说明**: 获取指定出库申请的所有明细项（列表查看、申请人查看详情、审批/执行时均会使用）
 
 ---
 

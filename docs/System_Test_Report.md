@@ -8,7 +8,7 @@
 | **创建/更新日期** | 2026年3月9日 |
 | **适用版本** | CDIOM v1.7.0 |
 | **测试目的** | 支撑功能测试、性能测试、安全测试及业务逻辑验证 |
-| **参考文档** | API_Documentation.md、Function_Modules.md、Code_Logic_Vulnerability_Report.md、Code_Completeness_Report.md |
+| **参考文档** | API_Documentation.md、Function_Modules.md、Code_Logic_Vulnerability_Report.md、Code_Completeness_Report.md、UPDATE_LOG_20260309_Outbound_Dashboard.md（出库/审批/仪表盘近期变更） |
 
 ---
 
@@ -110,13 +110,17 @@
 | 用例编号 | 测试项 | 权限要求 | 操作步骤 | 预期结果 | 实际结果 |
 |----------|--------|----------|----------|----------|----------|
 | OUT-01 | 出库申请列表与筛选 | outbound:view 等 | GET /api/v1/outbound?status=&applicantId= 等 | 200，分页与状态筛选正确 | |
-| OUT-02 | 创建出库申请 | outbound:apply | POST /api/v1/outbound，department、purpose、items（药品、批次、数量） | 200，申请单生成，状态 PENDING | |
-| OUT-03 | 审批通过（普通） | outbound:approve | POST /api/v1/outbound/{id}/approve | 200，状态变为 APPROVED | |
+| OUT-02 | 创建出库申请 | outbound:apply | POST /api/v1/outbound，department、purpose、items（药品、批次、数量） | 200，申请单生成，状态 PENDING，申请人为当前用户 | |
+| OUT-02a | 科室下拉与详情/撤回 | outbound:apply | 新建申请时 GET /api/v1/outbound/departments；本人 PENDING 申请可查看详情、撤回 | 200，科室下拉可选；详情弹窗只读；撤回后状态 CANCELLED | |
+| OUT-03 | 审批通过（普通） | outbound:approve | POST /api/v1/outbound/{id}/approve | 200，状态变为 APPROVED；**审批不扣库存** | |
+| OUT-03a | 审批前库存校验（不足禁止通过） | outbound:approve | 申请明细中某药品需求数量 > 当前可用库存时，POST 审批通过 | 失败，返回友好提示「以下药品库存不足…」且状态仍为 PENDING | |
+| OUT-03b | 库存校验接口 | outbound:view/apply/approve | GET /api/v1/outbound/{id}/stock-check | 200，返回 sufficient、message、details（药品名、需要量、可用量） | |
 | OUT-04 | 审批通过（特殊药品双人） | outbound:approve:special | POST /api/v1/outbound/{id}/approve，body 含 secondApproverId | 200，双人审批通过 | |
 | OUT-05 | 驳回申请 | drug:manage | POST /api/v1/outbound/{id}/reject，rejectReason | 200，状态 REJECTED | |
-| OUT-06 | 执行出库（FIFO） | outbound:execute | POST /api/v1/outbound/{id}/execute，outboundItems 与申请一致 | 200，库存按先进先出扣减，申请状态 OUTBOUND | |
+| OUT-06 | 执行出库（FIFO） | outbound:execute | POST /api/v1/outbound/{id}/execute，outboundItems 与申请一致 | 200，**库存扣减**，申请状态 OUTBOUND；仪表盘/库存页数据更新 | |
 | OUT-07 | 执行出库数量超过可用库存 | outbound:execute | 执行数量大于当前可用库存 | 失败，提示库存不足，不部分扣减 | |
-| OUT-08 | 取消申请 | outbound:apply | POST /api/v1/outbound/{id}/cancel（仅 PENDING） | 200，状态 CANCELLED | |
+| OUT-08 | 取消申请（管理员） | drug:manage | POST /api/v1/outbound/{id}/cancel | 200，状态 CANCELLED | |
+| OUT-08a | 申请人撤回 | outbound:apply | 申请人本人、PENDING 时 POST /api/v1/outbound/{id}/withdraw | 200，状态 CANCELLED；非本人或非 PENDING 则失败 | |
 | OUT-09 | 待审批数量 | outbound:approve | GET /api/v1/outbound/pending-count | 200，返回待审批数量 | |
 
 ### 2.6 采购订单
@@ -190,6 +194,9 @@
 | 入库数量 | 单订单单药品累计入库 ≤ 订单采购数量 | 见 IN-03 |
 | 订单状态 | 全部入库后订单自动 RECEIVED | 见 IN-04 |
 | 出库 FIFO | 执行出库按先进先出扣减，且不部分扣减（数量不足则整体失败） | 见 OUT-06、OUT-07；可查库存批次与出库明细是否按生产/入库日期先后 |
+| 审批不扣库存 | 审批通过仅改状态为 APPROVED，不扣减库存；库存扣减发生在「执行出库」 | 审批后查库存不变；执行出库后库存与仪表盘「今日出库」更新 |
+| 审批前库存校验 | 审批通过前校验每项申请明细的可用库存，不足则拒绝通过并返回药品名/需要量/可用量 | 见 OUT-03a、OUT-03b；前端审批弹窗不足时禁用确定按钮 |
+| 仪表盘/库存页刷新 | 仓库管理员仪表盘、库存管理页在标签页从隐藏变为可见时自动重新请求数据 | 审批或执行出库后切回对应标签页，待办数、今日出库、库存列表应更新 |
 
 ### 3.2 事务与回滚
 
