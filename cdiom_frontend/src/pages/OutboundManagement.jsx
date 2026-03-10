@@ -313,9 +313,13 @@ const OutboundManagement = () => {
     }
   }
 
-  const handleReject = async (reason) => {
+  const handleReject = async (applyId, reason) => {
+    if (!applyId) {
+      message.error('无法获取申请信息')
+      return
+    }
     try {
-      const res = await request.post(`/outbound/${currentRecord.id}/reject`, {
+      const res = await request.post(`/outbound/${applyId}/reject`, {
         rejectReason: reason,
       })
       if (res.code === 200) {
@@ -582,13 +586,14 @@ const OutboundManagement = () => {
                     danger
                     icon={<CloseCircleOutlined />}
                     onClick={() => {
+                      const applyId = record.id
                       Modal.confirm({
                         title: '确认驳回',
                         content: '请输入驳回理由',
                         onOk: (close) => {
                           const reason = prompt('请输入驳回理由:')
                           if (reason) {
-                            handleReject(reason)
+                            handleReject(applyId, reason)
                             close()
                           }
                         },
@@ -1019,12 +1024,13 @@ const OutboundManagement = () => {
             <p><strong>申领单号：</strong>{currentRecord.applyNumber}</p>
             <p><strong>申请人：</strong>
               {currentRecord.applicantRoleName
-                ? `${currentRecord.applicantName || '-'}（${currentRecord.applicantRoleName}）`
-                : (currentRecord.applicantName ?? '-')}
+                ? `${currentRecord.applicantName || '‑'}（${currentRecord.applicantRoleName}）`
+                : (currentRecord.applicantName ?? '‑')}
             </p>
             <p><strong>所属科室：</strong>{currentRecord.department}</p>
             <p><strong>用途：</strong>{currentRecord.purpose}</p>
-            {currentRecord.remark ? <p><strong>备注：</strong>{currentRecord.remark}</p> : null}
+            {currentRecord.remark ? <p><strong>申请备注：</strong>{currentRecord.remark}</p> : null}
+            {currentRecord.rejectReason ? <p><strong>审核备注：</strong>{currentRecord.rejectReason}</p> : null}
             <p><strong>申请状态：</strong>{getStatusTag(currentRecord.status)}</p>
             {detailItems.length > 0 && (
               <div style={{ marginTop: 12 }}>
@@ -1036,6 +1042,7 @@ const OutboundManagement = () => {
                       <li key={index}>
                         {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
                         {' '}× {item.quantity}
+                        {item.remark ? <>（备注：{item.remark}）</> : null}
                         {drug && drug.isSpecial === 1 && (
                           <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
                         )}

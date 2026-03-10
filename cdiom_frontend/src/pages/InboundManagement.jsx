@@ -36,6 +36,7 @@ const InboundManagement = () => {
   const [selectedDrug, setSelectedDrug] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderItems, setOrderItems] = useState([])
+  const [needForceReason, setNeedForceReason] = useState(false)
 
   useEffect(() => {
     fetchInboundRecords()
@@ -677,6 +678,14 @@ const InboundManagement = () => {
             <DatePicker
               style={{ width: '100%' }}
               disabledDate={(current) => current && current < dayjs().startOf('day')}
+              onChange={(date) => {
+                if (!date) {
+                  setNeedForceReason(false)
+                  return
+                }
+                const daysUntilExpiry = date.startOf('day').diff(dayjs().startOf('day'), 'day')
+                setNeedForceReason(daysUntilExpiry < 90)
+              }}
             />
           </Form.Item>
 
@@ -741,6 +750,14 @@ const InboundManagement = () => {
             name="expiryCheckReason"
             label="效期校验说明"
             rules={[
+              () => ({
+                validator(_, value) {
+                  if (needForceReason && !value) {
+                    return Promise.reject(new Error('有效期不足90天时，需填写强制入库原因'))
+                  }
+                  return Promise.resolve()
+                },
+              }),
               { max: 500, message: '效期校验说明长度不能超过500个字符' },
             ]}
           >

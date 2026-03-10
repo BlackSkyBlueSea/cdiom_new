@@ -64,14 +64,14 @@ public class PermissionInterceptor implements HandlerInterceptor {
         // 获取Token
         String token = getTokenFromRequest(request);
         if (!StringUtils.hasText(token) || !jwtUtil.validateToken(token)) {
-            writeErrorResponse(response, "未登录或Token已过期");
+            writeUnauthorizedResponse(response, "未登录或Token已过期");
             return false;
         }
 
         // 获取用户ID
         Long userId = jwtUtil.getUserIdFromToken(token);
         if (userId == null) {
-            writeErrorResponse(response, "无法获取用户信息");
+            writeUnauthorizedResponse(response, "无法获取用户信息");
             return false;
         }
 
@@ -136,7 +136,17 @@ public class PermissionInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * 写入错误响应
+     * 写入未授权响应（未登录或Token过期，便于前端统一跳转登录页）
+     */
+    private void writeUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        Result<Object> result = Result.error(401, message);
+        response.getWriter().write(objectMapper.writeValueAsString(result));
+    }
+
+    /**
+     * 写入错误响应（权限不足等）
      */
     private void writeErrorResponse(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);

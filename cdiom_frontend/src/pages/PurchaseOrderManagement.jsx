@@ -863,6 +863,9 @@ const PurchaseOrderManagement = () => {
             <div style={{ marginBottom: 16 }}>
               <p><strong>订单编号：</strong>{currentOrder.orderNumber}</p>
               <p><strong>订单状态：</strong>{getStatusTag(currentOrder.status)}</p>
+              {currentOrder.supplierName && (
+                <p><strong>供应商：</strong>{currentOrder.supplierName}</p>
+              )}
               {currentOrder.logisticsNumber && (
                 <p><strong>物流单号：</strong>{currentOrder.logisticsNumber}</p>
               )}
@@ -872,10 +875,20 @@ const PurchaseOrderManagement = () => {
               {currentOrder.rejectReason && (
                 <p><strong>拒绝理由：</strong><span style={{ color: '#ff4d4f' }}>{currentOrder.rejectReason}</span></p>
               )}
+              <p><strong>订单备注：</strong>{currentOrder.remark ? currentOrder.remark : '无'}</p>
             </div>
             <Table
               columns={[
-                { title: '药品名称', dataIndex: 'drugName', key: 'drugName' },
+                { 
+                  title: '药品名称', 
+                  dataIndex: 'drugName', 
+                  key: 'drugName',
+                  render: (text, record) => {
+                    const name = text || '未知';
+                    const spec = record.specification;
+                    return spec ? `${name}（${spec}）` : name;
+                  }
+                },
                 { title: '数量', dataIndex: 'quantity', key: 'quantity', align: 'right' },
                 { title: '单价', dataIndex: 'unitPrice', key: 'unitPrice', align: 'right', render: (price) => price ? `¥${price.toFixed(2)}` : '-' },
                 { title: '总价', dataIndex: 'totalPrice', key: 'totalPrice', align: 'right', render: (price) => price ? `¥${price.toFixed(2)}` : '-' },

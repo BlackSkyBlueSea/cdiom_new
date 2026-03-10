@@ -3,9 +3,11 @@ package com.cdiom.backend.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.common.exception.ServiceException;
+import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.PurchaseOrderItemMapper;
 import com.cdiom.backend.mapper.PurchaseOrderMapper;
 import com.cdiom.backend.mapper.SupplierMapper;
+import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.PurchaseOrder;
 import com.cdiom.backend.model.PurchaseOrderItem;
 import com.cdiom.backend.model.Supplier;
@@ -27,6 +29,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 采购订单服务实现类
@@ -42,6 +47,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final InboundRecordService inboundRecordService;
     private final SysNoticeService sysNoticeService;
     private final SupplierMapper supplierMapper;
+    private final DrugInfoMapper drugInfoMapper;
 
     /**
      * 构造函数注入
@@ -52,51 +58,109 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             PurchaseOrderItemMapper purchaseOrderItemMapper,
             @Lazy InboundRecordService inboundRecordService,
             SysNoticeService sysNoticeService,
-            SupplierMapper supplierMapper) {
+            SupplierMapper supplierMapper,
+            DrugInfoMapper drugInfoMapper) {
         this.purchaseOrderMapper = purchaseOrderMapper;
         this.purchaseOrderItemMapper = purchaseOrderItemMapper;
         this.inboundRecordService = inboundRecordService;
         this.sysNoticeService = sysNoticeService;
         this.supplierMapper = supplierMapper;
+        this.drugInfoMapper = drugInfoMapper;
     }
 
     @Override
     public Page<PurchaseOrder> getPurchaseOrderList(Integer page, Integer size, String keyword, Long supplierId, Long purchaserId, String status) {
         Page<PurchaseOrder> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<PurchaseOrder> wrapper = new LambdaQueryWrapper<>();
-        
+
+        // 支持按订单编号、物流单号和供应商名称模糊查询
+        Set<Long> supplierIdsByName = null;
         if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(PurchaseOrder::getOrderNumber, keyword)
-                    .or().like(PurchaseOrder::getLogisticsNumber, keyword));
+            List<Supplier> supplierList = supplierMapper.selectList(
+                    new LambdaQueryWrapper<Supplier>()
+                            .like(Supplier::getName, keyword)
+            );
+            if (supplierList != null && !supplierList.isEmpty()) {
+                supplierIdsByName = supplierList.stream()
+                        .map(Supplier::getId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+            }
         }
-        
+
+        if (StringUtils.hasText(keyword)) {
+            Set<Long> finalSupplierIdsByName = supplierIdsByName;
+            wrapper.and(w -> {
+                w.like(PurchaseOrder::getOrderNumber, keyword)
+                        .or().like(PurchaseOrder::getLogisticsNumber, keyword);
+                if (finalSupplierIdsByName != null && !finalSupplierIdsByName.isEmpty()) {
+                    w.or().in(PurchaseOrder::getSupplierId, finalSupplierIdsByName);
+                }
+            });
+        }
+
         if (supplierId != null) {
             wrapper.eq(PurchaseOrder::getSupplierId, supplierId);
         }
-        
+
         if (purchaserId != null) {
             wrapper.eq(PurchaseOrder::getPurchaserId, purchaserId);
         }
-        
+
         if (StringUtils.hasText(status)) {
             wrapper.eq(PurchaseOrder::getStatus, status);
         }
-        
+
         wrapper.orderByDesc(PurchaseOrder::getCreateTime);
-        
-        return purchaseOrderMapper.selectPage(pageParam, wrapper);
+
+        Page<PurchaseOrder> orderPage = purchaseOrderMapper.selectPage(pageParam, wrapper);
+
+        // 为列表中的订单补充供应商名称，方便前端展示
+        List<PurchaseOrder> records = orderPage.getRecords();
+        if (records != null && !records.isEmpty()) {
+            Set<Long> supplierIds = records.stream()
+                    .map(PurchaseOrder::getSupplierId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!supplierIds.isEmpty()) {
+                List<Supplier> suppliers = supplierMapper.selectByIds(supplierIds);
+                Map<Long, String> supplierNameMap = suppliers.stream()
+                        .collect(Collectors.toMap(Supplier::getId, Supplier::getName));
+                for (PurchaseOrder order : records) {
+                    if (order.getSupplierId() != null) {
+                        order.setSupplierName(supplierNameMap.get(order.getSupplierId()));
+                    }
+                }
+            }
+        }
+
+        return orderPage;
     }
 
     @Override
     public PurchaseOrder getPurchaseOrderById(Long id) {
-        return purchaseOrderMapper.selectById(id);
+        PurchaseOrder order = purchaseOrderMapper.selectById(id);
+        if (order != null && order.getSupplierId() != null) {
+            Supplier supplier = supplierMapper.selectById(order.getSupplierId());
+            if (supplier != null) {
+                order.setSupplierName(supplier.getName());
+            }
+        }
+        return order;
     }
 
     @Override
     public PurchaseOrder getPurchaseOrderByOrderNumber(String orderNumber) {
         LambdaQueryWrapper<PurchaseOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PurchaseOrder::getOrderNumber, orderNumber);
-        return purchaseOrderMapper.selectOne(wrapper);
+        PurchaseOrder order = purchaseOrderMapper.selectOne(wrapper);
+        if (order != null && order.getSupplierId() != null) {
+            Supplier supplier = supplierMapper.selectById(order.getSupplierId());
+            if (supplier != null) {
+                order.setSupplierName(supplier.getName());
+            }
+        }
+        return order;
     }
 
     @Override
@@ -248,7 +312,30 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     public List<PurchaseOrderItem> getOrderItems(Long orderId) {
-        return purchaseOrderItemMapper.selectByOrderId(orderId);
+        List<PurchaseOrderItem> items = purchaseOrderItemMapper.selectByOrderId(orderId);
+        if (items == null || items.isEmpty()) {
+            return items;
+        }
+
+        // 为订单明细补充药品名称和规格，方便前端详情展示
+        Set<Long> drugIds = items.stream()
+                .map(PurchaseOrderItem::getDrugId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (!drugIds.isEmpty()) {
+            List<DrugInfo> drugInfos = drugInfoMapper.selectByIds(drugIds);
+            Map<Long, DrugInfo> drugInfoMap = drugInfos.stream()
+                    .collect(Collectors.toMap(DrugInfo::getId, d -> d));
+            for (PurchaseOrderItem item : items) {
+                DrugInfo drug = drugInfoMap.get(item.getDrugId());
+                if (drug != null) {
+                    item.setDrugName(drug.getDrugName());
+                    item.setSpecification(drug.getSpecification());
+                }
+            }
+        }
+
+        return items;
     }
 
     @Override

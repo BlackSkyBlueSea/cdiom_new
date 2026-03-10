@@ -34,6 +34,7 @@
 
 - 请求中**优先使用 Header 中的 `Authorization: Bearer <token>`**，其次才使用 Cookie `cdiom_token`。
 - 避免同一浏览器中旧 Cookie（如其他用户）覆盖当前用户的身份，导致申请人/审批人显示错误。
+- **同设备多标签多用户**：若在未使用「多用户登录」时在同一浏览器多标签分别登录不同用户，Cookie 会被后登录用户覆盖，旧标签页若仅从 Cookie 取 token 会误用他人身份，导致审批人记录为错误用户。修复：登录时**始终写入 sessionStorage**（再按模式决定是否写 Cookie），且 `getToken`/`getUser` 优先读 sessionStorage，保证每个标签页使用本标签登录身份，审批人显示与记录正确。
 
 ### 1.3 权限与前端按钮
 
@@ -55,6 +56,7 @@
 | **申请人撤回** | `OutboundApplyService` 新增 `withdrawOutboundApply(id, applicantUserId)`；仅申请人本人且状态为 PENDING 时可撤回；Controller 新增 `POST /api/v1/outbound/{id}/withdraw`，权限 `outbound:apply`。 |
 | **审批前库存校验** | `InventoryMapper` 新增 `getTotalAvailableQuantityByDrugId(drugId, today)`；`InventoryService` 新增 `getTotalAvailableQuantity(drugId)`；`OutboundApplyServiceImpl.approveOutboundApply` 在改状态前按明细校验可用库存，不足则抛出友好错误；新增 `checkStockForApply(applyId)` 及 `GET /api/v1/outbound/{id}/stock-check` 供前端展示。 |
 | **JWT Token 优先级** | `JwtAuthenticationFilter`、`OutboundApplyController.getTokenFromRequest` 取 Token 时**先读 Authorization 头，再读 Cookie**，保证多用户/切换用户后当前请求身份正确。 |
+| **多标签审批人错乱修复** | 前端 `auth.js`：`setToken`/`setUser` 登录时**始终写入 sessionStorage**；`getToken`/`getUser` **优先读 sessionStorage 再 Cookie**，与 request 拦截器一致，避免同浏览器多标签登录不同用户时 Cookie 被覆盖导致审批人记录成他人。 |
 
 ### 2.2 前端
 

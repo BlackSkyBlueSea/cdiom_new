@@ -56,12 +56,16 @@ public class PurchaseOrderItem {
      */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    /**
+     * 药品名称（仅用于展示，不参与持久化）
+     */
+    @TableField(exist = false)
+    private String drugName;
+
+    /**
+     * 规格（仅用于展示，不参与持久化）
+     */
+    @TableField(exist = false)
+    private String specification;
 }
-
-
-
-
-
-
-
-

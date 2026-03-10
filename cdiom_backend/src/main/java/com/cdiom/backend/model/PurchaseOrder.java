@@ -83,6 +83,12 @@ public class PurchaseOrder {
      */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    /**
+     * 供应商名称（仅用于展示，不参与持久化）
+     */
+    @TableField(exist = false)
+    private String supplierName;
 }
 
 
