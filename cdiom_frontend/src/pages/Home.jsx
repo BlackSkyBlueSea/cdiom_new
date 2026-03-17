@@ -241,7 +241,7 @@ function Home() {
 
       <Footer className="home-footer" style={{ textAlign: 'center' }}>
         <Text type="secondary">
-          CDIOM 医药管理系统 © 2024 Created by CDIOM Team
+          CDIOM 医药管理系统 © 2026 Created by CDIOM Team
         </Text>
       </Footer>
 

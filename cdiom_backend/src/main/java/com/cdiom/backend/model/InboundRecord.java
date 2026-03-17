@@ -111,12 +111,10 @@ public class InboundRecord {
      */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    /**
+     * 药品名称（仅用于展示，来自关联的 drug_info 表）
+     */
+    @TableField(exist = false)
+    private String drugName;
 }
-
-
-
-
-
-
-
-

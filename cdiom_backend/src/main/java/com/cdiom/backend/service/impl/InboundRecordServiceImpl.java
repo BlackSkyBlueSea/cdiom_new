@@ -89,8 +89,23 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         }
         
         wrapper.orderByDesc(InboundRecord::getCreateTime);
-        
-        return inboundRecordMapper.selectPage(pageParam, wrapper);
+
+        // 先按条件分页查询入库记录
+        Page<InboundRecord> resultPage = inboundRecordMapper.selectPage(pageParam, wrapper);
+
+        // 为每条记录补充药品名称（避免前端 drugName 为空）
+        if (resultPage.getRecords() != null && !resultPage.getRecords().isEmpty()) {
+            for (InboundRecord record : resultPage.getRecords()) {
+                if (record.getDrugId() != null) {
+                    DrugInfo drug = drugInfoMapper.selectById(record.getDrugId());
+                    if (drug != null) {
+                        record.setDrugName(drug.getDrugName());
+                    }
+                }
+            }
+        }
+
+        return resultPage;
     }
 
     @Override

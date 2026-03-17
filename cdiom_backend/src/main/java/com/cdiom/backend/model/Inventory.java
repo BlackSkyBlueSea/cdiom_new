@@ -62,6 +62,12 @@ public class Inventory {
     private String remark;
 
     /**
+     * 药品名称（关联 drug_info 表，非库存表字段）
+     */
+    @TableField(exist = false)
+    private String drugName;
+
+    /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)

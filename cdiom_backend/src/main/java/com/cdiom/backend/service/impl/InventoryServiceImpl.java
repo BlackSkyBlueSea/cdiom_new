@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -33,60 +32,21 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Page<Inventory> getInventoryList(Integer page, Integer size, String keyword, Long drugId, String batchNumber, String storageLocation, LocalDate expiryDateStart, LocalDate expiryDateEnd, Integer isSpecial) {
-        // 优化：如果有关键字或特殊药品筛选，使用JOIN查询避免N+1问题
-        // 否则使用普通查询（性能更好）
-        boolean needJoin = StringUtils.hasText(keyword) || isSpecial != null;
-        
-        if (needJoin) {
-            // 使用JOIN查询优化N+1问题
-            List<Inventory> allResults = inventoryMapper.selectInventoryListWithJoin(
-                    keyword, drugId, batchNumber, storageLocation, 
-                    expiryDateStart, expiryDateEnd, isSpecial);
-            
-            // 手动分页
-            int start = (page - 1) * size;
-            int end = Math.min(start + size, allResults.size());
-            List<Inventory> pageResults = start < allResults.size() 
-                    ? allResults.subList(start, end) 
-                    : new java.util.ArrayList<>();
-            
-            Page<Inventory> pageParam = new Page<>(page, size, allResults.size());
-            pageParam.setRecords(pageResults);
-            return pageParam;
-        } else {
-            // 普通查询（无关键字和特殊药品筛选时，性能更好）
-            Page<Inventory> pageParam = new Page<>(page, size);
-            LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
-            
-            if (drugId != null) {
-                wrapper.eq(Inventory::getDrugId, drugId);
-            }
-            
-            if (StringUtils.hasText(batchNumber)) {
-                wrapper.like(Inventory::getBatchNumber, batchNumber);
-            }
-            
-            if (StringUtils.hasText(storageLocation)) {
-                wrapper.like(Inventory::getStorageLocation, storageLocation);
-            }
-            
-            if (expiryDateStart != null) {
-                wrapper.ge(Inventory::getExpiryDate, expiryDateStart);
-            }
-            
-            if (expiryDateEnd != null) {
-                wrapper.le(Inventory::getExpiryDate, expiryDateEnd);
-            }
-            
-            // 只查询数量大于0的库存
-            wrapper.gt(Inventory::getQuantity, 0);
-            
-            // 按有效期排序（最早到期的在前，FIFO）
-            wrapper.orderByAsc(Inventory::getExpiryDate);
-            wrapper.orderByDesc(Inventory::getCreateTime);
-            
-            return inventoryMapper.selectPage(pageParam, wrapper);
-        }
+        // 统一使用 JOIN 查询，始终返回药品名称等信息，避免前端 drugName 为空
+        List<Inventory> allResults = inventoryMapper.selectInventoryListWithJoin(
+                keyword, drugId, batchNumber, storageLocation,
+                expiryDateStart, expiryDateEnd, isSpecial);
+
+        // 手动分页
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, allResults.size());
+        List<Inventory> pageResults = start < allResults.size()
+                ? allResults.subList(start, end)
+                : new java.util.ArrayList<>();
+
+        Page<Inventory> pageParam = new Page<>(page, size, allResults.size());
+        pageParam.setRecords(pageResults);
+        return pageParam;
     }
 
     @Override
