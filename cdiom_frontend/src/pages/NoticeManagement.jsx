@@ -4,6 +4,13 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseC
 import request from '../utils/request'
 import { getUser, getUserRoleId } from '../utils/auth'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const NoticeManagement = () => {
   const [notices, setNotices] = useState([])
@@ -217,29 +224,31 @@ const NoticeManagement = () => {
   const canCreate = hasPermission([PERMISSIONS.NOTICE_VIEW, PERMISSIONS.NOTICE_MANAGE])
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>通知公告</h2>
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>通知公告</h2>
         {canCreate && (
           <Tooltip title="新增公告">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
           </Tooltip>
         )}
       </div>
-      <Table
-        columns={columns}
-        dataSource={notices}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize })
-          },
-        }}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={notices}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize })
+            },
+          }}
+        />
+      </div>
       <Modal
         title={editingNotice ? '编辑公告' : '新增公告'}
         open={modalVisible}

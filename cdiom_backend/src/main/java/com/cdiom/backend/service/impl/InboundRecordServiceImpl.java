@@ -26,6 +26,8 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 入库记录服务实现类
@@ -51,9 +53,19 @@ public class InboundRecordServiceImpl implements InboundRecordService {
         LambdaQueryWrapper<InboundRecord> wrapper = new LambdaQueryWrapper<>();
         
         if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(InboundRecord::getRecordNumber, keyword)
-                    .or().like(InboundRecord::getBatchNumber, keyword)
-                    .or().like(InboundRecord::getManufacturer, keyword));
+            LambdaQueryWrapper<DrugInfo> drugNameWrapper = new LambdaQueryWrapper<>();
+            drugNameWrapper.select(DrugInfo::getId).like(DrugInfo::getDrugName, keyword);
+            List<Long> drugIdsMatchingName = drugInfoMapper.selectList(drugNameWrapper).stream()
+                    .map(DrugInfo::getId)
+                    .collect(Collectors.toList());
+            wrapper.and(w -> {
+                w.like(InboundRecord::getRecordNumber, keyword)
+                        .or().like(InboundRecord::getBatchNumber, keyword)
+                        .or().like(InboundRecord::getManufacturer, keyword);
+                if (!drugIdsMatchingName.isEmpty()) {
+                    w.or().in(InboundRecord::getDrugId, drugIdsMatchingName);
+                }
+            });
         }
         
         if (orderId != null) {

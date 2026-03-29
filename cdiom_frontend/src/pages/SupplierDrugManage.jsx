@@ -3,6 +3,13 @@ import { Table, Button, Space, Input, Modal, Form, message, InputNumber, Popconf
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import logger from '../utils/logger'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 /**
  * 供应商可供应药品维护（供应商角色使用）
@@ -203,13 +210,13 @@ const SupplierDrugManage = () => {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           可供应药品维护
           {mySupplier?.name && <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>（{mySupplier.name}）</span>}
         </h2>
-        <Space>
+        <Space style={{ flexShrink: 0 }}>
           <Tooltip title="刷新">
             <Button icon={<ReloadOutlined />} onClick={fetchMyDrugs} />
           </Tooltip>
@@ -218,16 +225,19 @@ const SupplierDrugManage = () => {
           </Tooltip>
         </Space>
       </div>
-      <p style={{ color: '#666', marginBottom: 16 }}>
+      <p style={{ color: '#666', marginBottom: 16, flexShrink: 0 }}>
         在此维护本司可提供的药品及协议价。采购专员新建采购订单时，将仅能选择您在此维护的药品，并自动带出协议价（可修改）。
       </p>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={list}
-        loading={loading}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={list}
+          loading={loading}
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        />
+      </div>
 
       <Modal
         title="添加可供应药品"

@@ -79,6 +79,7 @@ public class SysConfigServiceImpl implements SysConfigService {
         config.setUpdateTime(LocalDateTime.now());
         
         sysConfigMapper.insert(config);
+        systemConfigUtil.clearCache(config.getConfigKey());
         return config;
     }
 
@@ -115,7 +116,12 @@ public class SysConfigServiceImpl implements SysConfigService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteConfig(Long id) {
+        SysConfig exist = sysConfigMapper.selectById(id);
+        if (exist == null) {
+            throw new ServiceException("参数配置不存在");
+        }
         sysConfigMapper.deleteById(id);
+        systemConfigUtil.clearCache(exist.getConfigKey());
     }
 }
 

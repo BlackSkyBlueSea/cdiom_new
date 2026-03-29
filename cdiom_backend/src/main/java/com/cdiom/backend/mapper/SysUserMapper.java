@@ -6,6 +6,9 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.time.LocalDateTime;
 
 /**
  * 系统用户Mapper接口
@@ -21,6 +24,12 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      */
     @Delete("DELETE FROM sys_user WHERE id = #{id}")
     int permanentlyDeleteById(@Param("id") Long id);
+
+    /**
+     * 将逻辑删除的用户恢复为未删除（绕过 BaseMapper.updateById 对 @TableLogic 的 WHERE deleted=0 限制）
+     */
+    @Update("UPDATE sys_user SET deleted = 0, update_time = #{updateTime} WHERE id = #{id} AND deleted = 1")
+    int restoreLogicallyDeletedById(@Param("id") Long id, @Param("updateTime") LocalDateTime updateTime);
     
     /**
      * 查询已删除的用户列表（包括逻辑删除的记录）

@@ -71,6 +71,25 @@
   align-items: center;
 }
 
+.header-user-block {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 40px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.user-menu-trigger:hover {
+  color: rgba(0, 0, 0, 0.88);
+}
+
 .user-info {
   display: flex;
   align-items: center;
@@ -101,6 +120,14 @@
   flex: 1;
   min-height: 0;
   -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 路由页面占满主内容高度，便于内部表格滚动而不撑出整页纵向滚动条 */
+.content > * {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Pad端内容区域优化 */

@@ -13,6 +13,7 @@ import request from '../utils/request'
 import logger from '../utils/logger'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { pageRootStyle, tableAreaStyle, TABLE_SCROLL_Y } from '../utils/tablePageLayout'
 
 const SupplierDashboard = () => {
   const navigate = useNavigate()
@@ -194,7 +195,8 @@ const SupplierDashboard = () => {
   }
 
   return (
-    <div>
+    <div style={pageRootStyle}>
+      <div style={{ flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0 }}>供应商工作台</h2>
         <Button icon={<ReloadOutlined />} onClick={() => fetchDashboardData(true)} loading={refreshing}>
@@ -287,27 +289,33 @@ const SupplierDashboard = () => {
           <Empty description="暂无数据" />
         )}
       </Card>
+      </div>
 
       {/* 已发货订单跟踪列表 */}
-      <Card 
-        title="已发货订单跟踪" 
+      <Card
+        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        styles={{ body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 } }}
+        title="已发货订单跟踪"
         extra={
           <Tooltip title="查看全部">
             <Button type="link" icon={<EyeOutlined />} onClick={() => navigate('/supplier-orders?status=SHIPPED')} />
           </Tooltip>
         }
       >
-        <Table
-          columns={shippedOrdersColumns}
-          dataSource={shippedOrders}
-          rowKey="id"
-          loading={shippedOrdersLoading}
-          pagination={false}
-          size="middle"
-          locale={{
-            emptyText: '暂无已发货订单'
-          }}
-        />
+        <div style={tableAreaStyle}>
+          <Table
+            columns={shippedOrdersColumns}
+            dataSource={shippedOrders}
+            rowKey="id"
+            loading={shippedOrdersLoading}
+            pagination={false}
+            size="middle"
+            scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+            locale={{
+              emptyText: '暂无已发货订单'
+            }}
+          />
+        </div>
       </Card>
     </div>
   )

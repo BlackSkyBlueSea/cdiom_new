@@ -1,12 +1,20 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, AutoComplete, message, Popconfirm, Tooltip, DatePicker } from 'antd'
 
-const { Compact } = Space
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, ScanOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ScanOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const { TextArea } = Input
 
@@ -41,6 +49,11 @@ const STORAGE_REQUIREMENT_OPTIONS = [
 const DrugManagement = () => {
   const [drugs, setDrugs] = useState([])
   const [loading, setLoading] = useState(false)
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  })
   const [modalVisible, setModalVisible] = useState(false)
   const [editingDrug, setEditingDrug] = useState(null)
   const [form] = Form.useForm()
@@ -48,38 +61,31 @@ const DrugManagement = () => {
     keyword: '',
     isSpecial: undefined,
   })
+  /** 工具栏搜索框本地输入，提交后再写入 filters.keyword（与原先 Input.Search 行为一致） */
+  const [searchInput, setSearchInput] = useState('')
+  const [manufacturerOptions, setManufacturerOptions] = useState([])
   const [scanning, setScanning] = useState(false)
   const [searchingByName, setSearchingByName] = useState(false)
   const [searchingByApproval, setSearchingByApproval] = useState(false)
   const [exporting, setExporting] = useState(false)
-
-  // 从已有药品数据中提取生产厂家选项
-  const manufacturerOptions = useMemo(() => {
-    const manufacturers = new Set()
-    drugs.forEach(drug => {
-      if (drug.manufacturer && drug.manufacturer.trim()) {
-        manufacturers.add(drug.manufacturer.trim())
-      }
-    })
-    return Array.from(manufacturers).sort().map(manufacturer => ({
-      value: manufacturer,
-      label: manufacturer
-    }))
-  }, [drugs])
 
   const fetchDrugs = useCallback(async () => {
     setLoading(true)
     try {
       const res = await request.get('/drugs', {
         params: {
-          page: 1,
-          size: 10000, // 设置一个很大的值以获取所有数据
+          page: pagination.current,
+          size: pagination.pageSize,
           keyword: filters.keyword || undefined,
           isSpecial: filters.isSpecial,
         },
       })
       if (res.code === 200) {
         setDrugs(res.data.records || [])
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.total ?? 0,
+        }))
       } else {
         message.error(res.msg || '获取药品列表失败')
       }
@@ -94,11 +100,41 @@ const DrugManagement = () => {
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [filters, pagination.current, pagination.pageSize])
 
   useEffect(() => {
     fetchDrugs()
   }, [fetchDrugs])
+
+  // 弹窗打开时拉取一批数据用于生产厂家下拉建议（不阻塞主列表分页）
+  useEffect(() => {
+    if (!modalVisible) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await request.get('/drugs', {
+          params: { page: 1, size: 2000 },
+        })
+        if (cancelled || res.code !== 200) return
+        const manufacturers = new Set()
+        ;(res.data.records || []).forEach((drug) => {
+          if (drug.manufacturer && String(drug.manufacturer).trim()) {
+            manufacturers.add(String(drug.manufacturer).trim())
+          }
+        })
+        setManufacturerOptions(
+          Array.from(manufacturers)
+            .sort()
+            .map((m) => ({ value: m, label: m }))
+        )
+      } catch (e) {
+        logger.error('加载生产厂家选项失败:', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [modalVisible])
 
   const handleAdd = () => {
     setEditingDrug(null)
@@ -256,12 +292,24 @@ const DrugManagement = () => {
     }
   }
 
-  const handleSearch = (value) => {
-    setFilters({ ...filters, keyword: value })
+  const runToolbarSearch = () => {
+    const k = searchInput.trim()
+    setSearchInput(k)
+    setFilters((prev) => ({ ...prev, keyword: k }))
+    setPagination((p) => ({ ...p, current: 1 }))
   }
 
   const handleFilterChange = (key, value) => {
     setFilters({ ...filters, [key]: value })
+    setPagination((p) => ({ ...p, current: 1 }))
+  }
+
+  const handleTableChange = (pag) => {
+    setPagination((prev) => ({
+      ...prev,
+      current: pag.current,
+      pageSize: pag.pageSize,
+    }))
   }
 
   const handleExport = async () => {
@@ -313,8 +361,6 @@ const DrugManagement = () => {
       dataIndex: 'id',
       key: 'id',
       width: 80,
-      sorter: (a, b) => a.id - b.id,
-      defaultSortOrder: 'ascend',
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>药品名称</span>,
@@ -399,50 +445,83 @@ const DrugManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>药品信息管理</h2>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
-          <Input.Search
-            placeholder="搜索药品名称、国家本位码、批准文号、生产厂家"
-            allowClear
-            style={{ width: 300 }}
-            onSearch={handleSearch}
-            enterButton
-          />
-          <Select
-            placeholder="筛选特殊药品"
-            allowClear
-            style={{ width: 150 }}
-            onChange={(value) => handleFilterChange('isSpecial', value)}
-          >
-            <Select.Option value={0}>普通药品</Select.Option>
-            <Select.Option value={1}>特殊药品</Select.Option>
-          </Select>
-          <Tooltip title="导出Excel">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleExport}
-              loading={exporting}
-            />
-          </Tooltip>
-          <PermissionWrapper permission={PERMISSIONS.DRUG_CREATE}>
-            <Tooltip title="新增药品">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>药品信息管理</h2>
+        <div style={compactFilterRowStyle}>
+          <div style={filterCellFlex('1.5 1 160px', 160, 420)}>
+            <Space.Compact block style={{ width: '100%' }}>
+              <Input
+                allowClear
+                placeholder="搜索药品名称、国家本位码、批准文号、生产厂家"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onPressEnter={runToolbarSearch}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={runToolbarSearch}
+                style={{
+                  boxShadow: 'none',
+                  alignSelf: 'stretch',
+                  height: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              />
+            </Space.Compact>
+          </div>
+          <div style={{ flex: '0 0 auto', width: 132, minWidth: 120 }}>
+            <Select
+              placeholder="筛选特殊药品"
+              allowClear
+              style={{ width: '100%' }}
+              value={filters.isSpecial}
+              onChange={(value) => handleFilterChange('isSpecial', value)}
+            >
+              <Select.Option value={0}>普通药品</Select.Option>
+              <Select.Option value={1}>特殊药品</Select.Option>
+            </Select>
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="导出Excel">
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleExport}
+                loading={exporting}
+              />
             </Tooltip>
-          </PermissionWrapper>
+            <PermissionWrapper permission={PERMISSIONS.DRUG_CREATE}>
+              <Tooltip title="新增药品">
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+              </Tooltip>
+            </PermissionWrapper>
+          </Space>
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={drugs}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 1200 }}
-        pagination={false}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={drugs}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 1200, y: TABLE_SCROLL_Y }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            pageSizeOptions: ['10', '20', '50', '100'],
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
       
       <Modal
         title={editingDrug ? '编辑药品信息' : '新增药品信息'}

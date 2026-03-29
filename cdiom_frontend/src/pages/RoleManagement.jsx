@@ -3,6 +3,13 @@ import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, 
 import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import SuperAdminModal from '../components/SuperAdminModal'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState([])
@@ -194,27 +201,29 @@ const RoleManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>角色管理</h2>
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>角色管理</h2>
         <Tooltip title="新增角色">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
         </Tooltip>
       </div>
-      <Table
-        columns={columns}
-        dataSource={roles}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize })
-          },
-        }}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={roles}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize })
+            },
+          }}
+        />
+      </div>
       <Modal
         title={editingRole ? '编辑角色' : '新增角色'}
         open={modalVisible}

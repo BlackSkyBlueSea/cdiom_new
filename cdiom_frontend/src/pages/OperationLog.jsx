@@ -5,6 +5,15 @@ import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 import { Navigate } from 'react-router-dom'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarSectionStackedStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowFullWidthStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y_STACKED,
+} from '../utils/tablePageLayout'
 
 const OperationLog = () => {
   // 权限检查：只有系统管理员可以查看操作日志
@@ -126,63 +135,75 @@ const OperationLog = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>操作日志</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索关键词"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Input
-            placeholder="操作模块"
-            value={filters.module}
-            onChange={(e) => setFilters({ ...filters, module: e.target.value })}
-            style={{ width: 150 }}
-            allowClear
-          />
-          <Select
-            placeholder="操作类型"
-            value={filters.operationType}
-            onChange={(value) => setFilters({ ...filters, operationType: value })}
-            style={{ width: 150 }}
-            allowClear
-          >
-            <Select.Option value="INSERT">新增</Select.Option>
-            <Select.Option value="UPDATE">更新</Select.Option>
-            <Select.Option value="DELETE">删除</Select.Option>
-            <Select.Option value="SELECT">查询</Select.Option>
-          </Select>
-          <Select
-            placeholder="状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value={1}>成功</Select.Option>
-            <Select.Option value={0}>失败</Select.Option>
-          </Select>
-          <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
-        </Space>
+    <div style={pageRootStyle}>
+      <div style={toolbarSectionStackedStyle}>
+        <h2 style={toolbarPageTitleStyle}>操作日志</h2>
+        <div style={compactFilterRowFullWidthStyle}>
+          <div style={filterCellFlex('1.2 1 88px', 88, 240)}>
+            <Input
+              placeholder="搜索关键词"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </div>
+          <div style={filterCellFlex('1 1 72px', 72, 180)}>
+            <Input
+              placeholder="操作模块"
+              value={filters.module}
+              onChange={(e) => setFilters({ ...filters, module: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </div>
+          <div style={{ flex: '0 0 auto', width: 132, minWidth: 120 }}>
+            <Select
+              placeholder="操作类型"
+              value={filters.operationType}
+              onChange={(value) => setFilters({ ...filters, operationType: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="INSERT">新增</Select.Option>
+              <Select.Option value="UPDATE">更新</Select.Option>
+              <Select.Option value="DELETE">删除</Select.Option>
+              <Select.Option value="SELECT">查询</Select.Option>
+            </Select>
+          </div>
+          <div style={{ flex: '0 0 auto', width: 108, minWidth: 100 }}>
+            <Select
+              placeholder="状态"
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value={1}>成功</Select.Option>
+              <Select.Option value={0}>失败</Select.Option>
+            </Select>
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
+          </Space>
+        </div>
       </div>
-      <Table
-        columns={columns}
-        dataSource={logs}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize })
-          },
-        }}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={logs}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y_STACKED }}
+          pagination={{
+            ...pagination,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize })
+            },
+          }}
+        />
+      </div>
     </div>
   )
 }

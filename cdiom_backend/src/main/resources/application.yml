@@ -114,6 +114,7 @@ system:
   config:
     expiry-warning-days: 180  # 药品过期预警天数（距离过期还有多少天时预警）- 默认值，可在数据库中动态调整
     expiry-critical-days: 90  # 药品过期严重预警天数（距离过期还有多少天时严重预警）- 默认值，可在数据库中动态调整
+    log-retention-years: 5  # 登录/操作日志保留年限（与 sys_config.log_retention_years 对应）
 
 # 万维易源药品信息API配置（非敏感配置）
 yuanyanyao:

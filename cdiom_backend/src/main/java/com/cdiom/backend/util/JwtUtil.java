@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -19,12 +20,15 @@ import java.util.Map;
  */
 @Component
 public class JwtUtil {
-    
+
+    private final SystemConfigUtil systemConfigUtil;
+
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private Long expiration;
+    public JwtUtil(@Lazy SystemConfigUtil systemConfigUtil) {
+        this.systemConfigUtil = systemConfigUtil;
+    }
 
     /**
      * 生成Token
@@ -42,7 +46,8 @@ public class JwtUtil {
      */
     private String createToken(Map<String, Object> claims, String subject) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expiration);
+        long ttlMs = systemConfigUtil.getJwtExpirationMillis();
+        Date expiryDate = new Date(now.getTime() + ttlMs);
         
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         

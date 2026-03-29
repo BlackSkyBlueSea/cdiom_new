@@ -1,9 +1,11 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.*;
 import com.cdiom.backend.model.*;
 import com.cdiom.backend.service.DashboardService;
+import com.cdiom.backend.util.SystemConfigUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final InboundRecordMapper inboundRecordMapper;
     private final OutboundApplyMapper outboundApplyMapper;
     private final PurchaseOrderMapper purchaseOrderMapper;
+    private final SystemConfigUtil systemConfigUtil;
 
     @Override
     public Map<String, Object> getStatistics() {
@@ -208,20 +211,21 @@ public class DashboardServiceImpl implements DashboardService {
         try {
             Map<String, Object> result = new HashMap<>();
             
-            // 预警日期计算
+            // 预警日期：与系统配置（及库存管理近效期统计）一致
             LocalDate today = LocalDate.now();
-            LocalDate yellowWarningDate = today.plusDays(180); // 180天后
-            LocalDate redWarningDate = today.plusDays(90);   // 90天后
+            int warningDays = systemConfigUtil.getExpiryWarningDays();
+            int criticalDays = systemConfigUtil.getExpiryCriticalDays();
+            LocalDate yellowBoundary = today.plusDays(warningDays);
+            LocalDate redBoundary = today.plusDays(criticalDays);
 
-            // 近效期预警统计（基于药品有效期）
-            // 黄色预警：90-180天
-            Long yellowWarningCount = inventoryMapper.countYellowWarning(today, yellowWarningDate);
+            // 黄色预警：严重预警天数～预警天数之间（与红色区间不重复）
+            Long yellowWarningCount = inventoryMapper.countYellowExclusive(redBoundary, yellowBoundary);
             if (yellowWarningCount == null) {
                 yellowWarningCount = 0L;
             }
-            
-            // 红色预警：≤90天
-            Long redWarningCount = inventoryMapper.countRedWarning(today, redWarningDate);
+
+            // 红色预警：≤严重预警天数
+            Long redWarningCount = inventoryMapper.countRedWarning(today, redBoundary);
             if (redWarningCount == null) {
                 redWarningCount = 0L;
             }
@@ -299,6 +303,8 @@ public class DashboardServiceImpl implements DashboardService {
             todayStats.put("outbound", todayOutboundCount);
 
             result.put("nearExpiryWarning", nearExpiryWarning);
+            result.put("expiryWarningDays", warningDays);
+            result.put("expiryCriticalDays", criticalDays);
             result.put("pendingTasks", pendingTasks);
             result.put("todayStats", todayStats);
             result.put("totalInventory", totalInventory);
@@ -327,8 +333,27 @@ public class DashboardServiceImpl implements DashboardService {
             result.put("dates", new ArrayList<>());
             result.put("inboundCounts", new ArrayList<>());
             result.put("outboundCounts", new ArrayList<>());
+            try {
+                result.put("expiryWarningDays", systemConfigUtil.getExpiryWarningDays());
+                result.put("expiryCriticalDays", systemConfigUtil.getExpiryCriticalDays());
+            } catch (Exception ex) {
+                result.put("expiryWarningDays", 180);
+                result.put("expiryCriticalDays", 90);
+            }
             return result;
         }
+    }
+
+    @Override
+    public List<Inventory> getWarehouseNearExpiryDetails(String level) {
+        if (level == null || (!"red".equalsIgnoreCase(level) && !"yellow".equalsIgnoreCase(level))) {
+            throw new ServiceException("参数 level 必须为 red 或 yellow");
+        }
+        String lv = level.toLowerCase();
+        LocalDate today = LocalDate.now();
+        LocalDate yellowBoundary = today.plusDays(systemConfigUtil.getExpiryWarningDays());
+        LocalDate redBoundary = today.plusDays(systemConfigUtil.getExpiryCriticalDays());
+        return inventoryMapper.selectNearExpiryDetailsWithJoin(today, redBoundary, yellowBoundary, lv);
     }
 
     @Override

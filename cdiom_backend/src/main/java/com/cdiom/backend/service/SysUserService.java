@@ -13,7 +13,7 @@ public interface SysUserService {
     /**
      * 分页查询用户列表
      */
-    Page<SysUser> getUserList(Integer page, Integer size, String keyword, Long roleId, Integer status);
+    Page<SysUser> getUserList(Integer page, Integer size, String keyword, Long roleId, Integer status, Long permissionId);
 
     /**
      * 根据ID查询用户

@@ -5,6 +5,15 @@ import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -363,88 +372,103 @@ const InventoryManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>库存管理</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索药品名称、批次号"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Input
-            placeholder="批次号"
-            value={filters.batchNumber}
-            onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
-            style={{ width: 150 }}
-            allowClear
-          />
-          <Input
-            placeholder="存储位置"
-            value={filters.storageLocation}
-            onChange={(e) => setFilters({ ...filters, storageLocation: e.target.value })}
-            style={{ width: 150 }}
-            allowClear
-          />
-          <Select
-            placeholder="特殊药品"
-            value={filters.isSpecial}
-            onChange={(value) => setFilters({ ...filters, isSpecial: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value={1}>是</Select.Option>
-            <Select.Option value={0}>否</Select.Option>
-          </Select>
-          <RangePicker
-            placeholder={['有效期开始', '有效期结束']}
-            value={filters.expiryDateStart && filters.expiryDateEnd 
-              ? [filters.expiryDateStart, filters.expiryDateEnd] 
-              : null}
-            onChange={(dates) => {
-              setFilters({
-                ...filters,
-                expiryDateStart: dates ? dates[0] : undefined,
-                expiryDateEnd: dates ? dates[1] : undefined,
-              })
-            }}
-          />
-          <Tooltip title="查询">
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchInventory}
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>库存管理</h2>
+        <div style={compactFilterRowStyle}>
+          <div style={filterCellFlex('1.4 1 72px', 72, 200)}>
+            <Input
+              placeholder="搜索药品名称、批次号"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-          <Tooltip title="重置">
-            <Button icon={<ReloadOutlined />} onClick={handleReset} />
-          </Tooltip>
-          <Tooltip title="导出Excel">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleExport}
-              loading={exporting}
+          </div>
+          <div style={filterCellFlex('0.85 1 56px', 56, 130)}>
+            <Input
+              placeholder="批次号"
+              value={filters.batchNumber}
+              onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-        </Space>
+          </div>
+          <div style={filterCellFlex('0.85 1 56px', 56, 130)}>
+            <Input
+              placeholder="存储位置"
+              value={filters.storageLocation}
+              onChange={(e) => setFilters({ ...filters, storageLocation: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </div>
+          <div style={{ flex: '0 0 auto', width: 96, minWidth: 88 }}>
+            <Select
+              placeholder="特殊药品"
+              value={filters.isSpecial}
+              onChange={(value) => setFilters({ ...filters, isSpecial: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value={1}>是</Select.Option>
+              <Select.Option value={0}>否</Select.Option>
+            </Select>
+          </div>
+          <div style={filterCellFlex('1.15 1 180px', 168, 300)}>
+            <RangePicker
+              placeholder={['有效期开始', '有效期结束']}
+              value={filters.expiryDateStart && filters.expiryDateEnd
+                ? [filters.expiryDateStart, filters.expiryDateEnd]
+                : null}
+              onChange={(dates) => {
+                setFilters({
+                  ...filters,
+                  expiryDateStart: dates ? dates[0] : undefined,
+                  expiryDateEnd: dates ? dates[1] : undefined,
+                })
+              }}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="查询">
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={fetchInventory}
+              />
+            </Tooltip>
+            <Tooltip title="重置">
+              <Button icon={<ReloadOutlined />} onClick={handleReset} />
+            </Tooltip>
+            <Tooltip title="导出Excel">
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleExport}
+                loading={exporting}
+              />
+            </Tooltip>
+          </Space>
+        </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={inventory}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        onChange={handleTableChange}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={inventory}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
 
       {/* 库存调整弹窗 */}
       <Modal

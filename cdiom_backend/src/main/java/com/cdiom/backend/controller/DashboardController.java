@@ -2,6 +2,7 @@ package com.cdiom.backend.controller;
 
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
+import com.cdiom.backend.model.Inventory;
 import com.cdiom.backend.model.Supplier;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
@@ -10,8 +11,10 @@ import com.cdiom.backend.service.SupplierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -69,6 +72,18 @@ public class DashboardController {
     public Result<Map<String, Object>> getWarehouseDashboard() {
         Map<String, Object> data = dashboardService.getWarehouseDashboard();
         return Result.success(data);
+    }
+
+    /**
+     * 近效期预警明细（药品名称、批次、效期等），与仪表盘卡片区间一致
+     *
+     * @param level yellow — 介于严重预警天数与预警天数之间；red — 至多到严重预警天数
+     */
+    @GetMapping("/warehouse/near-expiry-details")
+    @RequiresPermission({"drug:view", "drug:manage", "inbound:view", "outbound:view"})
+    public Result<List<Inventory>> getWarehouseNearExpiryDetails(@RequestParam String level) {
+        List<Inventory> list = dashboardService.getWarehouseNearExpiryDetails(level);
+        return Result.success(list);
     }
 
     /**

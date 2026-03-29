@@ -1,6 +1,7 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysPermissionMapper;
@@ -9,6 +10,7 @@ import com.cdiom.backend.mapper.SysUserPermissionMapper;
 import com.cdiom.backend.model.SysPermission;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.model.SysUserPermission;
+import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.PermissionService;
 import com.cdiom.backend.service.SysUserService;
 import lombok.RequiredArgsConstructor;
@@ -34,19 +36,21 @@ import lombok.extern.slf4j.Slf4j;
 public class SysUserServiceImpl implements SysUserService {
 
     private final SysUserMapper sysUserMapper;
+    private final AuthService authService;
     private final PermissionService permissionService;
     private final SysPermissionMapper permissionMapper;
     private final SysUserPermissionMapper userPermissionMapper;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
-    public Page<SysUser> getUserList(Integer page, Integer size, String keyword, Long roleId, Integer status) {
+    public Page<SysUser> getUserList(Integer page, Integer size, String keyword, Long roleId, Integer status, Long permissionId) {
         Page<SysUser> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(SysUser::getUsername, keyword)
-                    .or().like(SysUser::getPhone, keyword));
+                    .or().like(SysUser::getPhone, keyword)
+                    .or().like(SysUser::getEmail, keyword));
         }
         
         if (roleId != null) {
@@ -55,6 +59,12 @@ public class SysUserServiceImpl implements SysUserService {
         
         if (status != null) {
             wrapper.eq(SysUser::getStatus, status);
+        }
+
+        if (permissionId != null) {
+            // 超级管理员（role_id=6）在业务上拥有全部权限；其余用户按角色权限或直接授权匹配
+            wrapper.apply("(sys_user.role_id = 6 OR EXISTS (SELECT 1 FROM sys_user_permission up WHERE up.user_id = sys_user.id AND up.permission_id = {0}) OR EXISTS (SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = sys_user.role_id AND rp.permission_id = {0}))",
+                    permissionId);
         }
         
         wrapper.orderByDesc(SysUser::getCreateTime);
@@ -219,15 +229,27 @@ public class SysUserServiceImpl implements SysUserService {
         return user;
     }
 
+    private void assertTargetIsNotCurrentUser(Long targetUserId, String message) {
+        if (targetUserId == null) {
+            return;
+        }
+        Long selfId = authService.getCurrentUserId();
+        if (selfId != null && selfId.equals(targetUserId)) {
+            throw new ServiceException(message);
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteUser(Long id) {
+        assertTargetIsNotCurrentUser(id, "不能删除当前登录账号");
         sysUserMapper.deleteById(id);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateUserStatus(Long id, Integer status) {
+        assertTargetIsNotCurrentUser(id, "不能修改当前登录账号的状态，请使用其他管理员操作");
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
             throw new ServiceException("用户不存在");
@@ -251,10 +273,15 @@ public class SysUserServiceImpl implements SysUserService {
         if (user == null) {
             throw new ServiceException("用户不存在");
         }
-        user.setLoginFailCount(0);
-        user.setLockTime(null);
-        user.setUpdateTime(LocalDateTime.now());
-        sysUserMapper.updateById(user);
+        // updateById 默认忽略 null 字段，lock_time 无法被清空；必须用 UpdateWrapper 显式置 NULL
+        LocalDateTime now = LocalDateTime.now();
+        LambdaUpdateWrapper<SysUser> uw = new LambdaUpdateWrapper<>();
+        uw.eq(SysUser::getId, id)
+                .set(SysUser::getLoginFailCount, 0)
+                .set(SysUser::getLockTime, null)
+                .set(SysUser::getLastLoginFailTime, null)
+                .set(SysUser::getUpdateTime, now);
+        sysUserMapper.update(null, uw);
     }
 
     @Override
@@ -291,15 +318,10 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void restoreUser(Long id) {
-        // 注意：由于@TableLogic会自动过滤deleted=1的记录，selectById可能查不到已删除的用户
-        // 我们需要直接更新deleted字段
-        SysUser user = new SysUser();
-        user.setId(id);
-        user.setDeleted(0);
-        user.setUpdateTime(LocalDateTime.now());
-        
-        // 使用updateById更新，如果用户不存在，返回0
-        int updated = sysUserMapper.updateById(user);
+        assertTargetIsNotCurrentUser(id, "不能恢复当前登录账号，请由其他管理员操作");
+        // 不能使用 updateById：@TableLogic 会在 WHERE 中追加 deleted=0，已删除行匹配不到，更新行数恒为 0
+        LocalDateTime now = LocalDateTime.now();
+        int updated = sysUserMapper.restoreLogicallyDeletedById(id, now);
         if (updated == 0) {
             throw new ServiceException("用户不存在或已被永久删除");
         }
@@ -308,6 +330,7 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void permanentlyDeleteUser(Long id) {
+        assertTargetIsNotCurrentUser(id, "不能永久删除当前登录账号");
         // 物理删除：使用原生SQL直接删除（绕过逻辑删除）
         // 注意：此操作不可逆，会真正从数据库删除记录
         int deletedCount = sysUserMapper.permanentlyDeleteById(id);

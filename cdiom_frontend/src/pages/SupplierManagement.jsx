@@ -5,6 +5,15 @@ import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarSectionStackedStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowFullWidthStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y_STACKED,
+} from '../utils/tablePageLayout'
 
 const SupplierManagement = () => {
   const [suppliers, setSuppliers] = useState([])
@@ -417,79 +426,89 @@ const SupplierManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>供应商管理</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索供应商名称、联系人"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Select
-            placeholder="状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="0">禁用</Select.Option>
-            <Select.Option value="1">启用</Select.Option>
-          </Select>
-          <Select
-            placeholder="审核状态"
-            value={filters.auditStatus}
-            onChange={(value) => setFilters({ ...filters, auditStatus: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="0">待审核</Select.Option>
-            <Select.Option value="1">已通过</Select.Option>
-            <Select.Option value="2">已驳回</Select.Option>
-          </Select>
-          <Tooltip title="查询">
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchSuppliers}
+    <div style={pageRootStyle}>
+      <div style={toolbarSectionStackedStyle}>
+        <h2 style={toolbarPageTitleStyle}>供应商管理</h2>
+        <div style={compactFilterRowFullWidthStyle}>
+          <div style={filterCellFlex('1.2 1 88px', 88, 240)}>
+            <Input
+              placeholder="搜索供应商名称、联系人"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-          <Tooltip title="重置">
-            <Button icon={<ReloadOutlined />} onClick={handleReset} />
-          </Tooltip>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Tooltip title="新建供应商">
+          </div>
+          <div style={{ flex: '0 0 auto', width: 108, minWidth: 100 }}>
+            <Select
+              placeholder="状态"
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="0">禁用</Select.Option>
+              <Select.Option value="1">启用</Select.Option>
+            </Select>
+          </div>
+          <div style={{ flex: '0 0 auto', width: 112, minWidth: 104 }}>
+            <Select
+              placeholder="审核状态"
+              value={filters.auditStatus}
+              onChange={(value) => setFilters({ ...filters, auditStatus: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="0">待审核</Select.Option>
+              <Select.Option value="1">已通过</Select.Option>
+              <Select.Option value="2">已驳回</Select.Option>
+            </Select>
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="查询">
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setEditingSupplier(null)
-                  form.resetFields()
-                  setFileList([])
-                  setModalVisible(true)
-                }}
+                icon={<SearchOutlined />}
+                onClick={fetchSuppliers}
               />
             </Tooltip>
-          )}
-        </Space>
+            <Tooltip title="重置">
+              <Button icon={<ReloadOutlined />} onClick={handleReset} />
+            </Tooltip>
+            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+              <Tooltip title="新建供应商">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setEditingSupplier(null)
+                    form.resetFields()
+                    setFileList([])
+                    setModalVisible(true)
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Space>
+        </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={suppliers}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        onChange={handleTableChange}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={suppliers}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y_STACKED }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
 
       <Modal
         title={editingSupplier ? '编辑供应商' : '新建供应商'}

@@ -5,9 +5,14 @@ import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.SysConfig;
 import com.cdiom.backend.service.SysConfigService;
+import com.cdiom.backend.util.LoginConfigUtil;
+import com.cdiom.backend.util.SystemConfigUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 系统参数配置控制器
@@ -21,6 +26,24 @@ import org.springframework.web.bind.annotation.*;
 public class SysConfigController {
 
     private final SysConfigService sysConfigService;
+    private final SystemConfigUtil systemConfigUtil;
+    private final LoginConfigUtil loginConfigUtil;
+
+    /**
+     * 各模块当前生效的运行时参数（与 sys_config 表映射，JWT 等对非法表值有回退）
+     */
+    @GetMapping("/runtime-effective")
+    public Result<Map<String, Object>> getRuntimeEffective() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("expiryWarningDays", systemConfigUtil.getExpiryWarningDays());
+        m.put("expiryCriticalDays", systemConfigUtil.getExpiryCriticalDays());
+        m.put("logRetentionYears", systemConfigUtil.getLogRetentionYears());
+        m.put("jwtExpirationMs", systemConfigUtil.getJwtExpirationMillis());
+        m.put("loginFailThreshold", loginConfigUtil.getLoginFailThreshold());
+        m.put("loginFailTimeWindowMinutes", loginConfigUtil.getLoginFailTimeWindow());
+        m.put("loginLockDurationHours", loginConfigUtil.getLoginLockDuration());
+        return Result.success(m);
+    }
 
     /**
      * 分页查询参数配置列表

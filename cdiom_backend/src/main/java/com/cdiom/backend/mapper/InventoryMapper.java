@@ -26,6 +26,12 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
     Long countYellowWarning(LocalDate today, LocalDate yellowWarningDate);
 
     /**
+     * 黄色预警批次数量（与红色互斥：效期在严重预警天数之后、预警天数之内）
+     */
+    @Select("SELECT COUNT(*) FROM inventory WHERE quantity > 0 AND expiry_date > #{redBoundary} AND expiry_date <= #{yellowBoundary}")
+    Long countYellowExclusive(@Param("redBoundary") LocalDate redBoundary, @Param("yellowBoundary") LocalDate yellowBoundary);
+
+    /**
      * 查询近效期预警（红色预警：≤90天）
      */
     @Select("SELECT COUNT(*) FROM inventory WHERE expiry_date >= #{today} AND expiry_date <= #{redWarningDate} AND quantity > 0")
@@ -91,5 +97,13 @@ public interface InventoryMapper extends BaseMapper<Inventory> {
                                                  @Param("expiryDateStart") LocalDate expiryDateStart,
                                                  @Param("expiryDateEnd") LocalDate expiryDateEnd,
                                                  @Param("isSpecial") Integer isSpecial);
+
+    /**
+     * 近效期明细（与仪表盘预警区间一致，level=red 或 yellow）
+     */
+    List<Inventory> selectNearExpiryDetailsWithJoin(@Param("today") LocalDate today,
+                                                    @Param("redBoundary") LocalDate redBoundary,
+                                                    @Param("yellowBoundary") LocalDate yellowBoundary,
+                                                    @Param("level") String level);
 }
 

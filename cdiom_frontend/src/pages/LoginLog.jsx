@@ -4,6 +4,15 @@ import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import dayjs from 'dayjs'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const LoginLog = () => {
   const [logs, setLogs] = useState([])
@@ -132,44 +141,52 @@ const LoginLog = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>登录日志</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索关键词"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Select
-            placeholder="状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value={1}>成功</Select.Option>
-            <Select.Option value={0}>失败</Select.Option>
-          </Select>
-          <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
-        </Space>
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>登录日志</h2>
+        <div style={compactFilterRowStyle}>
+          <div style={filterCellFlex('1.2 1 100px', 100, 280)}>
+            <Input
+              placeholder="搜索关键词"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </div>
+          <div style={{ flex: '0 0 auto', width: 108, minWidth: 100 }}>
+            <Select
+              placeholder="状态"
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value={1}>成功</Select.Option>
+              <Select.Option value={0}>失败</Select.Option>
+            </Select>
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
+          </Space>
+        </div>
       </div>
-      <Table
-        columns={columns}
-        dataSource={logs}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize })
-          },
-        }}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={logs}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize })
+            },
+          }}
+        />
+      </div>
     </div>
   )
 }

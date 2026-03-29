@@ -5,6 +5,15 @@ import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarSectionStackedStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowFullWidthStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y_STACKED,
+} from '../utils/tablePageLayout'
 
 const SupplierOrderManagement = () => {
   const navigate = useNavigate()
@@ -306,58 +315,66 @@ const SupplierOrderManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>订单管理</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索订单编号"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Select
-            placeholder="订单状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="PENDING">待确认</Select.Option>
-            <Select.Option value="REJECTED">已拒绝</Select.Option>
-            <Select.Option value="CONFIRMED">待发货</Select.Option>
-            <Select.Option value="SHIPPED">已发货</Select.Option>
-            <Select.Option value="RECEIVED">已入库</Select.Option>
-            <Select.Option value="CANCELLED">已取消</Select.Option>
-          </Select>
-          <Tooltip title="查询">
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchOrders}
+    <div style={pageRootStyle}>
+      <div style={toolbarSectionStackedStyle}>
+        <h2 style={toolbarPageTitleStyle}>订单管理</h2>
+        <div style={compactFilterRowFullWidthStyle}>
+          <div style={filterCellFlex('1.2 1 100px', 100, 280)}>
+            <Input
+              placeholder="搜索订单编号"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-          <Tooltip title="重置">
-            <Button icon={<ReloadOutlined />} onClick={handleReset} />
-          </Tooltip>
-        </Space>
+          </div>
+          <div style={{ flex: '0 0 auto', width: 124, minWidth: 116 }}>
+            <Select
+              placeholder="订单状态"
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="PENDING">待确认</Select.Option>
+              <Select.Option value="REJECTED">已拒绝</Select.Option>
+              <Select.Option value="CONFIRMED">待发货</Select.Option>
+              <Select.Option value="SHIPPED">已发货</Select.Option>
+              <Select.Option value="RECEIVED">已入库</Select.Option>
+              <Select.Option value="CANCELLED">已取消</Select.Option>
+            </Select>
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="查询">
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={fetchOrders}
+              />
+            </Tooltip>
+            <Tooltip title="重置">
+              <Button icon={<ReloadOutlined />} onClick={handleReset} />
+            </Tooltip>
+          </Space>
+        </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={orders}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        onChange={handleTableChange}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={orders}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y_STACKED }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
 
       {/* 订单明细模态框 */}
       <Modal

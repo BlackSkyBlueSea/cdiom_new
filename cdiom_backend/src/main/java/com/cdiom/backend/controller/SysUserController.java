@@ -48,8 +48,9 @@ public class SysUserController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long roleId,
-            @RequestParam(required = false) Integer status) {
-        Page<SysUser> userPage = sysUserService.getUserList(page, size, keyword, roleId, status);
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) Long permissionId) {
+        Page<SysUser> userPage = sysUserService.getUserList(page, size, keyword, roleId, status, permissionId);
         // 清除密码信息
         userPage.getRecords().forEach(user -> user.setPassword(null));
         return Result.success(userPage);

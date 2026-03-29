@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysRoleMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
+import com.cdiom.backend.model.AdminContactInfo;
 import com.cdiom.backend.model.LoginLog;
 import com.cdiom.backend.model.SysRole;
 import com.cdiom.backend.model.SysUser;
@@ -354,6 +355,7 @@ public class AuthServiceImpl implements AuthService {
         // 9. 生成JWT Token
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), roleCode);
         user.setPassword(null); // 清除密码信息
+        fillRoleName(user);
 
         return new Object[]{token, user};
     }
@@ -440,10 +442,18 @@ public class AuthServiceImpl implements AuthService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void resetUserFailStatus(SysUser user) {
-        user.setLoginFailCount(0);          // 失败次数归0
-        user.setLastLoginFailTime(null);   // 清空最后失败时间
-        user.setLockTime(null);            // 清空锁定时间
-        sysUserMapper.updateById(user);
+        user.setLoginFailCount(0);
+        user.setLastLoginFailTime(null);
+        user.setLockTime(null);
+        // 与 unlockUser 相同：updateById 不会把 null 写入库，必须用 Wrapper 显式置 NULL
+        LocalDateTime now = LocalDateTime.now();
+        LambdaUpdateWrapper<SysUser> uw = new LambdaUpdateWrapper<>();
+        uw.eq(SysUser::getId, user.getId())
+                .set(SysUser::getLoginFailCount, 0)
+                .set(SysUser::getLastLoginFailTime, null)
+                .set(SysUser::getLockTime, null)
+                .set(SysUser::getUpdateTime, now);
+        sysUserMapper.update(null, uw);
     }
 
     @Override
@@ -453,7 +463,47 @@ public class AuthServiceImpl implements AuthService {
             return null;
         }
         Long userId = (Long) authentication.getPrincipal();
-        return sysUserMapper.selectById(userId);
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user != null) {
+            fillRoleName(user);
+        }
+        return user;
+    }
+
+    @Override
+    public Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long)) {
+            return null;
+        }
+        return (Long) authentication.getPrincipal();
+    }
+
+    @Override
+    public AdminContactInfo getAdminContactForUsers() {
+        LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
+        w.eq(SysUser::getRoleId, 1L)
+                .eq(SysUser::getStatus, 1)
+                .orderByAsc(SysUser::getId)
+                .last("LIMIT 1");
+        SysUser admin = sysUserMapper.selectOne(w);
+        AdminContactInfo info = new AdminContactInfo();
+        if (admin != null) {
+            info.setAdminUsername(admin.getUsername());
+            info.setPhone(admin.getPhone());
+            info.setEmail(admin.getEmail());
+        }
+        return info;
+    }
+
+    private void fillRoleName(SysUser user) {
+        if (user == null || user.getRoleId() == null) {
+            return;
+        }
+        SysRole role = sysRoleMapper.selectById(user.getRoleId());
+        if (role != null) {
+            user.setRoleName(role.getRoleName());
+        }
     }
 
     @Override

@@ -46,6 +46,12 @@ public class SysUser {
     private Long roleId;
 
     /**
+     * 角色名称（非表字段，登录/当前用户接口填充）
+     */
+    @TableField(exist = false)
+    private String roleName;
+
+    /**
      * 状态：0-禁用/1-正常
      */
     private Integer status;

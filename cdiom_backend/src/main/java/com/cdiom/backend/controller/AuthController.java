@@ -1,6 +1,7 @@
 package com.cdiom.backend.controller;
 
 import com.cdiom.backend.common.Result;
+import com.cdiom.backend.model.AdminContactInfo;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.PermissionService;
@@ -88,6 +89,18 @@ public class AuthController {
         }
         Set<String> permissions = permissionService.getPermissionCodesByUserId(user.getId());
         return Result.success(permissions);
+    }
+
+    /**
+     * 系统管理员联系信息（用于个人中心提示：申请修改资料时联系谁）
+     */
+    @GetMapping("/admin-contact")
+    public Result<AdminContactInfo> getAdminContactForProfile() {
+        SysUser user = authService.getCurrentUser();
+        if (user == null) {
+            return Result.error(401, "未登录");
+        }
+        return Result.success(authService.getAdminContactForUsers());
     }
 
     /**

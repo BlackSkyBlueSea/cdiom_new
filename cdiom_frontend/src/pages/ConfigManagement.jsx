@@ -1,7 +1,41 @@
-import { useState, useEffect } from 'react'
-import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip } from 'antd'
+import { useState, useEffect, useCallback } from 'react'
+import { Table, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Tooltip, Spin } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import request from '../utils/request'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
+
+/** 按 configKey 映射 runtime-effective 接口字段，与后端统一 */
+function formatRuntimeEffectiveForKey(configKey, r, loading) {
+  if (loading && !r) return <Spin size="small" />
+  if (!r) return '—'
+  switch (configKey) {
+    case 'expiry_warning_days':
+      return r.expiryWarningDays != null ? `${r.expiryWarningDays} 天` : '—'
+    case 'expiry_critical_days':
+      return r.expiryCriticalDays != null ? `${r.expiryCriticalDays} 天` : '—'
+    case 'log_retention_years':
+      return r.logRetentionYears != null ? `${r.logRetentionYears} 年` : '—'
+    case 'jwt_expiration': {
+      const ms = r.jwtExpirationMs != null ? Number(r.jwtExpirationMs) : NaN
+      if (!Number.isFinite(ms)) return '—'
+      return `${ms} ms（约 ${(ms / 3600000).toFixed(2)} 小时）`
+    }
+    case 'login.fail.threshold':
+      return r.loginFailThreshold != null ? `${r.loginFailThreshold} 次` : '—'
+    case 'login.fail.time.window':
+      return r.loginFailTimeWindowMinutes != null ? `${r.loginFailTimeWindowMinutes} 分钟` : '—'
+    case 'login.lock.duration':
+      return r.loginLockDurationHours != null ? `${r.loginLockDurationHours} 小时` : '—'
+    default:
+      return '—'
+  }
+}
 
 const ConfigManagement = () => {
   const [configs, setConfigs] = useState([])
@@ -14,10 +48,31 @@ const ConfigManagement = () => {
     pageSize: 10,
     total: 0,
   })
+  /** 与后端各模块运行时一致（表保存后刷新；JWT 等对非法值有回退） */
+  const [runtimeEffective, setRuntimeEffective] = useState(null)
+  const [runtimeLoading, setRuntimeLoading] = useState(false)
+
+  const fetchRuntimeEffective = useCallback(async () => {
+    setRuntimeLoading(true)
+    try {
+      const res = await request.get('/configs/runtime-effective')
+      if (res.code === 200) {
+        setRuntimeEffective(res.data || null)
+      }
+    } catch {
+      setRuntimeEffective(null)
+    } finally {
+      setRuntimeLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     fetchConfigs()
   }, [pagination.current, pagination.pageSize])
+
+  useEffect(() => {
+    fetchRuntimeEffective()
+  }, [fetchRuntimeEffective])
 
   const fetchConfigs = async () => {
     setLoading(true)
@@ -59,6 +114,7 @@ const ConfigManagement = () => {
       await request.delete(`/configs/${id}`)
       message.success('删除成功')
       fetchConfigs()
+      fetchRuntimeEffective()
     } catch (error) {
       message.error('删除失败')
     }
@@ -76,6 +132,7 @@ const ConfigManagement = () => {
       }
       setModalVisible(false)
       fetchConfigs()
+      fetchRuntimeEffective()
     } catch (error) {
       if (error.errorFields) {
         return
@@ -113,6 +170,21 @@ const ConfigManagement = () => {
       key: 'configValue',
       width: 200,
       ellipsis: true,
+    },
+    {
+      title: (
+        <Tooltip title="后端各模块实际使用的值；与「参数值」不一致时多为 JWT 非法回退、日志保留年上下限等规则导致">
+          <span style={{ whiteSpace: 'nowrap' }}>当前业务生效</span>
+        </Tooltip>
+      ),
+      key: 'runtimeEffective',
+      width: 220,
+      ellipsis: true,
+      render: (_, record) => (
+        <span style={{ fontSize: 13 }}>
+          {formatRuntimeEffectiveForKey(record.configKey, runtimeEffective, runtimeLoading)}
+        </span>
+      ),
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>参数类型</span>,
@@ -156,27 +228,42 @@ const ConfigManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>参数配置</h2>
-        <Tooltip title="新增配置">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
-        </Tooltip>
+    <div style={pageRootStyle}>
+      <div style={{ ...toolbarRowCompactStyle, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+          <h2 style={toolbarPageTitleStyle}>参数配置</h2>
+          <div style={{ marginTop: 6, fontSize: 13, color: '#666' }}>
+            「当前业务生效」列与后端运行时一致；未映射的键名显示「—」。JWT 表值超范围时将回退为配置文件默认值。
+          </div>
+        </div>
+        <Space style={{ flexShrink: 0 }}>
+          <Tooltip title="重新拉取各键运行时生效值">
+            <Button onClick={fetchRuntimeEffective} loading={runtimeLoading}>
+              刷新生效参数
+            </Button>
+          </Tooltip>
+          <Tooltip title="新增配置">
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
+          </Tooltip>
+        </Space>
       </div>
-      <Table
-        columns={columns}
-        dataSource={configs}
-        loading={loading}
-        rowKey="id"
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize })
-          },
-        }}
-      />
+
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={configs}
+          loading={loading}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize })
+            },
+          }}
+        />
+      </div>
       <Modal
         title={editingConfig ? '编辑配置' : '新增配置'}
         open={modalVisible}

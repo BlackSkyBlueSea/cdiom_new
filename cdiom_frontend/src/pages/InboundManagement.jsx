@@ -5,9 +5,46 @@ import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowStyle,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
+
+/** 入库筛选区 placeholder 文案（宽度按字数对齐） */
+const INBOUND_PH_SEARCH = '搜索入库单号、批次号、药品名称'
+const INBOUND_PH_STATUS = '验收状态'
+const INBOUND_PH_EXPIRY = '效期校验'
+const INBOUND_PH_RANGE = ['开始日期', '结束日期']
+
+/** 默认 14px 字号下，中文约一字宽 14px；extra 含左右 padding、边框、清除/下拉/日历图标区 */
+const INBOUND_CHAR_PX = 14
+const fitW = (text, extra) => `${[...text].length * INBOUND_CHAR_PX + extra}px`
+/**
+ * RangePicker 为左右两段独立输入，每段需单独容纳 placeholder，否则会省略为「开始日…」。
+ * perSegPad：每段除文字外的内边距与光标区；middlePad：中间分隔与右侧日历图标区。
+ */
+const fitRangeW = (a, b, perSegPad = 38, middlePad = 38) => {
+  const seg = (t) => [...t].length * INBOUND_CHAR_PX + perSegPad
+  return `${seg(a) + seg(b) + middlePad}px`
+}
+
+const inboundSearchWrap = { flex: '0 0 auto', width: fitW(INBOUND_PH_SEARCH, 48) }
+const inboundStatusWrap = { flex: '0 0 auto', width: fitW(INBOUND_PH_STATUS, 52) }
+const inboundExpiryWrap = { flex: '0 0 auto', width: fitW(INBOUND_PH_EXPIRY, 52) }
+const inboundRangePickerWidth = fitRangeW(INBOUND_PH_RANGE[0], INBOUND_PH_RANGE[1])
+const inboundRangeWrap = {
+  flex: '0 0 auto',
+  flexShrink: 0,
+  width: inboundRangePickerWidth,
+  minWidth: inboundRangePickerWidth,
+}
 
 const InboundManagement = () => {
   const [inboundRecords, setInboundRecords] = useState([])
@@ -21,7 +58,6 @@ const InboundManagement = () => {
     keyword: '',
     orderId: undefined,
     drugId: undefined,
-    batchNumber: '',
     operatorId: undefined,
     startDate: undefined,
     endDate: undefined,
@@ -78,7 +114,6 @@ const InboundManagement = () => {
         keyword: filters.keyword || undefined,
         orderId: filters.orderId,
         drugId: filters.drugId,
-        batchNumber: filters.batchNumber || undefined,
         operatorId: filters.operatorId,
         startDate: filters.startDate ? filters.startDate.format('YYYY-MM-DD') : undefined,
         endDate: filters.endDate ? filters.endDate.format('YYYY-MM-DD') : undefined,
@@ -116,7 +151,6 @@ const InboundManagement = () => {
       keyword: '',
       orderId: undefined,
       drugId: undefined,
-      batchNumber: '',
       operatorId: undefined,
       startDate: undefined,
       endDate: undefined,
@@ -412,109 +446,115 @@ const InboundManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>入库管理</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索入库单号、药品名称"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Input
-            placeholder="批次号"
-            value={filters.batchNumber}
-            onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
-            style={{ width: 150 }}
-            allowClear
-          />
-          <Select
-            placeholder="验收状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="QUALIFIED">合格</Select.Option>
-            <Select.Option value="UNQUALIFIED">不合格</Select.Option>
-          </Select>
-          <Select
-            placeholder="效期校验"
-            value={filters.expiryCheckStatus}
-            onChange={(value) => setFilters({ ...filters, expiryCheckStatus: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="PASS">通过</Select.Option>
-            <Select.Option value="WARNING">警告</Select.Option>
-            <Select.Option value="FORCE">强制入库</Select.Option>
-          </Select>
-          <RangePicker
-            placeholder={['开始日期', '结束日期']}
-            value={filters.startDate && filters.endDate 
-              ? [filters.startDate, filters.endDate] 
-              : null}
-            onChange={(dates) => {
-              setFilters({
-                ...filters,
-                startDate: dates ? dates[0] : undefined,
-                endDate: dates ? dates[1] : undefined,
-              })
-            }}
-          />
-          <Tooltip title="查询">
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchInboundRecords}
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>入库管理</h2>
+        <div style={compactFilterRowStyle}>
+          <div style={inboundSearchWrap}>
+            <Input
+              placeholder={INBOUND_PH_SEARCH}
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-          <Tooltip title="重置">
-            <Button icon={<ReloadOutlined />} onClick={handleReset} />
-          </Tooltip>
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Tooltip title="采购订单入库">
+          </div>
+          <div style={inboundStatusWrap}>
+            <Select
+              placeholder={INBOUND_PH_STATUS}
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="QUALIFIED">合格</Select.Option>
+              <Select.Option value="UNQUALIFIED">不合格</Select.Option>
+            </Select>
+          </div>
+          <div style={inboundExpiryWrap}>
+            <Select
+              placeholder={INBOUND_PH_EXPIRY}
+              value={filters.expiryCheckStatus}
+              onChange={(value) => setFilters({ ...filters, expiryCheckStatus: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="PASS">通过</Select.Option>
+              <Select.Option value="WARNING">警告</Select.Option>
+              <Select.Option value="FORCE">强制入库</Select.Option>
+            </Select>
+          </div>
+          <div style={inboundRangeWrap}>
+            <RangePicker
+              placeholder={INBOUND_PH_RANGE}
+              value={filters.startDate && filters.endDate
+                ? [filters.startDate, filters.endDate]
+                : null}
+              onChange={(dates) => {
+                setFilters({
+                  ...filters,
+                  startDate: dates ? dates[0] : undefined,
+                  endDate: dates ? dates[1] : undefined,
+                })
+              }}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="查询">
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  setInboundType('order')
-                }}
+                icon={<SearchOutlined />}
+                onClick={fetchInboundRecords}
               />
             </Tooltip>
-          )}
-          {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Tooltip title="临时入库">
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setModalVisible(true)
-                  setInboundType('temporary')
-                }}
-              />
+            <Tooltip title="重置">
+              <Button icon={<ReloadOutlined />} onClick={handleReset} />
             </Tooltip>
-          )}
-        </Space>
+            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+              <Tooltip title="采购订单入库">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setModalVisible(true)
+                    setInboundType('order')
+                  }}
+                />
+              </Tooltip>
+            )}
+            {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
+              <Tooltip title="临时入库">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setModalVisible(true)
+                    setInboundType('temporary')
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Space>
+        </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={inboundRecords}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        onChange={handleTableChange}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={inboundRecords}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
 
       <Modal
         title={inboundType === 'order' ? '采购订单入库' : '临时入库'}

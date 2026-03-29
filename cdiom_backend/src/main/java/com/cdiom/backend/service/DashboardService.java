@@ -1,5 +1,8 @@
 package com.cdiom.backend.service;
 
+import com.cdiom.backend.model.Inventory;
+
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +32,13 @@ public interface DashboardService {
      * 包括：近效期预警、待办任务、今日出入库统计、库存总量
      */
     Map<String, Object> getWarehouseDashboard();
+
+    /**
+     * 仓库管理员仪表盘：近效期预警明细（按区间：红色 ≤ 严重预警天数，黄色为两区间之间）
+     *
+     * @param level red 或 yellow
+     */
+    List<Inventory> getWarehouseNearExpiryDetails(String level);
 
     /**
      * 获取采购专员仪表盘数据

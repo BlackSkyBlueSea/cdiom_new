@@ -6,6 +6,15 @@ import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, fetchUserPermissions } from '../utils/permission'
 import { getUserRoleId, getUser } from '../utils/auth'
+import {
+  pageRootStyle,
+  tableAreaStyle,
+  toolbarRowCompactStyle,
+  toolbarPageTitleStyle,
+  compactFilterRowStyle,
+  filterCellFlex,
+  TABLE_SCROLL_Y,
+} from '../utils/tablePageLayout'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
@@ -624,91 +633,104 @@ const OutboundManagement = () => {
   ]
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>出库管理</h2>
-        <Space wrap>
-          <Input
-            placeholder="搜索申领单号、申请人"
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Input
-            placeholder="所属科室"
-            value={filters.department}
-            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-            style={{ width: 150 }}
-            allowClear
-          />
-          <Select
-            placeholder="申请状态"
-            value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
-            style={{ width: 120 }}
-            allowClear
-          >
-            <Select.Option value="PENDING">待审批</Select.Option>
-            <Select.Option value="APPROVED">已通过</Select.Option>
-            <Select.Option value="REJECTED">已驳回</Select.Option>
-            <Select.Option value="OUTBOUND">已出库</Select.Option>
-            <Select.Option value="CANCELLED">已取消</Select.Option>
-          </Select>
-          <RangePicker
-            placeholder={['开始日期', '结束日期']}
-            value={filters.startDate && filters.endDate 
-              ? [filters.startDate, filters.endDate] 
-              : null}
-            onChange={(dates) => {
-              setFilters({
-                ...filters,
-                startDate: dates ? dates[0] : undefined,
-                endDate: dates ? dates[1] : undefined,
-              })
-            }}
-          />
-          <Tooltip title="查询">
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={fetchOutboundApplies}
+    <div style={pageRootStyle}>
+      <div style={toolbarRowCompactStyle}>
+        <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>出库管理</h2>
+        <div style={compactFilterRowStyle}>
+          <div style={filterCellFlex('1.15 1 80px', 80, 220)}>
+            <Input
+              placeholder="搜索申领单号、申请人"
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
             />
-          </Tooltip>
-          <Tooltip title="重置">
-            <Button icon={<ReloadOutlined />} onClick={handleReset} />
-          </Tooltip>
-          {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
-            <Tooltip title="新建出库申请">
+          </div>
+          <div style={filterCellFlex('0.9 1 56px', 56, 140)}>
+            <Input
+              placeholder="所属科室"
+              value={filters.department}
+              onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </div>
+          <div style={{ flex: '0 0 auto', width: 120, minWidth: 112 }}>
+            <Select
+              placeholder="申请状态"
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="PENDING">待审批</Select.Option>
+              <Select.Option value="APPROVED">已通过</Select.Option>
+              <Select.Option value="REJECTED">已驳回</Select.Option>
+              <Select.Option value="OUTBOUND">已出库</Select.Option>
+              <Select.Option value="CANCELLED">已取消</Select.Option>
+            </Select>
+          </div>
+          <div style={filterCellFlex('1.1 1 200px', 180, 320)}>
+            <RangePicker
+              placeholder={['开始日期', '结束日期']}
+              value={filters.startDate && filters.endDate
+                ? [filters.startDate, filters.endDate]
+                : null}
+              onChange={(dates) => {
+                setFilters({
+                  ...filters,
+                  startDate: dates ? dates[0] : undefined,
+                  endDate: dates ? dates[1] : undefined,
+                })
+              }}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="查询">
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
-                onClick={async () => {
-                  await fetchDepartmentOptions()
-                  setModalVisible(true)
-                  form.resetFields()
-                  setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
-                }}
+                icon={<SearchOutlined />}
+                onClick={fetchOutboundApplies}
               />
             </Tooltip>
-          )}
-        </Space>
+            <Tooltip title="重置">
+              <Button icon={<ReloadOutlined />} onClick={handleReset} />
+            </Tooltip>
+            {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
+              <Tooltip title="新建出库申请">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={async () => {
+                    await fetchDepartmentOptions()
+                    setModalVisible(true)
+                    form.resetFields()
+                    setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Space>
+        </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={outboundApplies}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        scroll={{ x: 'max-content' }}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        onChange={handleTableChange}
-      />
+      <div style={tableAreaStyle}>
+        <Table
+          columns={columns}
+          dataSource={outboundApplies}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          scroll={{ x: 'max-content', y: TABLE_SCROLL_Y }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          onChange={handleTableChange}
+        />
+      </div>
 
       {/* 新建出库申请模态框 */}
       <Modal

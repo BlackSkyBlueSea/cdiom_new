@@ -36,4 +36,22 @@
         ORDER BY i.expiry_date ASC, i.create_time DESC
     </select>
 
+    <select id="selectNearExpiryDetailsWithJoin" resultType="com.cdiom.backend.model.Inventory">
+        SELECT
+            i.*,
+            d.drug_name AS drugName
+        FROM inventory i
+        INNER JOIN drug_info d ON i.drug_id = d.id
+        WHERE i.quantity &gt; 0 AND d.deleted = 0
+        <choose>
+            <when test="level == 'red'">
+                AND i.expiry_date &gt;= #{today} AND i.expiry_date &lt;= #{redBoundary}
+            </when>
+            <when test="level == 'yellow'">
+                AND i.expiry_date &gt; #{redBoundary} AND i.expiry_date &lt;= #{yellowBoundary}
+            </when>
+        </choose>
+        ORDER BY i.expiry_date ASC, i.batch_number ASC
+    </select>
+
 </mapper>

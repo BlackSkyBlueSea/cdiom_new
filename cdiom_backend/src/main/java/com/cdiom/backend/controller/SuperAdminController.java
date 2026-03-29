@@ -171,6 +171,10 @@ public class SuperAdminController {
                 return Result.error("超级管理员用户不存在");
             }
 
+            if (currentUser.getId().equals(superAdmin.getId())) {
+                return Result.error("不能停用自己的超级管理员账号，请使用其他具备用户管理权限的账号操作");
+            }
+
             // 验证邮箱必须是当前登录用户绑定的邮箱
             if (currentUser.getEmail() == null || currentUser.getEmail().trim().isEmpty()) {
                 return Result.error("当前用户账户未绑定邮箱，请先在个人设置中绑定邮箱地址");
@@ -185,9 +189,6 @@ public class SuperAdminController {
                 return Result.error("验证码错误或已过期");
             }
 
-            // 检查当前登录用户是否是超级管理员
-            boolean isCurrentUser = superAdminUsername.equals(currentUser.getUsername());
-
             // 停用用户
             superAdmin.setStatus(0);
             sysUserService.updateUser(superAdmin);
@@ -200,7 +201,7 @@ public class SuperAdminController {
                     currentUser,
                     "用户管理",
                     "UPDATE",
-                    "停用超级管理员账户" + (isCurrentUser ? "（当前登录用户）" : ""),
+                    "停用超级管理员账户",
                     httpRequest,
                     request,
                     true,
@@ -208,12 +209,11 @@ public class SuperAdminController {
             );
             operationLogService.saveLog(operationLog);
 
-            log.info("超级管理员已停用，操作人: {}, 操作邮箱: {}, 是否当前用户: {}", 
-                    currentUser.getUsername(), request.getEmail(), isCurrentUser);
+            log.info("超级管理员已停用，操作人: {}, 操作邮箱: {}", currentUser.getUsername(), request.getEmail());
 
-            // 返回响应，包含是否当前用户被禁用的标识
+            // 已禁止当前超级管理员停用自己，成功时操作人必为其他账号
             DisableResponse response = new DisableResponse();
-            response.setCurrentUserDisabled(isCurrentUser);
+            response.setCurrentUserDisabled(false);
             return Result.success("超级管理员已停用", response);
         } catch (Exception e) {
             log.error("停用超级管理员失败", e);

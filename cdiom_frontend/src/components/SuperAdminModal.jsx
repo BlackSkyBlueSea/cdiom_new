@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Button, message, Space, Tag, Alert } from 'antd'
 import { MailOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
 import request from '../utils/request'
 import logger from '../utils/logger'
-import { getUser, removeToken } from '../utils/auth'
+import { getUser } from '../utils/auth'
 import dayjs from 'dayjs'
 
 const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
@@ -13,7 +12,10 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
   const [sendingCode, setSendingCode] = useState(false)
   const [status, setStatus] = useState(null)
   const [countdown, setCountdown] = useState(0)
-  const navigate = useNavigate()
+  const isLoggedInSuperAdmin = () => {
+    const u = getUser()
+    return !!(u && (u.username === 'super_admin' || u.roleId === 6))
+  }
 
   // 隐藏邮箱中间部分，只显示前3个字符和@后面的部分
   const maskEmail = (email) => {
@@ -124,28 +126,11 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
         code: values.code,
       })
       if (res.code === 200) {
-        // 检查是否是当前登录用户被禁用
-        const currentUser = getUser()
-        const isCurrentUser = currentUser && 
-                            (currentUser.username === 'super_admin' || currentUser.roleId === 6)
-        
-        // 如果后端返回标识，或者前端判断是当前用户，则自动退出登录
-        if (res.data?.currentUserDisabled || isCurrentUser) {
-          message.success('超级管理员已停用，您将被退出登录')
-          // 清除token和用户信息
-          removeToken()
-          // 延迟跳转，让用户看到提示信息
-          setTimeout(() => {
-            navigate('/')
-            window.location.reload() // 刷新页面确保完全清除状态
-          }, 1000)
-        } else {
-          message.success('超级管理员已停用')
-          form.resetFields()
-          setCountdown(0)
-          fetchStatus()
-          onSuccess?.()
-        }
+        message.success('超级管理员已停用')
+        form.resetFields()
+        setCountdown(0)
+        fetchStatus()
+        onSuccess?.()
       } else {
         message.error(res.msg || '停用失败')
       }
@@ -206,6 +191,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
             <div>
               <p>• 超级管理员（super_admin）拥有所有系统功能和业务功能的权限，主要用于系统测试和维护。</p>
               <p>• 系统投入使用后应停用该用户，后期维护更新测试时可以重新启用。</p>
+              <p>• 停用超级管理员须由<strong>其他</strong>具备用户管理权限的账号操作；当前超级管理员账号不能停用自己。</p>
               <p>• 启用/停用操作需要通过邮箱验证码验证，<strong>必须使用当前登录、执行该操作的用户的邮箱</strong>。</p>
               <p>• 验证码将发送到您输入的邮箱地址，验证码有效期为5分钟，请及时使用。</p>
             </div>
@@ -213,6 +199,15 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
           type="info"
           showIcon
         />
+
+        {status?.status === 1 && isLoggedInSuperAdmin() && (
+          <Alert
+            message="无法停用自己"
+            description="您正以超级管理员身份登录，不能在此处停用自己的账号。请使用其他具备用户管理权限的管理员账号登录后操作。"
+            type="warning"
+            showIcon
+          />
+        )}
 
         {/* 操作表单 */}
         <Form
@@ -282,6 +277,7 @@ const SuperAdminModal = ({ open, onCancel, onSuccess }) => {
                 htmlType="submit"
                 loading={loading}
                 danger={status?.status === 1}
+                disabled={status?.status === 1 && isLoggedInSuperAdmin()}
               >
                 {status?.status === 1 ? '停用超级管理员' : '启用超级管理员'}
               </Button>

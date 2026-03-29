@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, List, Button, Alert, Tooltip } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Spin, Empty, List, Button, Alert, Tooltip, Popover } from 'antd'
 import { 
   UserOutlined, 
   TeamOutlined, 
@@ -30,6 +30,116 @@ import { getUserRoleId } from '../utils/auth'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import './Dashboard.css'
+import { TABLE_SCROLL_Y_EMBEDDED } from '../utils/tablePageLayout'
+
+/** 根据后端返回的预警天数生成标题；配置无效时退回「按系统预警设置」 */
+function getNearExpiryLabels(criticalDays, warningDays) {
+  const c = Number(criticalDays)
+  const w = Number(warningDays)
+  const valid = Number.isFinite(c) && Number.isFinite(w) && c >= 0 && w >= 0 && w > c
+  if (!valid) {
+    return {
+      yellowStat: '近效期预警（按系统预警设置）',
+      redStat: '近效期预警（按系统预警设置）',
+      yellowPopover: '黄色预警明细（按系统预警设置）',
+      redPopover: '红色预警明细（按系统预警设置）',
+      redAlertLine: (n) =>
+        `紧急：${n} 个批次处于红色预警区间（按系统预警设置），请立即处理！`,
+      yellowAlertLine: (n) =>
+        `注意：${n} 个批次处于黄色预警区间（按系统预警设置），请关注处理。`,
+    }
+  }
+  const yLow = c + 1
+  return {
+    yellowStat: `近效期预警（${yLow}～${w}天）`,
+    redStat: `近效期预警（≤${c}天）`,
+    yellowPopover: `黄色预警明细（${yLow}～${w}天）`,
+    redPopover: `红色预警明细（≤${c}天）`,
+    redAlertLine: (n) => `紧急：${n} 个批次有效期≤${c}天，请立即处理！`,
+    yellowAlertLine: (n) => `注意：${n} 个批次有效期在${yLow}～${w}天，请关注处理。`,
+  }
+}
+
+const nearExpiryDetailColumns = [
+  { title: '药品名称', dataIndex: 'drugName', key: 'drugName', ellipsis: true, width: 130 },
+  { title: '批次号', dataIndex: 'batchNumber', key: 'batchNumber', width: 108 },
+  {
+    title: '有效期至',
+    dataIndex: 'expiryDate',
+    key: 'expiryDate',
+    width: 102,
+    render: (d) => (d ? dayjs(d).format('YYYY-MM-DD') : '-'),
+  },
+  {
+    title: '剩余(天)',
+    key: 'daysLeft',
+    width: 76,
+    render: (_, r) =>
+      r.expiryDate != null ? dayjs(r.expiryDate).diff(dayjs(), 'day') : '-',
+  },
+  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 56 },
+  { title: '存储位置', dataIndex: 'storageLocation', key: 'storageLocation', ellipsis: true, width: 96 },
+]
+
+/** 仓库仪表盘近效期卡片：悬停或点击展示批次明细 */
+function WarehouseNearExpiryCard({ level, title, popoverTitle, value, valueStyle, subtitle }) {
+  const [loading, setLoading] = useState(false)
+  const [rows, setRows] = useState([])
+
+  const loadDetails = () => {
+    setLoading(true)
+    request
+      .get('/dashboard/warehouse/near-expiry-details', { params: { level } })
+      .then((res) => {
+        if (res.code === 200) setRows(res.data || [])
+        else setRows([])
+      })
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false))
+  }
+
+  return (
+    <Popover
+      title={popoverTitle}
+      trigger={['hover', 'click']}
+      onOpenChange={(open) => {
+        if (open) loadDetails()
+      }}
+      placement="bottomLeft"
+      overlayStyle={{ maxWidth: 580 }}
+      content={
+        <div style={{ width: 520, maxHeight: 380, overflow: 'auto' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <Spin />
+            </div>
+          ) : rows.length === 0 ? (
+            <Empty description="暂无近效期批次" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <Table
+              size="small"
+              rowKey="id"
+              pagination={false}
+              columns={nearExpiryDetailColumns}
+              dataSource={rows}
+            />
+          )}
+        </div>
+      }
+    >
+      <Card style={{ cursor: 'pointer' }} styles={{ body: { minHeight: 120 } }}>
+        <Statistic
+          title={title}
+          value={value}
+          prefix={<WarningOutlined />}
+          valueStyle={valueStyle}
+        />
+        <div style={{ marginTop: '8px', fontSize: '12px', color: '#999' }}>{subtitle}</div>
+        <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>悬停或点击查看药品与批次</div>
+      </Card>
+    </Popover>
+  )
+}
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -43,6 +153,8 @@ const Dashboard = () => {
   // 仓库管理员专用数据
   const [warehouseStats, setWarehouseStats] = useState({
     nearExpiryWarning: { yellow: 0, red: 0 },
+    expiryWarningDays: 180,
+    expiryCriticalDays: 90,
     pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
     todayStats: { inbound: 0, outbound: 0 },
     totalInventory: 0,
@@ -96,6 +208,8 @@ const Dashboard = () => {
             const d = warehouseRes.data
             setWarehouseStats({
               nearExpiryWarning: { yellow: Number(d.nearExpiryWarning?.yellow ?? 0), red: Number(d.nearExpiryWarning?.red ?? 0) },
+              expiryWarningDays: Number(d.expiryWarningDays ?? 180),
+              expiryCriticalDays: Number(d.expiryCriticalDays ?? 90),
               pendingTasks: { pendingInbound: Number(d.pendingTasks?.pendingInbound ?? 0), pendingOutbound: Number(d.pendingTasks?.pendingOutbound ?? 0) },
               todayStats: { inbound: Number(d.todayStats?.inbound ?? 0), outbound: Number(d.todayStats?.outbound ?? 0) },
               totalInventory: Number(d.totalInventory ?? 0),
@@ -106,6 +220,8 @@ const Dashboard = () => {
           } else {
             setWarehouseStats({
               nearExpiryWarning: { yellow: 0, red: 0 },
+              expiryWarningDays: 180,
+              expiryCriticalDays: 90,
               pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
               todayStats: { inbound: 0, outbound: 0 },
               totalInventory: 0,
@@ -118,6 +234,8 @@ const Dashboard = () => {
           logger.warn('获取仓库管理员数据失败，使用默认数据:', error.message)
           setWarehouseStats({
             nearExpiryWarning: { yellow: 0, red: 0 },
+            expiryWarningDays: 180,
+            expiryCriticalDays: 90,
             pendingTasks: { pendingInbound: 0, pendingOutbound: 0 },
             todayStats: { inbound: 0, outbound: 0 },
             totalInventory: 0,
@@ -431,6 +549,10 @@ const Dashboard = () => {
 
   // 仓库管理员专用仪表盘
   if (roleId === 2) {
+    const nearExpiryLbl = getNearExpiryLabels(
+      warehouseStats.expiryCriticalDays,
+      warehouseStats.expiryWarningDays
+    )
     return (
       <div>
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
@@ -448,30 +570,24 @@ const Dashboard = () => {
           className="warehouse-stats-row"
         >
           <Col xs={24} sm={12} md={24} lg={24} xl={24} style={{ flex: '1 1 0', minWidth: '180px' }}>
-            <Card>
-              <Statistic
-                title="近效期预警（90-180天）"
-                value={warehouseStats.nearExpiryWarning?.yellow ?? 0}
-                prefix={<WarningOutlined />}
-                valueStyle={{ color: '#faad14' }}
-              />
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#999' }}>
-                黄色预警
-              </div>
-            </Card>
+            <WarehouseNearExpiryCard
+              level="yellow"
+              title={nearExpiryLbl.yellowStat}
+              popoverTitle={nearExpiryLbl.yellowPopover}
+              value={warehouseStats.nearExpiryWarning?.yellow ?? 0}
+              valueStyle={{ color: '#faad14' }}
+              subtitle="黄色预警"
+            />
           </Col>
           <Col xs={24} sm={12} md={24} lg={24} xl={24} style={{ flex: '1 1 0', minWidth: '180px' }}>
-            <Card>
-              <Statistic
-                title="近效期预警（≤90天）"
-                value={warehouseStats.nearExpiryWarning?.red ?? 0}
-                prefix={<WarningOutlined />}
-                valueStyle={{ color: '#ff4d4f' }}
-              />
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#999' }}>
-                红色预警
-              </div>
-            </Card>
+            <WarehouseNearExpiryCard
+              level="red"
+              title={nearExpiryLbl.redStat}
+              popoverTitle={nearExpiryLbl.redPopover}
+              value={warehouseStats.nearExpiryWarning?.red ?? 0}
+              valueStyle={{ color: '#ff4d4f' }}
+              subtitle="红色预警"
+            />
           </Col>
           <Col xs={24} sm={12} md={24} lg={24} xl={24} style={{ flex: '1 1 0', minWidth: '180px' }}>
             <Card>
@@ -599,12 +715,12 @@ const Dashboard = () => {
               <div>
                 {(warehouseStats.nearExpiryWarning?.red ?? 0) > 0 && (
                   <div style={{ marginBottom: '8px' }}>
-                    <Tag color="red">紧急：{warehouseStats.nearExpiryWarning.red} 个批次有效期≤90天，请立即处理！</Tag>
+                    <Tag color="red">{nearExpiryLbl.redAlertLine(warehouseStats.nearExpiryWarning.red)}</Tag>
                   </div>
                 )}
                 {(warehouseStats.nearExpiryWarning?.yellow ?? 0) > 0 && (
                   <div>
-                    <Tag color="orange">注意：{warehouseStats.nearExpiryWarning.yellow} 个批次有效期90-180天，请关注处理。</Tag>
+                    <Tag color="orange">{nearExpiryLbl.yellowAlertLine(warehouseStats.nearExpiryWarning.yellow)}</Tag>
                   </div>
                 )}
               </div>
@@ -1176,7 +1292,7 @@ const Dashboard = () => {
             rowKey="id"
             pagination={false}
             size="middle"
-            scroll={{ x: 'max-content', y: 400 }}
+            scroll={{ x: 'max-content', y: TABLE_SCROLL_Y_EMBEDDED }}
           />
         </Card>
       )}
