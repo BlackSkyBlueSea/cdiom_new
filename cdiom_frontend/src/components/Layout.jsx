@@ -352,7 +352,7 @@ const Layout = () => {
           onCancel={() => setProfileOpen(false)}
           footer={null}
           width={560}
-          destroyOnClose
+          destroyOnHidden
         >
           <Spin spinning={profileLoading}>
             {profileDetail ? (

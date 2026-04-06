@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.DrugInfoMapper;
+import com.cdiom.backend.mapper.InventoryMapper;
 import com.cdiom.backend.mapper.OutboundApplyItemMapper;
 import com.cdiom.backend.mapper.OutboundApplyMapper;
 import com.cdiom.backend.mapper.SysRoleMapper;
@@ -27,8 +28,14 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 出库申请服务实现类
@@ -40,9 +47,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OutboundApplyServiceImpl implements OutboundApplyService {
 
+    /** 医护人员角色 ID（与 sys_role 初始化数据一致） */
+    private static final long MEDICAL_STAFF_ROLE_ID = 4L;
+
     private final OutboundApplyMapper outboundApplyMapper;
     private final OutboundApplyItemMapper outboundApplyItemMapper;
     private final DrugInfoMapper drugInfoMapper;
+    private final InventoryMapper inventoryMapper;
     private final InventoryService inventoryService;
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -97,6 +108,28 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
     }
 
     @Override
+    public List<Map<String, Object>> listDrugBatchesForApply(Long drugId) {
+        if (drugId == null) {
+            throw new ServiceException("药品ID不能为空");
+        }
+        DrugInfo drug = drugInfoMapper.selectById(drugId);
+        if (drug == null) {
+            throw new ServiceException("药品不存在");
+        }
+        Page<Inventory> page = inventoryService.getInventoryList(
+                1, 500, null, drugId, null, null, null, null, null);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Inventory inv : page.getRecords()) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("batchNumber", inv.getBatchNumber());
+            row.put("quantity", inv.getQuantity());
+            row.put("expiryDate", inv.getExpiryDate());
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    @Override
     public OutboundApply getOutboundApplyById(Long id) {
         OutboundApply apply = outboundApplyMapper.selectById(id);
         if (apply != null) {
@@ -129,6 +162,16 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 }
             }
         }
+        if (apply.getProxyRegistrarId() != null) {
+            SysUser proxy = sysUserMapper.selectById(apply.getProxyRegistrarId());
+            if (proxy != null) {
+                apply.setProxyRegistrarName(proxy.getUsername());
+                if (proxy.getRoleId() != null) {
+                    SysRole role = sysRoleMapper.selectById(proxy.getRoleId());
+                    apply.setProxyRegistrarRoleName(role != null ? role.getRoleName() : null);
+                }
+            }
+        }
     }
 
     @Override
@@ -158,6 +201,68 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             }
             throw new ServiceException("创建出库申请失败：" + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OutboundApply createOutboundApplyOnBehalf(Long proxyRegistrarId, Long applicantUserId, String department,
+            String purpose, String remark, List<Map<String, Object>> items) {
+        if (proxyRegistrarId == null) {
+            throw new ServiceException("无法识别代录人，请重新登录后重试");
+        }
+        if (applicantUserId == null) {
+            throw new ServiceException("请选择申领医护人员");
+        }
+        if (proxyRegistrarId.equals(applicantUserId)) {
+            throw new ServiceException("申领人与代录人不能为同一人");
+        }
+        SysUser applicant = sysUserMapper.selectById(applicantUserId);
+        if (applicant == null) {
+            throw new ServiceException("所选申领人不存在");
+        }
+        if (applicant.getStatus() == null || applicant.getStatus() != 1) {
+            throw new ServiceException("所选用户未启用，不能作为申领人");
+        }
+        if (applicant.getRoleId() == null || applicant.getRoleId() != MEDICAL_STAFF_ROLE_ID) {
+            throw new ServiceException("代录出库的申领人须为医护人员");
+        }
+        OutboundApply apply = new OutboundApply();
+        apply.setApplicantId(applicantUserId);
+        apply.setProxyRegistrarId(proxyRegistrarId);
+        apply.setDepartment(department);
+        apply.setPurpose(purpose);
+        apply.setRemark(remark);
+        OutboundApply created = createOutboundApply(apply, items);
+        log.info("代录出库申请：申领单号={}, 申领人ID={}, 代录人ID={}", created.getApplyNumber(), applicantUserId, proxyRegistrarId);
+        return created;
+    }
+
+    @Override
+    public List<Map<String, Object>> listMedicalApplicantsForProxy() {
+        LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
+        w.eq(SysUser::getRoleId, MEDICAL_STAFF_ROLE_ID);
+        w.eq(SysUser::getStatus, 1);
+        w.orderByAsc(SysUser::getUsername);
+        List<SysUser> list = sysUserMapper.selectList(w);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (SysUser u : list) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", u.getId());
+            row.put("username", u.getUsername());
+            SysRole role = u.getRoleId() != null ? sysRoleMapper.selectById(u.getRoleId()) : null;
+            row.put("roleName", role != null ? role.getRoleName() : null);
+            out.add(row);
+        }
+        return out;
+    }
+
+    @Override
+    public List<SysUser> listOutboundSecondApproverCandidates() {
+        List<SysUser> list = sysUserMapper.selectUsersWithOutboundApprovePermissions();
+        for (SysUser u : list) {
+            u.setPassword(null);
+        }
+        return list;
     }
 
     @Override
@@ -262,11 +367,15 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         }
         
         List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(id);
-        
-        // 执行出库
+        if (outboundItems.size() != items.size()) {
+            throw new ServiceException("出库明细条数与申请明细不一致，请刷新页面后重试");
+        }
+
+        // 执行出库（与申请明细按顺序一一对应，避免同一药品多行时错配）
         for (int i = 0; i < outboundItems.size(); i++) {
             Map<String, Object> outboundItem = outboundItems.get(i);
-            
+            OutboundApplyItem item = items.get(i);
+
             // 验证并转换 drugId
             Object drugIdObj = outboundItem.get("drugId");
             if (drugIdObj == null) {
@@ -279,8 +388,15 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 log.error("出库明细第{}项：药品ID类型转换失败，值={}, 错误={}", i + 1, drugIdObj, e.getMessage());
                 throw new ServiceException("出库明细第" + (i + 1) + "项：药品ID格式不正确");
             }
-            
-            String batchNumber = outboundItem.get("batchNumber") != null ? outboundItem.get("batchNumber").toString() : null;
+            if (!item.getDrugId().equals(drugId)) {
+                throw new ServiceException("出库明细第" + (i + 1) + "项与申请明细药品不一致，请刷新页面后重试");
+            }
+
+            String batchNumber = outboundItem.get("batchNumber") != null ? outboundItem.get("batchNumber").toString().trim() : null;
+            // 执行时未再次指定批次时，沿用申请人在申请明细中填写的批次号（否则会被误判为 FIFO）
+            if (!StringUtils.hasText(batchNumber)) {
+                batchNumber = item.getBatchNumber() != null ? item.getBatchNumber().trim() : null;
+            }
             
             // 验证并转换 actualQuantity
             Object actualQuantityObj = outboundItem.get("actualQuantity");
@@ -297,12 +413,6 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 log.error("出库明细第{}项：实际出库数量类型转换失败，值={}, 错误={}", i + 1, actualQuantityObj, e.getMessage());
                 throw new ServiceException("出库明细第" + (i + 1) + "项：实际出库数量格式不正确");
             }
-            
-            // 查找对应的申请明细
-            OutboundApplyItem item = items.stream()
-                    .filter(applyItem -> applyItem.getDrugId().equals(drugId))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("未找到对应的申请明细"));
             
             // 如果指定了批次，从指定批次出库
             if (StringUtils.hasText(batchNumber)) {
@@ -433,6 +543,213 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         return result;
     }
 
+    @Override
+    public Map<String, Object> getOutboundPickSummary(LocalDate date, String scope) {
+        String sc = StringUtils.hasText(scope) ? scope.trim() : "approve_day";
+        LocalDate day = date != null ? date : LocalDate.now();
+
+        LambdaQueryWrapper<OutboundApply> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OutboundApply::getStatus, "APPROVED");
+        if ("approve_day".equals(sc)) {
+            wrapper.ge(OutboundApply::getApproveTime, day.atStartOfDay());
+            wrapper.lt(OutboundApply::getApproveTime, day.plusDays(1).atStartOfDay());
+        } else if ("all_pending".equals(sc)) {
+            // 全部待执行（已通过、未出库）
+        } else {
+            throw new ServiceException("scope 参数无效，仅支持 approve_day 或 all_pending");
+        }
+        wrapper.orderByAsc(OutboundApply::getApproveTime).orderByAsc(OutboundApply::getId);
+        List<OutboundApply> applies = outboundApplyMapper.selectList(wrapper);
+
+        List<Map<String, Object>> pickLines = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("scope", sc);
+        result.put("date", day.toString());
+        result.put("applyCount", applies.size());
+        result.put("pickLines", pickLines);
+        result.put("warnings", warnings);
+
+        if (applies.isEmpty()) {
+            result.put("summary", new ArrayList<>());
+            return result;
+        }
+
+        Set<Long> drugIds = new HashSet<>();
+        for (OutboundApply a : applies) {
+            List<OutboundApplyItem> its = outboundApplyItemMapper.selectByApplyId(a.getId());
+            for (OutboundApplyItem it : its) {
+                if (it.getDrugId() != null) {
+                    drugIds.add(it.getDrugId());
+                }
+            }
+        }
+
+        Map<Long, List<SimBatch>> pool = new HashMap<>();
+        if (!drugIds.isEmpty()) {
+            LambdaQueryWrapper<Inventory> invW = new LambdaQueryWrapper<>();
+            invW.in(Inventory::getDrugId, drugIds);
+            invW.gt(Inventory::getQuantity, 0);
+            invW.ge(Inventory::getExpiryDate, LocalDate.now());
+            List<Inventory> invRows = inventoryMapper.selectList(invW);
+            for (Inventory inv : invRows) {
+                SimBatch sb = new SimBatch();
+                sb.batchNumber = inv.getBatchNumber();
+                sb.quantity = inv.getQuantity() != null ? inv.getQuantity() : 0;
+                sb.storageLocation = inv.getStorageLocation();
+                sb.expiryDate = inv.getExpiryDate();
+                pool.computeIfAbsent(inv.getDrugId(), k -> new ArrayList<>()).add(sb);
+            }
+            for (List<SimBatch> list : pool.values()) {
+                list.sort(Comparator
+                        .comparing((SimBatch b) -> b.expiryDate != null ? b.expiryDate : LocalDate.MAX)
+                        .thenComparing(b -> b.batchNumber != null ? b.batchNumber : ""));
+            }
+        }
+
+        for (OutboundApply apply : applies) {
+            fillApplicantAndApproverNames(apply);
+            List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(apply.getId());
+            for (OutboundApplyItem item : items) {
+                Long drugId = item.getDrugId();
+                int qty = item.getQuantity() != null ? item.getQuantity() : 0;
+                if (drugId == null || qty <= 0) {
+                    continue;
+                }
+                DrugInfo drug = drugInfoMapper.selectById(drugId);
+                String drugName = drug != null ? drug.getDrugName() : ("药品ID:" + drugId);
+                String spec = drug != null ? drug.getSpecification() : null;
+
+                String batchFromApply = item.getBatchNumber() != null ? item.getBatchNumber().trim() : null;
+                String batchNumber = StringUtils.hasText(batchFromApply) ? batchFromApply : null;
+
+                if (StringUtils.hasText(batchNumber)) {
+                    SimBatch match = findSimBatch(pool.get(drugId), batchNumber);
+                    if (match == null || match.quantity <= 0) {
+                        warnings.add(String.format("申领单 %s：药品「%s」指定批次 %s 当前无可用量，将按先到期先出（FIFO）尝试",
+                                apply.getApplyNumber(), drugName, batchNumber));
+                        allocateFifoLines(apply, drugId, drugName, spec, qty, pool, pickLines, warnings);
+                        continue;
+                    }
+                    int take = Math.min(qty, match.quantity);
+                    match.quantity -= take;
+                    pickLines.add(buildPickLine(apply, drugId, drugName, spec, match.batchNumber,
+                            match.storageLocation, match.expiryDate, take));
+                    if (take < qty) {
+                        warnings.add(String.format("申领单 %s：药品「%s」批次 %s 仅满足 %d/%d，余量按 FIFO",
+                                apply.getApplyNumber(), drugName, batchNumber, take, qty));
+                        allocateFifoLines(apply, drugId, drugName, spec, qty - take, pool, pickLines, warnings);
+                    }
+                } else {
+                    allocateFifoLines(apply, drugId, drugName, spec, qty, pool, pickLines, warnings);
+                }
+            }
+        }
+
+        Map<String, Map<String, Object>> summaryMap = new LinkedHashMap<>();
+        for (Map<String, Object> line : pickLines) {
+            Long drugId = (Long) line.get("drugId");
+            String bn = line.get("batchNumber") != null ? line.get("batchNumber").toString() : "";
+            String loc = line.get("storageLocation") != null ? line.get("storageLocation").toString() : "";
+            String key = drugId + "\0" + bn + "\0" + loc;
+            int q = (Integer) line.get("quantity");
+            summaryMap.compute(key, (k, existing) -> {
+                if (existing == null) {
+                    Map<String, Object> s = new LinkedHashMap<>();
+                    s.put("drugId", line.get("drugId"));
+                    s.put("drugName", line.get("drugName"));
+                    s.put("specification", line.get("specification"));
+                    s.put("batchNumber", line.get("batchNumber"));
+                    s.put("storageLocation", line.get("storageLocation"));
+                    s.put("expiryDate", line.get("expiryDate"));
+                    s.put("quantity", q);
+                    return s;
+                }
+                existing.put("quantity", (Integer) existing.get("quantity") + q);
+                return existing;
+            });
+        }
+
+        List<Map<String, Object>> summary = new ArrayList<>(summaryMap.values());
+        summary.sort(Comparator
+                .comparing((Map<String, Object> m) -> String.valueOf(m.getOrDefault("storageLocation", "")))
+                .thenComparing(m -> String.valueOf(m.getOrDefault("drugName", "")))
+                .thenComparing(m -> String.valueOf(m.getOrDefault("batchNumber", ""))));
+
+        result.put("summary", summary);
+        return result;
+    }
+
+    private static SimBatch findSimBatch(List<SimBatch> list, String batchNumber) {
+        if (list == null || !StringUtils.hasText(batchNumber)) {
+            return null;
+        }
+        String bn = batchNumber.trim();
+        for (SimBatch b : list) {
+            if (b.batchNumber != null && bn.equals(b.batchNumber.trim())) {
+                return b;
+            }
+        }
+        return null;
+    }
+
+    private void allocateFifoLines(OutboundApply apply, Long drugId, String drugName, String spec, int need,
+            Map<Long, List<SimBatch>> pool, List<Map<String, Object>> pickLines, List<String> warnings) {
+        if (need <= 0) {
+            return;
+        }
+        List<SimBatch> list = pool.get(drugId);
+        if (list == null || list.isEmpty()) {
+            warnings.add(String.format("申领单 %s：药品「%s」无可用库存（需 %d）", apply.getApplyNumber(), drugName, need));
+            return;
+        }
+        int remaining = need;
+        for (SimBatch b : list) {
+            if (remaining <= 0) {
+                break;
+            }
+            if (b.quantity <= 0) {
+                continue;
+            }
+            int take = Math.min(remaining, b.quantity);
+            b.quantity -= take;
+            remaining -= take;
+            pickLines.add(buildPickLine(apply, drugId, drugName, spec, b.batchNumber,
+                    b.storageLocation, b.expiryDate, take));
+        }
+        if (remaining > 0) {
+            warnings.add(String.format("申领单 %s：药品「%s」FIFO 分配不足，尚缺 %d（可能与其他待执行单竞争库存）",
+                    apply.getApplyNumber(), drugName, remaining));
+        }
+    }
+
+    private static Map<String, Object> buildPickLine(OutboundApply apply, Long drugId, String drugName, String spec,
+            String batchNumber, String storageLocation, LocalDate expiryDate, int quantity) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("applyNumber", apply.getApplyNumber());
+        m.put("department", apply.getDepartment());
+        m.put("approveTime", apply.getApproveTime());
+        m.put("drugId", drugId);
+        m.put("drugName", drugName);
+        m.put("specification", spec);
+        m.put("batchNumber", batchNumber);
+        m.put("storageLocation", storageLocation);
+        m.put("expiryDate", expiryDate);
+        m.put("quantity", quantity);
+        return m;
+    }
+
+    /**
+     * 拣货汇总模拟用：与当前库存快照一致，按审批顺序扣减，用于预估批次与货位（执行顺序不同则可能与实际略有差异）
+     */
+    private static class SimBatch {
+        String batchNumber;
+        int quantity;
+        String storageLocation;
+        LocalDate expiryDate;
+    }
+
     /**
      * 核心任务：生成单号 + 插入出库申请（供重试工具调用）
      */
@@ -464,7 +781,10 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
             }
             
             if (item.get("batchNumber") != null) {
-                applyItem.setBatchNumber(item.get("batchNumber").toString());
+                String bn = item.get("batchNumber").toString().trim();
+                if (StringUtils.hasText(bn)) {
+                    applyItem.setBatchNumber(bn);
+                }
             }
             
             // 验证并转换 quantity

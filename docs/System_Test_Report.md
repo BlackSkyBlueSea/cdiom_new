@@ -4,11 +4,11 @@
 
 | 项目 | 说明 |
 |------|------|
-| **文档版本** | v1.0 |
-| **创建/更新日期** | 2026年3月9日 |
-| **适用版本** | CDIOM v1.7.0 |
+| **文档版本** | v1.1 |
+| **创建/更新日期** | 2026年3月29日 |
+| **适用版本** | CDIOM v1.7.0（含 2026-03-28 工作区变更，见 UPDATE_LOG_20260328.md） |
 | **测试目的** | 支撑功能测试、性能测试、安全测试及业务逻辑验证 |
-| **参考文档** | API_Documentation.md、Function_Modules.md、Code_Logic_Vulnerability_Report.md、Code_Completeness_Report.md、UPDATE_LOG_20260309_Outbound_Dashboard.md（出库/审批/仪表盘近期变更） |
+| **参考文档** | API_Documentation.md、Function_Modules.md、Code_Logic_Vulnerability_Report.md、Code_Completeness_Report.md、UPDATE_LOG_20260309_Outbound_Dashboard.md（出库/审批/仪表盘）、UPDATE_LOG_20260328.md（系统参数贯通、JWT/日志保留、列表布局、管理员联系信息） |
 
 ---
 
@@ -45,7 +45,7 @@
 ### 1.3 统一响应与认证约定
 
 - 接口统一格式：`{ "code": 200, "msg": "...", "data": ... }`，200 成功，401 未授权，500 失败。  
-- 认证：JWT Token，8 小时有效，Cookie key：`cdiom_token`。  
+- 认证：JWT Token，**默认约 8 小时**；实际有效期以 `sys_config` 键 `jwt_expiration`（毫秒）为准，非法值回退 `application.yml` 中 `jwt.expiration`。Cookie key：`cdiom_token`；请求头 `Authorization` 优先于 Cookie。  
 - 权限：基于 RBAC + 细粒度权限（如 `outbound:apply`、`inbound:create` 等），接口需按角色/权限设计用例。
 
 ---
@@ -66,6 +66,7 @@
 | AUTH-06 | 获取当前用户 | 已登录 | GET /api/v1/auth/current，带 Token | 200，返回当前用户信息 | |
 | AUTH-07 | 获取权限列表 | 已登录 | GET /api/v1/auth/permissions | 200，返回权限代码集合 | |
 | AUTH-08 | 登出 | 已登录 | POST /api/v1/auth/logout | 200，Token/Cookie 清除，再请求需认证接口返回 401 | |
+| AUTH-09 | 系统管理员联系信息（个人中心提示） | 已登录 | GET /api/v1/auth/admin-contact | 200，返回首个启用系统管理员的 `adminUsername`、`phone`、`email`（字段可为空）；未登录 401 | |
 
 ### 2.2 用户与角色管理
 
@@ -78,6 +79,7 @@
 | USER-05 | 解锁用户 | user:manage | PUT /api/v1/users/{id}/unlock | 200，锁定时间与失败次数清零 | |
 | USER-06 | 逻辑删除用户 | user:manage | DELETE /api/v1/users/{id} | 200，用户标记删除，列表不显示，回收站可查 | |
 | USER-07 | 无权限访问用户接口 | 无 user:manage | 调用上述任一接口 | 403 或 401 | |
+| USER-08 | 禁止删除/禁用当前登录账号 | user:manage，以管理员 A 登录 | 对用户 A 自己执行 DELETE /api/v1/users/{A的id} 或 PUT …/status | 失败，提示不能删除或不能修改当前登录账号状态 | |
 | ROLE-01 | 角色列表与筛选 | user:manage | GET /api/v1/roles?page=1&size=10&keyword= | 200，分页与筛选正确 | |
 | ROLE-02 | 创建角色（role_code 唯一） | user:manage | POST /api/v1/roles，roleCode 唯一 | 200，角色创建成功 | |
 | ROLE-03 | 重复 role_code 创建 | user:manage | POST 与已有 roleCode 相同的角色 | 失败，提示唯一性冲突 | |
@@ -158,6 +160,8 @@
 |----------|--------|----------|----------|----------|
 | CFG-01 | 配置 CRUD 与 key 唯一 | GET/POST/PUT/DELETE /api/v1/configs，按 key 查询 | 200，config_key 唯一 | |
 | CFG-02 | 红色预警阈值映射与动态更新（expiry_critical_days） | 界面与接口验证见 **§2.9.1**；补充：GET /api/v1/configs/runtime-effective；保存后「刷新生效参数」；仓库工作台近效期红色卡片与库存预警列 | 保存成功；`expiryCriticalDays` 与表一致；红色预警区间与仪表盘/库存展示一致；须满足「预警阈值 &gt; 红色阈值」 | |
+| CFG-03 | JWT 有效期（jwt_expiration，毫秒） | 参数表修改 `jwt_expiration` 为合法值（如 3600000），保存后 `GET /api/v1/configs/runtime-effective` 中 `jwtExpirationMs` 一致；重新登录后新 Token 在预期时间内过期 | 运行时与配置一致；非法值回退配置文件默认 | |
+| CFG-04 | 日志保留年限（log_retention_years） | 修改参数并查看 `runtime-effective` 中 `logRetentionYears`；配合定时任务（每日 03:00）清理早于「现在−N 年」的登录/操作日志（**生产环境慎用**，建议先备份） | 接口展示与表一致；清理仅影响阈值之前记录 | |
 | NOTICE-01 | 公告 CRUD 与状态 | GET/POST/PUT/DELETE /api/v1/notices，状态开启/关闭 | 200，状态生效 | |
 | LOG-01 | 操作日志列表 | GET /api/v1/operation-logs（需 log:operation:view） | 200，仅列表，不可删 | |
 | LOG-02 | 登录日志与地理位置 | GET /api/v1/login-logs，检查是否有 IP、地理位置（内网显示“内网IP”） | 200 | |
@@ -271,7 +275,7 @@
 | 测试项 | 说明 |
 |--------|------|
 | 浏览器 | Chrome、Edge、Firefox、Safari 最新版，登录与主要业务流程可用 |
-| 分辨率/响应式 | 文档要求支持 PC 与 Pad；检查列表、表单、仪表盘在不同宽度下布局与操作正常 |
+| 分辨率/响应式 | 文档要求支持 PC 与 Pad；检查列表、表单、仪表盘在不同宽度下布局与操作正常；主要列表页表体应在视口内滚动（见 `tablePageLayout.js` 与 Layout） |
 | 移动端 | 若有移动访问需求，需单独做基础流程与触摸操作验证 |
 
 ---
@@ -282,15 +286,15 @@
 
 | 模块 | 用例数 | 通过 | 失败 | 阻塞 | 备注 |
 |------|--------|------|------|------|------|
-| 认证 | 8 | | | | |
-| 用户/角色 | 10 | | | | |
+| 认证 | 9 | | | | |
+| 用户/角色 | 11 | | | | |
 | 药品/库存 | 6 | | | | |
 | 入库 | 7 | | | | |
 | 出库 | 9 | | | | |
 | 采购订单 | 7 | | | | |
 | 供应商 | 4 | | | | |
 | 库存调整 | 3 | | | | |
-| 配置/公告/日志 | 4 | | | | |
+| 配置/公告/日志 | 6 | | | | |
 | 仪表盘/监控 | 4 | | | | |
 | 文件/超级管理员 | 3 | | | | |
 

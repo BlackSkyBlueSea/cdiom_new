@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, message, Modal, Form, InputNumber, Alert, Tooltip } from 'antd'
-import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined, DownloadOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
@@ -37,6 +37,10 @@ const InventoryManagement = () => {
   })
   const [adjustModalVisible, setAdjustModalVisible] = useState(false)
   const [adjustForm] = Form.useForm()
+  const [locationModalVisible, setLocationModalVisible] = useState(false)
+  const [locationForm] = Form.useForm()
+  const [locationRecord, setLocationRecord] = useState(null)
+  const [locationSubmitting, setLocationSubmitting] = useState(false)
   const [currentRecord, setCurrentRecord] = useState(null)
   const [drugInfo, setDrugInfo] = useState(null)
   const [users, setUsers] = useState([])
@@ -172,10 +176,21 @@ const InventoryManagement = () => {
 
   const getExpiryWarning = (expiryDate) => {
     if (!expiryDate) return null
-    const days = dayjs(expiryDate).diff(dayjs(), 'day')
+    const end = dayjs(expiryDate).startOf('day')
+    const today = dayjs().startOf('day')
+    const days = end.diff(today, 'day')
+    if (days < 0) {
+      const overdue = -days
+      return (
+        <Tag color="magenta" icon={<WarningOutlined />}>
+          已过期（超期 {overdue} 天）
+        </Tag>
+      )
+    }
     if (days <= 90) {
       return <Tag color="red" icon={<WarningOutlined />}>红色预警（≤90天）</Tag>
-    } else if (days <= 180) {
+    }
+    if (days <= 180) {
       return <Tag color="orange" icon={<WarningOutlined />}>黄色预警（90-180天）</Tag>
     }
     return null
@@ -211,6 +226,42 @@ const InventoryManagement = () => {
       message.error('获取药品信息失败')
     }
     return null
+  }
+
+  const openLocationModal = (record) => {
+    setLocationRecord(record)
+    locationForm.setFieldsValue({ storageLocation: record.storageLocation || '' })
+    setLocationModalVisible(true)
+  }
+
+  const handleLocationSubmit = async () => {
+    if (!locationRecord) return
+    try {
+      const values = await locationForm.validateFields()
+      const loc = String(values.storageLocation || '').trim()
+      if (!loc) {
+        message.warning('请输入存储位置')
+        return
+      }
+      setLocationSubmitting(true)
+      const res = await request.patch(`/inventory/${locationRecord.id}/storage-location`, {
+        storageLocation: loc,
+      })
+      if (res.code === 200) {
+        message.success('存储位置已更新')
+        setLocationModalVisible(false)
+        locationForm.resetFields()
+        setLocationRecord(null)
+        fetchInventory()
+      } else {
+        message.error(res.msg || '更新失败')
+      }
+    } catch (error) {
+      if (error.errorFields) return
+      message.error(error.response?.data?.msg || error.message || '更新失败')
+    } finally {
+      setLocationSubmitting(false)
+    }
   }
 
   // 打开调整弹窗
@@ -323,7 +374,7 @@ const InventoryManagement = () => {
       render: (date) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
     },
     {
-      title: <span style={{ whiteSpace: 'nowrap' }}>预警状态</span>,
+      title: <span style={{ whiteSpace: 'nowrap' }}>效期状态</span>,
       key: 'warning',
       width: 150,
       render: (_, record) => getExpiryWarning(record.expiryDate),
@@ -352,19 +403,29 @@ const InventoryManagement = () => {
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
       key: 'action',
-      width: 100,
+      width: 132,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           {hasPermission(PERMISSIONS.DRUG_MANAGE) && (
-            <Tooltip title="调整">
-              <Button
-                type="link"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleAdjust(record)}
-              />
-            </Tooltip>
+            <>
+              <Tooltip title="存储位置">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EnvironmentOutlined />}
+                  onClick={() => openLocationModal(record)}
+                />
+              </Tooltip>
+              <Tooltip title="调整数量">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => handleAdjust(record)}
+                />
+              </Tooltip>
+            </>
           )}
         </Space>
       ),
@@ -620,6 +681,39 @@ const InventoryManagement = () => {
                 showCount
                 maxLength={500}
               />
+            </Form.Item>
+          </Form>
+        )}
+      </Modal>
+
+      <Modal
+        title="修改存储位置"
+        open={locationModalVisible}
+        onCancel={() => {
+          setLocationModalVisible(false)
+          locationForm.resetFields()
+          setLocationRecord(null)
+        }}
+        onOk={handleLocationSubmit}
+        confirmLoading={locationSubmitting}
+        okText="保存"
+        cancelText="取消"
+        destroyOnHidden
+      >
+        {locationRecord && (
+          <Form form={locationForm} layout="vertical">
+            <Form.Item label="药品 / 批次">
+              <Input value={`${locationRecord.drugName || ''} · ${locationRecord.batchNumber || ''}`} disabled />
+            </Form.Item>
+            <Form.Item
+              name="storageLocation"
+              label="存储位置"
+              rules={[
+                { required: true, message: '请输入存储位置' },
+                { max: 200, message: '长度不能超过200个字符' },
+              ]}
+            >
+              <Input placeholder="如：阴凉库A区-3层" allowClear />
             </Form.Item>
           </Form>
         )}

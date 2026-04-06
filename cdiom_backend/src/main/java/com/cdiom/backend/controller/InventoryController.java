@@ -12,6 +12,10 @@ import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.ExcelExportService;
 import com.cdiom.backend.service.InventoryService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -73,6 +77,18 @@ public class InventoryController {
     public Result<Inventory> getInventoryById(@PathVariable Long id) {
         Inventory inventory = inventoryService.getInventoryById(id);
         return Result.success(inventory);
+    }
+
+    /**
+     * 修改库存批次的存储位置
+     */
+    @PatchMapping("/{id}/storage-location")
+    @RequiresPermission({"drug:manage"})
+    public Result<Inventory> updateStorageLocation(
+            @PathVariable Long id,
+            @Valid @RequestBody StorageLocationUpdateRequest body) {
+        inventoryService.updateStorageLocation(id, body.getStorageLocation());
+        return Result.success(inventoryService.getInventoryById(id));
     }
 
     /**
@@ -193,6 +209,13 @@ public class InventoryController {
         } catch (Exception e) {
             throw new RuntimeException("导出失败: " + e.getMessage(), e);
         }
+    }
+
+    @Data
+    public static class StorageLocationUpdateRequest {
+        @NotBlank(message = "存储位置不能为空")
+        @Size(max = 200, message = "存储位置长度不能超过200个字符")
+        private String storageLocation;
     }
 }
 

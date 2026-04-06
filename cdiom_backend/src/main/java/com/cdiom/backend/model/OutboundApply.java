@@ -31,6 +31,23 @@ public class OutboundApply {
     private Long applicantId;
 
     /**
+     * 代录人ID（仓库管理员现场代录时；自助申领为 null）
+     */
+    private Long proxyRegistrarId;
+
+    /**
+     * 代录人姓名（非表字段）
+     */
+    @TableField(exist = false)
+    private String proxyRegistrarName;
+
+    /**
+     * 代录人角色名称（非表字段）
+     */
+    @TableField(exist = false)
+    private String proxyRegistrarRoleName;
+
+    /**
      * 申请人姓名（非表字段，列表/详情展示用，来自 sys_user.username）
      */
     @TableField(exist = false)

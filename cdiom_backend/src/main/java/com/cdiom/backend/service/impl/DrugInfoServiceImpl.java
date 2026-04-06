@@ -41,7 +41,8 @@ public class DrugInfoServiceImpl implements DrugInfoService {
     private final AuthService authService;
 
     @Override
-    public Page<DrugInfo> getDrugInfoList(Integer page, Integer size, String keyword, Integer isSpecial) {
+    public Page<DrugInfo> getDrugInfoList(Integer page, Integer size, String keyword, Integer isSpecial,
+            String sortField, String sortOrder) {
         Page<DrugInfo> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<DrugInfo> wrapper = new LambdaQueryWrapper<>();
         
@@ -55,8 +56,18 @@ public class DrugInfoServiceImpl implements DrugInfoService {
         if (isSpecial != null) {
             wrapper.eq(DrugInfo::getIsSpecial, isSpecial);
         }
-        
-        wrapper.orderByDesc(DrugInfo::getCreateTime);
+
+        boolean byId = StringUtils.hasText(sortField) && "id".equalsIgnoreCase(sortField.trim());
+        if (byId) {
+            boolean asc = StringUtils.hasText(sortOrder) && "asc".equalsIgnoreCase(sortOrder.trim());
+            if (asc) {
+                wrapper.orderByAsc(DrugInfo::getId);
+            } else {
+                wrapper.orderByDesc(DrugInfo::getId);
+            }
+        } else {
+            wrapper.orderByDesc(DrugInfo::getCreateTime);
+        }
         
         return drugInfoMapper.selectPage(pageParam, wrapper);
     }
@@ -261,6 +272,31 @@ public class DrugInfoServiceImpl implements DrugInfoService {
     }
 
     @Override
+    public Page<DrugInfo> getDeletedDrugInfoList(Integer page, Integer size, String keyword) {
+        Page<DrugInfo> pageParam = new Page<>(page, size);
+        Long offset = (long) ((page - 1) * size);
+        Long limit = (long) size;
+        List<DrugInfo> records = drugInfoMapper.selectDeletedDrugList(keyword, offset, limit);
+        Long total = drugInfoMapper.countDeletedDrugs(keyword);
+        pageParam.setRecords(records);
+        pageParam.setTotal(total == null ? 0L : total);
+        return pageParam;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void restoreDrugInfo(Long id) {
+        if (id == null) {
+            throw new ServiceException("药品ID不能为空");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int updated = drugInfoMapper.restoreLogicallyDeletedById(id, now);
+        if (updated == 0) {
+            throw new ServiceException("药品不存在或未被删除");
+        }
+    }
+
+    @Override
     public DrugInfo searchDrugByCode(String code) {
         if (!StringUtils.hasText(code)) {
             return null;
@@ -366,7 +402,8 @@ public class DrugInfoServiceImpl implements DrugInfoService {
     }
 
     @Override
-    public Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword) {
+    public Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword,
+            String sortField, String sortOrder) {
         // 先获取该供应商提供的药品ID列表
         List<Long> drugIds = supplierDrugService.getDrugIdsBySupplierId(supplierId);
         
@@ -386,15 +423,25 @@ public class DrugInfoServiceImpl implements DrugInfoService {
                     .or().like(DrugInfo::getApprovalNumber, keyword)
                     .or().like(DrugInfo::getManufacturer, keyword));
         }
-        
-        wrapper.orderByDesc(DrugInfo::getCreateTime);
+
+        boolean byId = StringUtils.hasText(sortField) && "id".equalsIgnoreCase(sortField.trim());
+        if (byId) {
+            boolean asc = StringUtils.hasText(sortOrder) && "asc".equalsIgnoreCase(sortOrder.trim());
+            if (asc) {
+                wrapper.orderByAsc(DrugInfo::getId);
+            } else {
+                wrapper.orderByDesc(DrugInfo::getId);
+            }
+        } else {
+            wrapper.orderByDesc(DrugInfo::getCreateTime);
+        }
         
         return drugInfoMapper.selectPage(pageParam, wrapper);
     }
 
     @Override
     public Page<SupplierDrugVO> getSupplierDrugsWithPrice(Long supplierId, Integer page, Integer size, String keyword) {
-        Page<DrugInfo> drugPage = getDrugInfoListBySupplierId(supplierId, page, size, keyword);
+        Page<DrugInfo> drugPage = getDrugInfoListBySupplierId(supplierId, page, size, keyword, null, null);
         List<SupplierDrug> supplierDrugs = supplierDrugService.getListBySupplierId(supplierId);
         Map<Long, SupplierDrug> drugIdToSupplierDrug = supplierDrugs.stream()
                 .collect(Collectors.toMap(SupplierDrug::getDrugId, sd -> sd, (a, b) -> a));

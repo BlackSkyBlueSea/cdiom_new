@@ -32,6 +32,11 @@ public class InboundRecord {
     private Long orderId;
 
     /**
+     * 到货批次头ID（采购订单多批次入库；临时入库可为空）
+     */
+    private Long receiptBatchId;
+
+    /**
      * 药品ID
      */
     private Long drugId;
@@ -67,6 +72,11 @@ public class InboundRecord {
     private String manufacturer;
 
     /**
+     * 入库指定存储位置（合格入库必填，入账时写入库存批次）
+     */
+    private String storageLocation;
+
+    /**
      * 随货同行单编号
      */
     private String deliveryNoteNumber;
@@ -92,6 +102,27 @@ public class InboundRecord {
     private String status;
 
     /**
+     * 第二人确认流程：NONE-不适用 / CONFIRMED-已入账 / PENDING_SECOND-待第二人确认 /
+     * REJECTED-第二人驳回 / WITHDRAWN-第一人撤回 / TIMEOUT-超时关闭
+     */
+    private String secondConfirmStatus;
+
+    /**
+     * 第二人确认时间
+     */
+    private LocalDateTime secondConfirmTime;
+
+    /**
+     * 第二人确认截止时间（超时后标记 TIMEOUT）
+     */
+    private LocalDateTime secondConfirmDeadline;
+
+    /**
+     * 第二人驳回原因
+     */
+    private String secondRejectReason;
+
+    /**
      * 效期校验状态：PASS-通过/WARNING-不足180天需确认/FORCE-强制入库
      */
     private String expiryCheckStatus;
@@ -107,6 +138,16 @@ public class InboundRecord {
     private String remark;
 
     /**
+     * 不合格处置意向代码（仅 status=UNQUALIFIED 时有意义），见 {@link com.cdiom.backend.inbound.InboundDispositionCodes}
+     */
+    private String dispositionCode;
+
+    /**
+     * 处置补充说明（可选）
+     */
+    private String dispositionRemark;
+
+    /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)
@@ -117,4 +158,22 @@ public class InboundRecord {
      */
     @TableField(exist = false)
     private String drugName;
+
+    /**
+     * 到货批次号（仅列表展示，来自 inbound_receipt_batch）
+     */
+    @TableField(exist = false)
+    private String receiptBatchCode;
+
+    /**
+     * 第一操作人展示名（来自 sys_user.username）
+     */
+    @TableField(exist = false)
+    private String operatorName;
+
+    /**
+     * 第二操作人展示名（特殊药品双人流程，来自 sys_user.username）
+     */
+    @TableField(exist = false)
+    private String secondOperatorName;
 }

@@ -32,7 +32,8 @@ INSERT INTO sys_permission (permission_name, permission_code, permission_type, p
 ('出库审核', 'outbound:approve', 3, 0, 62),
 ('出库执行', 'outbound:execute', 3, 0, 63),
 ('特殊药品审核', 'outbound:approve:special', 3, 0, 64),
-('出库驳回', 'outbound:reject', 3, 0, 65)
+('出库驳回', 'outbound:reject', 3, 0, 65),
+('出库代录', 'outbound:apply:on-behalf', 3, 0, 66)
 ON DUPLICATE KEY UPDATE permission_name=VALUES(permission_name);
 
 -- 入库管理权限
@@ -73,8 +74,8 @@ WHERE permission_code IN (
     'drug:view', 'drug:manage', 'drug:create', 'drug:update', 'drug:delete',
     -- 供应商审核
     'supplier:audit',
-    -- 出库管理（审核、执行，不包含申领）
-    'outbound:view', 'outbound:approve', 'outbound:execute', 'outbound:reject',
+    -- 出库管理（审核、执行、现场代录申领，不包含自助申领）
+    'outbound:view', 'outbound:approve', 'outbound:execute', 'outbound:reject', 'outbound:apply:on-behalf',
     -- 入库管理
     'inbound:view', 'inbound:create', 'inbound:approve', 'inbound:execute',
     -- 库存管理

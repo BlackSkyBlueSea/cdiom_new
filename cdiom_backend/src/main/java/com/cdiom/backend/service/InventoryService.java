@@ -34,6 +34,11 @@ public interface InventoryService {
     void increaseInventory(Long drugId, String batchNumber, Integer quantity, LocalDate expiryDate, String storageLocation, LocalDate productionDate, String manufacturer);
 
     /**
+     * 修改某库存批次的存储位置（仅当前数量大于 0 的批次）
+     */
+    void updateStorageLocation(Long inventoryId, String storageLocation);
+
+    /**
      * 减少库存（出库时调用）
      */
     void decreaseInventory(Long drugId, String batchNumber, Integer quantity);

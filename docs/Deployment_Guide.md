@@ -359,8 +359,12 @@ spring:
 ```yaml
 jwt:
   secret: your-jwt-secret-key-minimum-32-characters  # 至少32字符，生产环境使用强密钥
-  expiration: 28800000  # Token过期时间（毫秒），默认8小时
+  expiration: 28800000  # Token过期时间（毫秒），默认约8小时；后备值
 ```
+
+**与参数表的关系：**
+- 若数据库 `sys_config` 中存在键 **`jwt_expiration`**（毫秒），且在系统允许范围内，则**签发 Token 时以数据库为准**；非法或缺失时使用上式 `jwt.expiration`。
+- 登录/操作日志可按 **`log_retention_years`** 保留；后端定时任务会按该值清理早于「当前时间 − N 年」的日志（**生产环境部署前请确认合规要求并做好备份**）。
 
 **安全建议：**
 - 生产环境使用至少32字符的强随机密钥
@@ -565,9 +569,9 @@ nssm remove CDIOM
 **问题**：Token过期后无法访问接口
 
 **解决方案**：
-- Token默认有效期为8小时，过期后需要重新登录
-- 可以在 `application.yml` 中调整 `jwt.expiration` 配置
-- 前端会自动检测Token过期并跳转到登录页
+- 默认约 8 小时（`jwt.expiration`）；若在 **参数配置** 中维护 `jwt_expiration`（毫秒）且合法，则以**运行时配置**为准
+- 可在 `application.yml` 调整 `jwt.expiration` 作为后备
+- 前端通常会检测 Token 失效并跳转登录页
 
 ### 5. 文件上传失败
 

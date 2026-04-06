@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Alert, Tooltip } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EyeOutlined, RollbackOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EyeOutlined, RollbackOutlined, PrinterOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, fetchUserPermissions } from '../utils/permission'
-import { getUserRoleId, getUser } from '../utils/auth'
+import { getUser } from '../utils/auth'
 import {
   pageRootStyle,
   tableAreaStyle,
@@ -47,14 +47,142 @@ const OutboundManagement = () => {
   const [executeForm] = Form.useForm()
   const [drugs, setDrugs] = useState([])
   const [applyFormItems, setApplyFormItems] = useState([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+  /** 新建申请：按药品 ID 缓存可选批次（选完药品后拉取 /inventory） */
+  const [applyInventoryBatches, setApplyInventoryBatches] = useState({})
+  const [applyInventoryBatchLoading, setApplyInventoryBatchLoading] = useState({})
   const [approveItems, setApproveItems] = useState([]) // 审批时查看的申请明细
   const [hasSpecialDrug, setHasSpecialDrug] = useState(false) // 是否包含特殊药品
-  const [users, setUsers] = useState([]) // 用户列表（用于选择第二审批人）
+  const [secondApproverCandidates, setSecondApproverCandidates] = useState([]) // 具备出库审核权限的用户（第二审批人）
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [departmentOptions, setDepartmentOptions] = useState([]) // 已有科室列表（新建出库申请时下拉选择）
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [detailItems, setDetailItems] = useState([]) // 查看详情时的申请明细
   const [stockCheckResult, setStockCheckResult] = useState(null) // 审批前库存校验结果 { sufficient, message, details }
+  const [medicalApplicants, setMedicalApplicants] = useState([]) // 代录出库：可选医护人员
+  const [loadingMedicalApplicants, setLoadingMedicalApplicants] = useState(false)
+
+  /** 出库拣货汇总（按批次/货位打印） */
+  const [pickSummaryOpen, setPickSummaryOpen] = useState(false)
+  const [pickSummaryLoading, setPickSummaryLoading] = useState(false)
+  const [pickSummaryData, setPickSummaryData] = useState(null)
+  const [pickSummaryDate, setPickSummaryDate] = useState(() => dayjs())
+  const [pickSummaryScope, setPickSummaryScope] = useState('approve_day')
+
+  const canApplyOutbound = hasPermission(PERMISSIONS.OUTBOUND_APPLY)
+  const canProxyOutbound = hasPermission(PERMISSIONS.OUTBOUND_APPLY_ON_BEHALF)
+  const canViewPickSummary = hasPermission([
+    PERMISSIONS.OUTBOUND_EXECUTE,
+    PERMISSIONS.OUTBOUND_VIEW,
+    PERMISSIONS.OUTBOUND_APPROVE,
+    PERMISSIONS.OUTBOUND_APPROVE_SPECIAL,
+  ])
+
+  const loadPickSummary = useCallback(async () => {
+    setPickSummaryLoading(true)
+    try {
+      const params = { scope: pickSummaryScope }
+      if (pickSummaryScope === 'approve_day') {
+        params.date = pickSummaryDate.format('YYYY-MM-DD')
+      }
+      const res = await request.get('/outbound/pick-summary', { params })
+      if (res.code === 200) {
+        setPickSummaryData(res.data || {})
+      } else {
+        message.error(res.msg || '加载拣货汇总失败')
+        setPickSummaryData(null)
+      }
+    } catch (error) {
+      logger.error('拣货汇总:', error)
+      message.error(error.response?.data?.msg || '加载拣货汇总失败')
+      setPickSummaryData(null)
+    } finally {
+      setPickSummaryLoading(false)
+    }
+  }, [pickSummaryDate, pickSummaryScope])
+
+  useEffect(() => {
+    if (pickSummaryOpen) {
+      loadPickSummary()
+    }
+  }, [pickSummaryOpen, loadPickSummary])
+
+  const handlePrintPickSummary = () => {
+    const data = pickSummaryData
+    if (!data) return
+    const scopeLabel = data.scope === 'all_pending' ? '全部待执行出库' : `审批日 ${data.date || ''}`
+    const summary = Array.isArray(data.summary) ? data.summary : []
+    const warnings = Array.isArray(data.warnings) ? data.warnings : []
+    const lines = Array.isArray(data.pickLines) ? data.pickLines : []
+    const w = window.open('', '_blank')
+    if (!w) {
+      message.warning('请允许弹出窗口以打印')
+      return
+    }
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const rowHtml = (cells) =>
+      `<tr>${cells.map((c) => `<td style="border:1px solid #333;padding:6px 8px">${esc(c)}</td>`).join('')}</tr>`
+    let body = `
+      <h2 style="text-align:center;margin:0 0 12px">出库拣货汇总表</h2>
+      <p style="margin:4px 0;font-size:13px">${esc(scopeLabel)} · 待执行申领单 ${data.applyCount ?? 0} 笔</p>
+      <p style="margin:4px 0 12px;font-size:12px;color:#555">按存储位置、药品、批次汇总数量，拣货后请在系统中按单执行出库并交接医护。</p>
+      <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:16px">
+        <thead><tr>
+          <th style="border:1px solid #333;padding:6px 8px">存储位置</th>
+          <th style="border:1px solid #333;padding:6px 8px">药品名称</th>
+          <th style="border:1px solid #333;padding:6px 8px">规格</th>
+          <th style="border:1px solid #333;padding:6px 8px">批次号</th>
+          <th style="border:1px solid #333;padding:6px 8px">效期</th>
+          <th style="border:1px solid #333;padding:6px 8px">数量</th>
+        </tr></thead>
+        <tbody>
+    `
+    for (const r of summary) {
+      body += rowHtml([
+        r.storageLocation || '—',
+        r.drugName || '—',
+        r.specification || '—',
+        r.batchNumber || '—',
+        r.expiryDate ? dayjs(r.expiryDate).format('YYYY-MM-DD') : '—',
+        r.quantity ?? '—',
+      ])
+    }
+    body += `</tbody></table>`
+    if (lines.length > 0) {
+      body += `<h3 style="font-size:14px;margin:12px 0 8px">按申领单明细（拣货核对）</h3>
+      <table style="border-collapse:collapse;width:100%;font-size:12px">
+        <thead><tr>
+          <th style="border:1px solid #333;padding:4px 6px">申领单号</th>
+          <th style="border:1px solid #333;padding:4px 6px">科室</th>
+          <th style="border:1px solid #333;padding:4px 6px">药品</th>
+          <th style="border:1px solid #333;padding:4px 6px">批次</th>
+          <th style="border:1px solid #333;padding:4px 6px">货位</th>
+          <th style="border:1px solid #333;padding:4px 6px">数量</th>
+        </tr></thead><tbody>`
+      for (const r of lines) {
+        body += rowHtml([
+          r.applyNumber,
+          r.department,
+          r.specification ? `${r.drugName || ''} ${r.specification}` : (r.drugName || '—'),
+          r.batchNumber || '—',
+          r.storageLocation || '—',
+          r.quantity ?? '—',
+        ])
+      }
+      body += `</tbody></table>`
+    }
+    if (warnings.length > 0) {
+      body += `<div style="margin-top:12px;padding:8px;background:#fff7e6;border:1px solid #ffc53d;font-size:12px"><strong>提示：</strong><ul style="margin:4px 0 0 16px">`
+      for (const t of warnings) {
+        body += `<li>${esc(t)}</li>`
+      }
+      body += `</ul></div>`
+    }
+    body += `<p style="margin-top:16px;font-size:11px;color:#888">打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')} · 未指定批次时按先到期先出（FIFO）模拟，若执行顺序与审批顺序不一致，实际批次可能略有差异。</p>`
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>出库拣货汇总</title></head><body style="font-family:sans-serif;padding:16px">${body}</body></html>`)
+    w.document.close()
+    w.focus()
+    w.print()
+  }
 
   useEffect(() => {
     fetchOutboundApplies()
@@ -62,25 +190,22 @@ const OutboundManagement = () => {
 
   useEffect(() => {
     fetchDrugs()
-    // 如果是仓库管理员，预加载用户列表（用于选择第二审批人）
-    const roleId = getUserRoleId()
-    if (roleId === 2) {
-      fetchUsers()
-    }
   }, [])
 
-  // 获取用户列表（用于选择第二审批人）
-  const fetchUsers = async () => {
+  // 执行出库表单预填在「执行出库」Modal 的 afterOpenChange 中完成，避免 Modal 未挂载 Form 时调用 useForm 实例
+
+  /** 第二审批人可选列表（仅含具备 outbound:approve / outbound:approve:special 的用户） */
+  const fetchSecondApproverCandidates = async () => {
     setLoadingUsers(true)
     try {
-      const res = await request.get('/users', {
-        params: { page: 1, size: 1000, status: 1 }
-      })
+      const res = await request.get('/outbound/second-approver-candidates')
       if (res.code === 200) {
-        setUsers(res.data.records || [])
+        setSecondApproverCandidates(Array.isArray(res.data) ? res.data : [])
       }
     } catch (error) {
-      logger.error('获取用户列表失败:', error)
+      logger.error('获取第二审批人候选失败:', error)
+      message.error(error.response?.data?.msg || '获取第二审批人列表失败')
+      setSecondApproverCandidates([])
     } finally {
       setLoadingUsers(false)
     }
@@ -94,6 +219,39 @@ const OutboundManagement = () => {
       drug: drug
     }))
   }, [drugs])
+
+  /** 新建申请：选定药品后加载可选批次（医护人员走 /outbound/drug-batches；仅代录权限走 /inventory） */
+  const loadBatchesForApplyDrug = useCallback(async (drugId) => {
+    if (drugId == null) return
+    setApplyInventoryBatchLoading((prev) => ({ ...prev, [drugId]: true }))
+    try {
+      if (hasPermission(PERMISSIONS.OUTBOUND_APPLY)) {
+        const res = await request.get('/outbound/drug-batches', { params: { drugId } })
+        if (res.code === 200) {
+          const records = Array.isArray(res.data) ? res.data : []
+          setApplyInventoryBatches((prev) => ({ ...prev, [drugId]: records }))
+        }
+      } else {
+        const res = await request.get('/inventory', {
+          params: { page: 1, size: 500, drugId },
+        })
+        if (res.code === 200) {
+          const raw = res.data?.records || []
+          const records = raw.map((inv) => ({
+            batchNumber: inv.batchNumber,
+            quantity: inv.quantity,
+            expiryDate: inv.expiryDate,
+          }))
+          setApplyInventoryBatches((prev) => ({ ...prev, [drugId]: records }))
+        }
+      }
+    } catch (error) {
+      logger.error(`获取药品 ${drugId} 的库存批次失败:`, error)
+      message.warning(error.response?.data?.msg || '加载该药品批次失败，请稍后重试')
+    } finally {
+      setApplyInventoryBatchLoading((prev) => ({ ...prev, [drugId]: false }))
+    }
+  }, [])
 
   const fetchDrugs = async () => {
     try {
@@ -124,10 +282,11 @@ const OutboundManagement = () => {
     try {
       const res = await request.get(`/outbound/${applyId}/items`)
       if (res.code === 200) {
-        setApplyItems(res.data || [])
+        const list = res.data || []
+        setApplyItems(list)
         // 获取每个药品的可用批次
         const batchesMap = {}
-        for (const item of res.data) {
+        for (const item of list) {
           try {
             const inventoryRes = await request.get('/inventory', {
               params: {
@@ -212,11 +371,13 @@ const OutboundManagement = () => {
         const items = res.data || []
         setApproveItems(items)
         
-        // 检查是否包含特殊药品
+        // 检查是否包含特殊药品（优先用接口返回的 isSpecial，避免仅依赖本地 drugs 缓存导致代录/混单误判）
         let hasSpecial = false
         for (const item of items) {
-          const drug = drugs.find(d => d.id === item.drugId)
-          if (drug && drug.isSpecial === 1) {
+          const fromApi = item.isSpecial != null && Number(item.isSpecial) === 1
+          const drug = drugs.find((d) => Number(d.id) === Number(item.drugId))
+          const fromCache = drug != null && Number(drug.isSpecial) === 1
+          if (fromApi || fromCache) {
             hasSpecial = true
             break
           }
@@ -309,7 +470,9 @@ const OutboundManagement = () => {
       if (res.code === 200) {
         message.success('审批通过')
         setApproveModalVisible(false)
-        approveForm.resetFields()
+        setTimeout(() => {
+          approveForm.resetFields()
+        }, 0)
         setApproveItems([])
         setHasSpecialDrug(false)
         fetchOutboundApplies()
@@ -377,19 +540,39 @@ const OutboundManagement = () => {
         })
       }
 
-      const data = {
+      const basePayload = {
         department: values.department.trim(),
         purpose: values.purpose.trim(),
         remark: values.remark || '',
         items: validItems,
       }
 
-      const res = await request.post('/outbound', data)
+      const currentUid = getUser()?.id
+      const useOnBehalf =
+        canProxyOutbound &&
+        values.applicantId != null &&
+        currentUid != null &&
+        values.applicantId !== currentUid
+
+      if (canProxyOutbound && !canApplyOutbound && values.applicantId == null) {
+        message.error('请选择申领医护人员')
+        return
+      }
+
+      const res = useOnBehalf
+        ? await request.post('/outbound/on-behalf', {
+            ...basePayload,
+            applicantId: values.applicantId,
+          })
+        : await request.post('/outbound', basePayload)
+
       if (res.code === 200) {
-        message.success('出库申请创建成功')
+        message.success(useOnBehalf ? '代录出库申请已创建' : '出库申请创建成功')
         setModalVisible(false)
-        form.resetFields()
-        setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+        setTimeout(() => {
+          form.resetFields()
+          setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+        }, 0)
         fetchOutboundApplies()
       } else {
         message.error(res.msg || '创建出库申请失败')
@@ -427,7 +610,9 @@ const OutboundManagement = () => {
       if (res.code === 200) {
         message.success('出库执行成功')
         setExecuteModalVisible(false)
-        executeForm.resetFields()
+        setTimeout(() => {
+          executeForm.resetFields()
+        }, 0)
         setApplyItems([])
         setInventoryBatches({})
         fetchOutboundApplies()
@@ -484,8 +669,21 @@ const OutboundManagement = () => {
       width: 120,
       ellipsis: true,
       render: (name, record) => {
-        if (record.applicantRoleName) return `${name || '-'} (${record.applicantRoleName})`
-        return name ?? '-'
+        const main =
+          record.applicantRoleName != null && record.applicantRoleName !== ''
+            ? `${name || '-'} (${record.applicantRoleName})`
+            : (name ?? '-')
+        if (!record.proxyRegistrarId) return main
+        const proxy =
+          record.proxyRegistrarRoleName != null && record.proxyRegistrarRoleName !== ''
+            ? `${record.proxyRegistrarName || '-'}（${record.proxyRegistrarRoleName}）`
+            : (record.proxyRegistrarName ?? '-')
+        return (
+          <div>
+            <div>{main}</div>
+            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>代录：{proxy}</div>
+          </div>
+        )
       },
     },
     {
@@ -584,6 +782,7 @@ const OutboundManagement = () => {
                       setStockCheckResult(null)
                       await checkSpecialDrugs(record.id)
                       await fetchStockCheckForApply(record.id)
+                      await fetchSecondApproverCandidates()
                       setApproveModalVisible(true)
                     }}
                   />
@@ -697,15 +896,50 @@ const OutboundManagement = () => {
             <Tooltip title="重置">
               <Button icon={<ReloadOutlined />} onClick={handleReset} />
             </Tooltip>
-            {hasPermission(PERMISSIONS.OUTBOUND_APPLY) && (
-              <Tooltip title="新建出库申请">
+            {canViewPickSummary && (
+              <Tooltip title="按批次与存储位置汇总待出库药品，可打印拣货单">
+                <Button
+                  icon={<PrinterOutlined />}
+                  onClick={() => {
+                    setPickSummaryDate(dayjs())
+                    setPickSummaryOpen(true)
+                  }}
+                />
+              </Tooltip>
+            )}
+            {(canApplyOutbound || canProxyOutbound) && (
+              <Tooltip
+                title={
+                  canProxyOutbound && !canApplyOutbound
+                    ? '代录出库申请（现场）'
+                    : canApplyOutbound && canProxyOutbound
+                      ? '新建或代录出库申请'
+                      : '新建出库申请'
+                }
+              >
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={async () => {
                     await fetchDepartmentOptions()
+                    if (canProxyOutbound) {
+                      setLoadingMedicalApplicants(true)
+                      try {
+                        const res = await request.get('/outbound/medical-applicants')
+                        if (res.code === 200) {
+                          setMedicalApplicants(Array.isArray(res.data) ? res.data : [])
+                        }
+                      } catch (error) {
+                        logger.error('获取医护人员列表失败:', error)
+                        message.error(error.response?.data?.msg || '获取医护人员列表失败')
+                        setMedicalApplicants([])
+                      } finally {
+                        setLoadingMedicalApplicants(false)
+                      }
+                    }
+                    setApplyInventoryBatches({})
+                    setApplyInventoryBatchLoading({})
                     setModalVisible(true)
-                    form.resetFields()
                     setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
                   }}
                 />
@@ -732,14 +966,29 @@ const OutboundManagement = () => {
         />
       </div>
 
-      {/* 新建出库申请模态框 */}
+      {/* 新建 / 代录出库申请模态框 */}
       <Modal
-        title="新建出库申请"
+        title={
+          canProxyOutbound && !canApplyOutbound
+            ? '代录出库申请（现场）'
+            : canApplyOutbound && canProxyOutbound
+              ? '新建 / 代录出库申请'
+              : '新建出库申请'
+        }
         open={modalVisible}
         onCancel={() => {
           setModalVisible(false)
-          form.resetFields()
+          setTimeout(() => {
+            form.resetFields()
+          }, 0)
+          setApplyInventoryBatches({})
+          setApplyInventoryBatchLoading({})
           setApplyFormItems([{ drugId: undefined, quantity: undefined, batchNumber: undefined }])
+        }}
+        afterOpenChange={(open) => {
+          if (open) {
+            form.resetFields()
+          }
         }}
         onOk={() => form.submit()}
         width={900}
@@ -749,6 +998,35 @@ const OutboundManagement = () => {
           layout="vertical"
           onFinish={handleCreateApply}
         >
+          {canProxyOutbound && (
+            <Form.Item
+              name="applicantId"
+              label="申领医护人员"
+              rules={
+                canApplyOutbound
+                  ? []
+                  : [{ required: true, message: '请选择到场申领的医护人员' }]
+              }
+              extra={
+                canApplyOutbound
+                  ? '不选则以当前账号作为申请人；现场代领时请勾选到场医护人员。'
+                  : '请选择到场提出申领的医护人员，作为药品领用责任主体；本单由当前登录的仓库管理员代录。'
+              }
+            >
+              <Select
+                allowClear={!!canApplyOutbound}
+                placeholder="请选择医护人员"
+                loading={loadingMedicalApplicants}
+                showSearch
+                optionFilterProp="label"
+                options={medicalApplicants.map((u) => ({
+                  value: u.id,
+                  label: u.roleName ? `${u.username}（${u.roleName}）` : u.username,
+                }))}
+              />
+            </Form.Item>
+          )}
+
           <Form.Item
             name="department"
             label="所属科室"
@@ -804,15 +1082,18 @@ const OutboundManagement = () => {
                         filterOption={(inputValue, option) =>
                           (option?.label ?? '').toString().toUpperCase().indexOf((inputValue || '').toUpperCase()) !== -1
                         }
-                        onSelect={(value, option) => {
+                        onSelect={(value) => {
                           const newItems = [...applyFormItems]
                           newItems[index].drugId = value
+                          newItems[index].batchNumber = undefined
                           setApplyFormItems(newItems)
+                          loadBatchesForApplyDrug(value)
                         }}
                         onChange={(value) => {
                           if (value == null || String(value).trim() === '') {
                             const newItems = [...applyFormItems]
                             newItems[index].drugId = undefined
+                            newItems[index].batchNumber = undefined
                             setApplyFormItems(newItems)
                           }
                         }}
@@ -843,16 +1124,47 @@ const OutboundManagement = () => {
 
                     <Form.Item
                       label="指定批次（可选）"
-                      style={{ width: 200, marginBottom: 0 }}
+                      style={{ width: 320, marginBottom: 0 }}
                     >
-                      <Input
-                        placeholder="不指定则按FIFO"
-                        onChange={(e) => {
-                          const newItems = [...applyFormItems]
-                          newItems[index].batchNumber = e.target.value
-                          setApplyFormItems(newItems)
-                        }}
-                      />
+                      {(() => {
+                        const raw = item.drugId != null ? (applyInventoryBatches[item.drugId] || []) : []
+                        const batches = raw.slice().sort((a, b) => {
+                          if (!a?.expiryDate && !b?.expiryDate) return 0
+                          if (!a?.expiryDate) return 1
+                          if (!b?.expiryDate) return -1
+                          return dayjs(a.expiryDate).valueOf() - dayjs(b.expiryDate).valueOf()
+                        })
+                        const loading = !!applyInventoryBatchLoading[item.drugId]
+                        return (
+                          <Select
+                            allowClear
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder={
+                              item.drugId
+                                ? loading
+                                  ? '正在加载批次…'
+                                  : batches.length
+                                    ? '不选则出库时按 FIFO'
+                                    : '当前无库存批次记录'
+                                : '请先选择药品'
+                            }
+                            disabled={!item.drugId}
+                            loading={loading}
+                            value={item.batchNumber}
+                            onChange={(v) => {
+                              const newItems = [...applyFormItems]
+                              newItems[index].batchNumber = v
+                              setApplyFormItems(newItems)
+                            }}
+                            style={{ width: 320 }}
+                            options={batches.map((b) => ({
+                              value: b.batchNumber,
+                              label: `${b.batchNumber}（库存 ${b.quantity ?? 0}${b.expiryDate ? `，效期 ${dayjs(b.expiryDate).format('YYYY-MM-DD')}` : ''}）`,
+                            }))}
+                          />
+                        )
+                      })()}
                     </Form.Item>
 
                     {applyFormItems.length > 1 && (
@@ -899,7 +1211,9 @@ const OutboundManagement = () => {
         open={approveModalVisible}
         onCancel={() => {
           setApproveModalVisible(false)
-          approveForm.resetFields()
+          setTimeout(() => {
+            approveForm.resetFields()
+          }, 0)
           setApproveItems([])
           setHasSpecialDrug(false)
           setStockCheckResult(null)
@@ -941,6 +1255,13 @@ const OutboundManagement = () => {
                 ? `${currentRecord.applicantName || '-'}（${currentRecord.applicantRoleName}）`
                 : (currentRecord.applicantName ?? '-')}
             </p>
+            {currentRecord.proxyRegistrarId ? (
+              <p><strong>代录人：</strong>
+                {currentRecord.proxyRegistrarRoleName
+                  ? `${currentRecord.proxyRegistrarName || '-'}（${currentRecord.proxyRegistrarRoleName}）`
+                  : (currentRecord.proxyRegistrarName ?? '-')}
+              </p>
+            ) : null}
             <p><strong>所属科室：</strong>{currentRecord.department}</p>
             <p><strong>用途：</strong>{currentRecord.purpose}</p>
           </div>
@@ -966,6 +1287,7 @@ const OutboundManagement = () => {
                   <li key={index}>
                     {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
                     {' '}× {item.quantity}
+                    {item.batchNumber ? <>，批次 <strong>{item.batchNumber}</strong></> : null}
                     {drug && drug.isSpecial === 1 && (
                       <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
                     )}
@@ -995,13 +1317,14 @@ const OutboundManagement = () => {
               filterOption={(input, option) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
-                  options={users
-                .filter(user => {
+                  options={secondApproverCandidates
+                .filter((user) => {
                   const currentUser = getUser()
-                  if (currentUser && user.id === currentUser.id) return false // 第二审批人不能选自己（第一审批人）
-                  return user.roleId === 2 || user.roleId === 4 // 仓库管理员或医护人员（可能拥有特殊药品审核权限）
+                  if (currentUser && user.id === currentUser.id) return false // 第二审批人不能为第一审批人（当前用户）
+                  if (currentRecord && user.id === currentRecord.applicantId) return false
+                  return true
                 })
-                .map(user => ({
+                .map((user) => ({
                   value: user.id,
                   label: `${user.username} (${user.phone || '无手机号'})`,
                 }))}
@@ -1049,6 +1372,13 @@ const OutboundManagement = () => {
                 ? `${currentRecord.applicantName || '‑'}（${currentRecord.applicantRoleName}）`
                 : (currentRecord.applicantName ?? '‑')}
             </p>
+            {currentRecord.proxyRegistrarId ? (
+              <p><strong>代录人：</strong>
+                {currentRecord.proxyRegistrarRoleName
+                  ? `${currentRecord.proxyRegistrarName || '‑'}（${currentRecord.proxyRegistrarRoleName}）`
+                  : (currentRecord.proxyRegistrarName ?? '‑')}
+              </p>
+            ) : null}
             <p><strong>所属科室：</strong>{currentRecord.department}</p>
             <p><strong>用途：</strong>{currentRecord.purpose}</p>
             {currentRecord.remark ? <p><strong>申请备注：</strong>{currentRecord.remark}</p> : null}
@@ -1064,6 +1394,7 @@ const OutboundManagement = () => {
                       <li key={index}>
                         {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
                         {' '}× {item.quantity}
+                        {item.batchNumber ? <>，指定批次：<strong>{item.batchNumber}</strong></> : null}
                         {item.remark ? <>（备注：{item.remark}）</> : null}
                         {drug && drug.isSpecial === 1 && (
                           <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
@@ -1084,9 +1415,24 @@ const OutboundManagement = () => {
         open={executeModalVisible}
         onCancel={() => {
           setExecuteModalVisible(false)
-          executeForm.resetFields()
+          setTimeout(() => {
+            executeForm.resetFields()
+          }, 0)
           setApplyItems([])
           setInventoryBatches({})
+        }}
+        afterOpenChange={(open) => {
+          if (!open || applyItems.length === 0) return
+          executeForm.resetFields()
+          const executeFields = {}
+          for (const row of applyItems) {
+            const bn = row.batchNumber != null && String(row.batchNumber).trim() !== '' ? String(row.batchNumber).trim() : undefined
+            executeFields[`item_${row.id}`] = {
+              actualQuantity: row.quantity,
+              batchNumber: bn,
+            }
+          }
+          executeForm.setFieldsValue(executeFields)
         }}
         onOk={() => executeForm.submit()}
         width={900}
@@ -1094,11 +1440,23 @@ const OutboundManagement = () => {
         {currentRecord && (
           <div style={{ marginBottom: 16 }}>
             <p><strong>申领单号：</strong>{currentRecord.applyNumber}</p>
+            <p><strong>申请人：</strong>
+              {currentRecord.applicantRoleName
+                ? `${currentRecord.applicantName || '-'}（${currentRecord.applicantRoleName}）`
+                : (currentRecord.applicantName ?? '-')}
+            </p>
+            {currentRecord.proxyRegistrarId ? (
+              <p><strong>代录人：</strong>
+                {currentRecord.proxyRegistrarRoleName
+                  ? `${currentRecord.proxyRegistrarName || '-'}（${currentRecord.proxyRegistrarRoleName}）`
+                  : (currentRecord.proxyRegistrarName ?? '-')}
+              </p>
+            ) : null}
             <p><strong>所属科室：</strong>{currentRecord.department}</p>
             <p><strong>用途：</strong>{currentRecord.purpose}</p>
           </div>
         )}
-        
+
         <Form
           form={executeForm}
           layout="vertical"
@@ -1116,14 +1474,19 @@ const OutboundManagement = () => {
                   <div>
                     <strong>申请数量：</strong>{item.quantity}
                   </div>
+                  {item.batchNumber ? (
+                    <div>
+                      <strong>申请指定批次：</strong>{item.batchNumber}
+                    </div>
+                  ) : null}
                   <Space wrap>
                     <Form.Item
                       name={[`item_${item.id}`, 'batchNumber']}
-                      label="批次号（可选，不指定则按FIFO）"
-                      style={{ width: 200, marginBottom: 0 }}
+                      label="批次号（未选时沿用申请时的指定批次，再无则 FIFO）"
+                      style={{ width: 280, marginBottom: 0 }}
                     >
                       <Select
-                        placeholder="选择批次或留空（FIFO）"
+                        placeholder="选择批次或清空（见说明）"
                         showSearch
                         allowClear
                       >
@@ -1159,6 +1522,111 @@ const OutboundManagement = () => {
             )
           })}
         </Form>
+      </Modal>
+
+      <Modal
+        title="出库拣货汇总（现场打印）"
+        open={pickSummaryOpen}
+        onCancel={() => setPickSummaryOpen(false)}
+        width={960}
+        footer={[
+          <Button key="close" onClick={() => setPickSummaryOpen(false)}>关闭</Button>,
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintPickSummary} disabled={!pickSummaryData}>
+            打印
+          </Button>,
+        ]}
+      >
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Select
+            value={pickSummaryScope}
+            style={{ width: 200 }}
+            onChange={(v) => setPickSummaryScope(v)}
+            options={[
+              { value: 'approve_day', label: '按审批通过日（默认当天）' },
+              { value: 'all_pending', label: '全部待执行申领单' },
+            ]}
+          />
+          {pickSummaryScope === 'approve_day' && (
+            <DatePicker
+              value={pickSummaryDate}
+              onChange={(d) => d && setPickSummaryDate(d)}
+              allowClear={false}
+            />
+          )}
+          <Button type="primary" loading={pickSummaryLoading} onClick={loadPickSummary}>
+            刷新
+          </Button>
+        </Space>
+        <p style={{ fontSize: 12, color: 'rgba(0,0,0,0.55)', marginBottom: 12 }}>
+          汇总已通过审批、尚未执行出库的申领单；未指定批次时按先到期先出（FIFO）与库存货位模拟分配，便于到库位拣货；打印后可按单执行出库并交接医护人员。
+        </p>
+        {pickSummaryData?.warnings?.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="库存或分配提示"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {pickSummaryData.warnings.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            }
+          />
+        )}
+        <h4 style={{ marginBottom: 8 }}>按货位汇总（拣货主表）</h4>
+        <Table
+          size="small"
+          loading={pickSummaryLoading}
+          rowKey={(r, i) => `${r.drugId}-${r.batchNumber}-${r.storageLocation}-${i}`}
+          dataSource={pickSummaryData?.summary || []}
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+          columns={[
+            { title: '存储位置', dataIndex: 'storageLocation', width: 140, ellipsis: true, render: (v) => v || '—' },
+            { title: '药品名称', dataIndex: 'drugName', width: 160, ellipsis: true },
+            { title: '规格', dataIndex: 'specification', width: 120, ellipsis: true, render: (v) => v || '—' },
+            { title: '批次号', dataIndex: 'batchNumber', width: 120, ellipsis: true, render: (v) => v || '—' },
+            {
+              title: '效期',
+              dataIndex: 'expiryDate',
+              width: 110,
+              render: (d) => (d ? dayjs(d).format('YYYY-MM-DD') : '—'),
+            },
+            { title: '数量', dataIndex: 'quantity', width: 72 },
+          ]}
+        />
+        <h4 style={{ margin: '16px 0 8px' }}>按申领单明细（核对交接）</h4>
+        <Table
+          size="small"
+          loading={pickSummaryLoading}
+          rowKey={(r, i) => `${r.applyNumber}-${r.drugId}-${r.batchNumber}-${i}`}
+          dataSource={pickSummaryData?.pickLines || []}
+          pagination={false}
+          scroll={{ x: 'max-content', y: 280 }}
+          columns={[
+            { title: '申领单号', dataIndex: 'applyNumber', width: 130, ellipsis: true },
+            { title: '科室', dataIndex: 'department', width: 100, ellipsis: true },
+            {
+              title: '审批时间',
+              dataIndex: 'approveTime',
+              width: 160,
+              render: (t) => (t ? dayjs(t).format('YYYY-MM-DD HH:mm:ss') : '—'),
+            },
+            { title: '药品名称', dataIndex: 'drugName', width: 140, ellipsis: true },
+            { title: '规格', dataIndex: 'specification', width: 100, ellipsis: true, render: (v) => v || '—' },
+            { title: '批次号', dataIndex: 'batchNumber', width: 120, ellipsis: true, render: (v) => v || '—' },
+            { title: '存储位置', dataIndex: 'storageLocation', width: 120, ellipsis: true, render: (v) => v || '—' },
+            {
+              title: '效期',
+              dataIndex: 'expiryDate',
+              width: 100,
+              render: (d) => (d ? dayjs(d).format('YYYY-MM-DD') : '—'),
+            },
+            { title: '数量', dataIndex: 'quantity', width: 64 },
+          ]}
+        />
       </Modal>
     </div>
   )

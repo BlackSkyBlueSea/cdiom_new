@@ -692,9 +692,10 @@ const res = await request.delete(`/your-module/${id}`)
 
 #### 5. Token管理
 
-- Token存储在Cookie中（key: `cdiom_token`）
-- Token有效期8小时
-- 前端自动检测Token过期并跳转到登录页
+- Token 可同时使用 **Cookie**（`cdiom_token`）与 **请求头** `Authorization: Bearer <token>`；**请求头优先**（与后端过滤器一致）
+- 登录成功后建议 **sessionStorage** 与 Cookie 策略与现有 `auth.js` 保持一致（多标签场景）
+- **有效期**：默认约 8 小时（`jwt.expiration`）；若后端 `sys_config` 中 `jwt_expiration` 合法则以其为准
+- 前端自动检测 Token 过期或 401 并跳转登录页
 
 #### 6. 权限控制
 
@@ -739,7 +740,7 @@ if (hasPermission('your:manage')) {
 1. **API前缀**：所有API接口前缀为 `/api/v1`
 2. **响应格式**：统一使用 `Result<T>` 格式
 3. **异常处理**：统一使用 `GlobalExceptionHandler` 处理异常
-4. **Token存储**：Token存储在Cookie中（key: `cdiom_token`），有效期8小时
+4. **Token**：Cookie `cdiom_token` 与 Header `Authorization` 均可；Header 优先；有效期见 `jwt.expiration` 与 `sys_config.jwt_expiration`
 5. **逻辑删除**：所有删除操作均为逻辑删除，数据不会真正删除
 
 ### 后端注意事项

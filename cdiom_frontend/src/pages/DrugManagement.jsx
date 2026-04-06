@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, AutoComplete, message, Popconfirm, Tooltip, DatePicker } from 'antd'
 
-import { PlusOutlined, EditOutlined, DeleteOutlined, ScanOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, ScanOutlined, SearchOutlined, DownloadOutlined, InboxOutlined, UndoOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
@@ -68,6 +68,20 @@ const DrugManagement = () => {
   const [searchingByName, setSearchingByName] = useState(false)
   const [searchingByApproval, setSearchingByApproval] = useState(false)
   const [exporting, setExporting] = useState(false)
+  /** 已删除药品（回收站） */
+  const [recycleOpen, setRecycleOpen] = useState(false)
+  const [deletedDrugs, setDeletedDrugs] = useState([])
+  const [deletedLoading, setDeletedLoading] = useState(false)
+  const [deletedPagination, setDeletedPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  })
+  const [deletedSearchInput, setDeletedSearchInput] = useState('')
+  const [deletedKeyword, setDeletedKeyword] = useState('')
+  /** 药品 ID 列排序：受控，与服务端分页一致 */
+  const [idSortOrder, setIdSortOrder] = useState(undefined)
+  const prevIdSortRef = useRef(undefined)
 
   const fetchDrugs = useCallback(async () => {
     setLoading(true)
@@ -78,6 +92,12 @@ const DrugManagement = () => {
           size: pagination.pageSize,
           keyword: filters.keyword || undefined,
           isSpecial: filters.isSpecial,
+          ...(idSortOrder
+            ? {
+                sortField: 'id',
+                sortOrder: idSortOrder === 'ascend' ? 'asc' : 'desc',
+              }
+            : {}),
         },
       })
       if (res.code === 200) {
@@ -100,11 +120,44 @@ const DrugManagement = () => {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.current, pagination.pageSize])
+  }, [filters, pagination.current, pagination.pageSize, idSortOrder])
 
   useEffect(() => {
     fetchDrugs()
   }, [fetchDrugs])
+
+  const fetchDeletedDrugs = useCallback(async () => {
+    setDeletedLoading(true)
+    try {
+      const res = await request.get('/drugs/deleted', {
+        params: {
+          page: deletedPagination.current,
+          size: deletedPagination.pageSize,
+          keyword: deletedKeyword.trim() || undefined,
+        },
+      })
+      if (res.code === 200) {
+        setDeletedDrugs(res.data.records || [])
+        setDeletedPagination((prev) => ({
+          ...prev,
+          total: res.data.total ?? 0,
+        }))
+      } else {
+        message.error(res.msg || '获取已删除药品列表失败')
+      }
+    } catch (error) {
+      logger.error('获取已删除药品列表失败:', error)
+      const errorMsg = error.response?.data?.msg || error.message || '获取已删除药品列表失败'
+      message.error(errorMsg)
+    } finally {
+      setDeletedLoading(false)
+    }
+  }, [deletedPagination.current, deletedPagination.pageSize, deletedKeyword])
+
+  useEffect(() => {
+    if (!recycleOpen) return
+    fetchDeletedDrugs()
+  }, [recycleOpen, fetchDeletedDrugs])
 
   // 弹窗打开时拉取一批数据用于生产厂家下拉建议（不阻塞主列表分页）
   useEffect(() => {
@@ -267,6 +320,39 @@ const DrugManagement = () => {
     }
   }
 
+  const handleRestoreDrug = async (id) => {
+    try {
+      await request.put(`/drugs/${id}/restore`)
+      message.success('恢复成功')
+      fetchDeletedDrugs()
+      fetchDrugs()
+    } catch (error) {
+      const errorMsg = error.response?.data?.msg || error.message || '恢复失败'
+      message.error(errorMsg)
+    }
+  }
+
+  const openRecycle = () => {
+    setDeletedSearchInput('')
+    setDeletedKeyword('')
+    setDeletedPagination((p) => ({ ...p, current: 1 }))
+    setRecycleOpen(true)
+  }
+
+  const runDeletedSearch = () => {
+    const k = deletedSearchInput.trim()
+    setDeletedKeyword(k)
+    setDeletedPagination((p) => ({ ...p, current: 1 }))
+  }
+
+  const handleDeletedTableChange = (pag) => {
+    setDeletedPagination((prev) => ({
+      ...prev,
+      current: pag.current,
+      pageSize: pag.pageSize,
+    }))
+  }
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
@@ -304,10 +390,16 @@ const DrugManagement = () => {
     setPagination((p) => ({ ...p, current: 1 }))
   }
 
-  const handleTableChange = (pag) => {
+  const handleTableChange = (pag, _filters, sorter) => {
+    const active = Array.isArray(sorter) ? sorter[0] : sorter
+    const nextIdOrder =
+      active && active.field === 'id' ? active.order ?? undefined : undefined
+    const sortChanged = prevIdSortRef.current !== nextIdOrder
+    prevIdSortRef.current = nextIdOrder
+    setIdSortOrder(nextIdOrder)
     setPagination((prev) => ({
       ...prev,
-      current: pag.current,
+      current: sortChanged ? 1 : pag.current,
       pageSize: pag.pageSize,
     }))
   }
@@ -355,12 +447,53 @@ const DrugManagement = () => {
     }
   }
 
-  const columns = [
+  const recycleColumns = [
     {
-      title: <span style={{ whiteSpace: 'nowrap' }}>ID</span>,
+      title: <span style={{ whiteSpace: 'nowrap' }}>药品ID</span>,
       dataIndex: 'id',
       key: 'id',
-      width: 80,
+      width: 88,
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>药品名称</span>,
+      dataIndex: 'drugName',
+      key: 'drugName',
+      ellipsis: true,
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>国家本位码</span>,
+      dataIndex: 'nationalCode',
+      key: 'nationalCode',
+      ellipsis: true,
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>生产厂家</span>,
+      dataIndex: 'manufacturer',
+      key: 'manufacturer',
+      ellipsis: true,
+    },
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>操作</span>,
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Popconfirm title="确定恢复该药品？" onConfirm={() => handleRestoreDrug(record.id)}>
+          <Button type="link" size="small" icon={<UndoOutlined />}>
+            恢复
+          </Button>
+        </Popconfirm>
+      ),
+    },
+  ]
+
+  const columns = [
+    {
+      title: <span style={{ whiteSpace: 'nowrap' }}>药品ID</span>,
+      dataIndex: 'id',
+      key: 'id',
+      width: 96,
+      sorter: true,
+      sortOrder: idSortOrder,
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>药品名称</span>,
@@ -494,6 +627,11 @@ const DrugManagement = () => {
                 loading={exporting}
               />
             </Tooltip>
+            <PermissionWrapper permission={PERMISSIONS.DRUG_MANAGE}>
+              <Tooltip title="已删除药品（回收站）">
+                <Button icon={<InboxOutlined />} onClick={openRecycle} />
+              </Tooltip>
+            </PermissionWrapper>
             <PermissionWrapper permission={PERMISSIONS.DRUG_CREATE}>
               <Tooltip title="新增药品">
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} />
@@ -522,6 +660,46 @@ const DrugManagement = () => {
           onChange={handleTableChange}
         />
       </div>
+
+      <Modal
+        title="已删除药品（回收站）"
+        open={recycleOpen}
+        onCancel={() => setRecycleOpen(false)}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        <Space.Compact block style={{ width: '100%', marginBottom: 12 }}>
+          <Input
+            allowClear
+            placeholder="搜索名称、本位码、批准文号、厂家"
+            value={deletedSearchInput}
+            onChange={(e) => setDeletedSearchInput(e.target.value)}
+            onPressEnter={runDeletedSearch}
+            style={{ flex: 1 }}
+          />
+          <Button type="primary" icon={<SearchOutlined />} onClick={runDeletedSearch}>
+            搜索
+          </Button>
+        </Space.Compact>
+        <Table
+          rowKey="id"
+          size="small"
+          loading={deletedLoading}
+          columns={recycleColumns}
+          dataSource={deletedDrugs}
+          pagination={{
+            current: deletedPagination.current,
+            pageSize: deletedPagination.pageSize,
+            total: deletedPagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            pageSizeOptions: ['10', '20', '50'],
+          }}
+          onChange={handleDeletedTableChange}
+          scroll={{ x: 640 }}
+        />
+      </Modal>
       
       <Modal
         title={editingDrug ? '编辑药品信息' : '新增药品信息'}

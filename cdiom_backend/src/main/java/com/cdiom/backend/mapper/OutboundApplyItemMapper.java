@@ -18,7 +18,7 @@ public interface OutboundApplyItemMapper extends BaseMapper<OutboundApplyItem> {
     /**
      * 根据申请ID查询申请明细
      */
-    @Select("SELECT * FROM outbound_apply_item WHERE apply_id = #{applyId}")
+    @Select("SELECT * FROM outbound_apply_item WHERE apply_id = #{applyId} ORDER BY id ASC")
     List<OutboundApplyItem> selectByApplyId(Long applyId);
 }
 

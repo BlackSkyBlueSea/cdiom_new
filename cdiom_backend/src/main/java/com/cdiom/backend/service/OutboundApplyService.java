@@ -2,8 +2,9 @@ package com.cdiom.backend.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.model.OutboundApply;
-
 import com.cdiom.backend.model.OutboundApplyItem;
+import com.cdiom.backend.model.SysUser;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,11 @@ public interface OutboundApplyService {
     List<String> listDepartments();
 
     /**
+     * 申领出库时按药品查询可选批次（仅批次号、数量、效期；供无库存全量权限的医护人员使用）
+     */
+    List<Map<String, Object>> listDrugBatchesForApply(Long drugId);
+
+    /**
      * 根据ID查询出库申请
      */
     OutboundApply getOutboundApplyById(Long id);
@@ -39,6 +45,22 @@ public interface OutboundApplyService {
      * 创建出库申请
      */
     OutboundApply createOutboundApply(OutboundApply outboundApply, List<Map<String, Object>> items);
+
+    /**
+     * 仓库管理员代医护人员创建出库申请（记录 proxyRegistrarId 便于追溯）
+     */
+    OutboundApply createOutboundApplyOnBehalf(Long proxyRegistrarId, Long applicantUserId, String department,
+            String purpose, String remark, List<Map<String, Object>> items);
+
+    /**
+     * 代录出库时可选择的医护人员列表（启用、角色为医护人员）
+     */
+    List<Map<String, Object>> listMedicalApplicantsForProxy();
+
+    /**
+     * 可作为第二审批人的用户（具备 outbound:approve 或 outbound:approve:special，含超级管理员）
+     */
+    List<SysUser> listOutboundSecondApproverCandidates();
 
     /**
      * 审批出库申请（通过）
@@ -85,5 +107,13 @@ public interface OutboundApplyService {
      * @return Map: sufficient(Boolean), message(String), details(List<Map: drugId, drugName, required, available, sufficient>)
      */
     Map<String, Object> checkStockForApply(Long applyId);
+
+    /**
+     * 出库拣货汇总：待执行（已通过审批）的申领单按批次与存储位置展开，便于打印现场拣货单。
+     *
+     * @param date  当 scope 为 approve_day 时，按审批通过日期筛选；为 null 时使用当天
+     * @param scope approve_day：仅含该日审批通过的待执行单；all_pending：全部待执行单
+     */
+    Map<String, Object> getOutboundPickSummary(LocalDate date, String scope);
 }
 

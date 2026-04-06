@@ -26,6 +26,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,7 +165,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public PurchaseOrder createPurchaseOrder(PurchaseOrder purchaseOrder, List<PurchaseOrderItem> items) {
         try {
             if (items == null || items.isEmpty()) {
@@ -245,7 +246,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public PurchaseOrder updatePurchaseOrder(PurchaseOrder purchaseOrder) {
         try {
             PurchaseOrder existing = purchaseOrderMapper.selectById(purchaseOrder.getId());
@@ -273,7 +274,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void deletePurchaseOrder(Long id) {
         // 删除订单明细（级联删除）
         LambdaQueryWrapper<PurchaseOrderItem> itemWrapper = new LambdaQueryWrapper<>();
@@ -285,7 +286,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void updateOrderStatus(Long id, String status, String reason) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -313,7 +314,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     @Override
     public List<PurchaseOrderItem> getOrderItems(Long orderId) {
         List<PurchaseOrderItem> items = purchaseOrderItemMapper.selectByOrderId(orderId);
-        if (items == null || items.isEmpty()) {
+        if (items == null) {
+            return Collections.emptyList();
+        }
+        if (items.isEmpty()) {
             return items;
         }
 
@@ -342,12 +346,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     public Map<Long, Integer> getInboundQuantitiesByOrder(Long orderId) {
         List<PurchaseOrderItem> items = getOrderItems(orderId);
         Map<Long, Integer> result = new HashMap<>();
-        
         for (PurchaseOrderItem item : items) {
-            Integer inboundQuantity = inboundRecordService.getInboundQuantityByOrderAndDrug(orderId, item.getDrugId());
-            result.put(item.getDrugId(), inboundQuantity);
+            Integer allocated = inboundRecordService.getInboundCommittedQuantityByOrderAndDrug(orderId, item.getDrugId());
+            result.put(item.getDrugId(), allocated != null ? allocated : 0);
         }
-        
+
         return result;
     }
 
@@ -359,21 +362,21 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     public boolean isOrderFullyInbound(Long orderId) {
-        List<PurchaseOrderItem> items = getOrderItems(orderId);
-        Map<Long, Integer> inboundQuantities = getInboundQuantitiesByOrder(orderId);
-        
-        for (PurchaseOrderItem item : items) {
-            Integer inboundQuantity = inboundQuantities.getOrDefault(item.getDrugId(), 0);
-            if (inboundQuantity < item.getQuantity()) {
-                return false; // 还有未入库的
+        boolean allReceived = true;
+        for (PurchaseOrderItem item : getOrderItems(orderId)) {
+            Integer allocated = inboundRecordService.getInboundCommittedQuantityByOrderAndDrug(orderId, item.getDrugId());
+            int a = allocated != null ? allocated : 0;
+            int ordered = item.getQuantity() != null ? item.getQuantity() : 0;
+            if (a < ordered) {
+                allReceived = false;
+                break;
             }
         }
-        
-        return true; // 全部入库
+        return allReceived;
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void updateOrderInboundStatus(Long orderId) {
         if (isOrderFullyInbound(orderId)) {
             updateOrderStatus(orderId, "RECEIVED", null);
@@ -382,7 +385,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void confirmOrder(Long id) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -404,7 +407,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void rejectOrder(Long id, String reason) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -430,7 +433,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void shipOrder(Long id, String logisticsNumber) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -443,45 +446,25 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             if (!StringUtils.hasText(logisticsNumber)) {
                 throw new ServiceException("物流单号不能为空");
             }
-        order.setStatus("SHIPPED");
-        order.setLogisticsNumber(logisticsNumber);
-        order.setShipDate(java.time.LocalDateTime.now());
-        purchaseOrderMapper.updateById(order);
-        
-        // 创建待入库提醒通知，推送给仓库管理员
-        try {
-            Supplier supplier = supplierMapper.selectById(order.getSupplierId());
-            String supplierName = supplier != null ? supplier.getName() : "未知供应商";
-            
-            SysNotice notice = new SysNotice();
-            notice.setNoticeTitle("待入库提醒");
-            notice.setNoticeContent(String.format("订单编号：%s\n供应商：%s\n物流单号：%s\n发货日期：%s\n\n请及时进行入库验收。",
-                    order.getOrderNumber(),
-                    supplierName,
-                    logisticsNumber,
-                    order.getShipDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
-            notice.setNoticeType(1); // 1-通知
-            notice.setStatus(1); // 1-正常
-            notice.setCreateBy(null); // 系统自动创建
-            sysNoticeService.createNotice(notice);
-            
-            log.info("已创建待入库提醒通知：订单编号={}", order.getOrderNumber());
-        } catch (Exception e) {
-            // 通知创建失败不影响发货流程
-            log.warn("创建待入库提醒通知失败：订单ID={}, 错误={}", id, e.getMessage());
-        }
-        
+            order.setStatus("SHIPPED");
+            order.setLogisticsNumber(logisticsNumber);
+            order.setShipDate(java.time.LocalDateTime.now());
+            purchaseOrderMapper.updateById(order);
+
+            createInboundShipNotice(order, id, logisticsNumber);
+
             log.info("发货采购订单：订单ID={}, 订单编号={}, 物流单号={}", id, order.getOrderNumber(), logisticsNumber);
-        } catch (ServiceException e) {
-            throw e;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
+            if (e instanceof ServiceException) {
+                throw e;
+            }
             log.error("发货采购订单异常：订单ID={}", id, e);
             throw new ServiceException("发货失败：" + e.getMessage());
         }
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Throwable.class)
     public void cancelOrder(Long id, String reason) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -511,7 +494,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void updateLogisticsNumber(Long id, String logisticsNumber) {
         try {
             PurchaseOrder order = purchaseOrderMapper.selectById(id);
@@ -541,11 +523,35 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
     }
 
-    /**
-     * 生成订单编号
-     * 格式：ORD + 日期（YYYYMMDD）+ 3位序号
-     * 符合GSP规范，用于生成Code128条形码
-     */
+    // 发货后写入库提醒通知（失败不影响发货事务）
+    private void createInboundShipNotice(PurchaseOrder order, Long id, String logisticsNumber) {
+        try {
+            Supplier supplier = supplierMapper.selectById(order.getSupplierId());
+            String supplierName = supplier != null ? supplier.getName() : "未知供应商";
+            String shipDateStr = order.getShipDate() != null
+                    ? order.getShipDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    : "";
+            String content = String.format(
+                    "订单编号：%s\n供应商：%s\n物流单号：%s\n发货日期：%s\n\n请及时进行入库验收。",
+                    order.getOrderNumber(),
+                    supplierName,
+                    logisticsNumber,
+                    shipDateStr);
+
+            SysNotice notice = new SysNotice();
+            notice.setNoticeTitle("待入库提醒");
+            notice.setNoticeContent(content);
+            notice.setNoticeType(1);
+            notice.setStatus(1);
+            notice.setCreateBy(null);
+            sysNoticeService.createNotice(notice);
+
+            log.info("已创建待入库提醒通知：订单编号={}", order.getOrderNumber());
+        } catch (Exception e) {
+            log.warn("创建待入库提醒通知失败：订单ID={}, 错误={}", id, e.getMessage());
+        }
+    }
+
     private String generateOrderNumber() {
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         // 查询今天已生成的订单数量

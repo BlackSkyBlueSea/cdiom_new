@@ -49,7 +49,7 @@
 - `500`: 操作失败
 
 **认证方式：**
-- **Token认证**：JWT Token，8小时有效期，存储在Cookie中（key: cdiom_token）
+- **Token认证**：JWT；**默认约 8 小时**（`jwt.expiration`，毫秒）。若数据库 `sys_config` 中 `jwt_expiration` 为合法毫秒值则优先生效。客户端可同时使用 **请求头 `Authorization: Bearer <token>`** 与 **Cookie `cdiom_token`**，**请求头优先**。
 - **权限控制**：基于RBAC的权限系统，支持接口级权限控制
 
 ---
@@ -136,6 +136,24 @@
   "code": 200,
   "msg": "操作成功",
   "data": null
+}
+```
+
+### 系统管理员联系信息
+
+- **接口**: `GET /api/v1/auth/admin-contact`
+- **权限**: 需要 Token 认证（任意已登录用户）
+- **说明**: 返回首个**启用**的**系统管理员**（`roleId=1`）的用户名、手机、邮箱，供个人中心等场景提示「申请修改资料时联系谁」；字段可能为空。
+- **响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "adminUsername": "admin",
+    "phone": "13800138000",
+    "email": "admin@example.com"
+  }
 }
 ```
 
@@ -358,10 +376,38 @@
 
 ## 参数配置接口
 
+> 本模块控制器类级别要求 **`config:manage`**，下列接口均需该权限。
+
+### 获取当前运行时生效参数
+
+- **接口**: `GET /api/v1/configs/runtime-effective`
+- **权限**: 需要 `config:manage` 权限
+- **说明**: 返回与业务/安全相关的**当前生效值**（库内 `sys_config` 优先，非法或缺失时回退 `application.yml` 等默认值）。典型字段包括：
+  - `expiryWarningDays`、`expiryCriticalDays`：近效期黄/红阈值（天）
+  - `logRetentionYears`：登录/操作日志保留年限（用于定时清理）
+  - `jwtExpirationMs`：JWT 有效期（毫秒）
+  - `loginFailThreshold`、`loginFailTimeWindowMinutes`、`loginLockDurationHours`：登录锁定相关
+- **响应示例**:
+```json
+{
+  "code": 200,
+  "msg": "操作成功",
+  "data": {
+    "expiryWarningDays": 180,
+    "expiryCriticalDays": 90,
+    "logRetentionYears": 5,
+    "jwtExpirationMs": 28800000,
+    "loginFailThreshold": 5,
+    "loginFailTimeWindowMinutes": 15,
+    "loginLockDurationHours": 1
+  }
+}
+```
+
 ### 获取配置列表
 
 - **接口**: `GET /api/v1/configs`
-- **权限**: 需要 `config:view` 或 `config:manage` 权限
+- **权限**: 需要 `config:manage` 权限
 - **参数**: 
   - `page`: 页码（默认1）
   - `size`: 每页数量（默认10）
@@ -371,12 +417,12 @@
 ### 获取配置详情
 
 - **接口**: `GET /api/v1/configs/{id}`
-- **权限**: 需要 `config:view` 或 `config:manage` 权限
+- **权限**: 需要 `config:manage` 权限
 
 ### 根据键名获取配置
 
 - **接口**: `GET /api/v1/configs/key/{configKey}`
-- **权限**: 需要 `config:view` 或 `config:manage` 权限
+- **权限**: 需要 `config:manage` 权限
 - **说明**: 用于获取特定配置值
 
 ### 创建配置
@@ -1668,6 +1714,6 @@ jisuapi:
 
 ---
 
-**文档版本**: v1.1.0  
-**最后更新**: 2026年3月9日
+**文档版本**: v1.2.0  
+**最后更新**: 2026年3月29日
 

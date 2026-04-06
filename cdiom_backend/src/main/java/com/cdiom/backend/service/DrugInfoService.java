@@ -13,8 +13,12 @@ public interface DrugInfoService {
 
     /**
      * 分页查询药品信息列表
+     *
+     * @param sortField 排序字段，目前仅支持 id；为空则按创建时间倒序
+     * @param sortOrder asc 或 desc（大小写不敏感）
      */
-    Page<DrugInfo> getDrugInfoList(Integer page, Integer size, String keyword, Integer isSpecial);
+    Page<DrugInfo> getDrugInfoList(Integer page, Integer size, String keyword, Integer isSpecial,
+            String sortField, String sortOrder);
 
     /**
      * 根据ID查询药品信息
@@ -35,6 +39,16 @@ public interface DrugInfoService {
      * 删除药品信息
      */
     void deleteDrugInfo(Long id);
+
+    /**
+     * 分页查询已逻辑删除的药品列表（回收站）
+     */
+    Page<DrugInfo> getDeletedDrugInfoList(Integer page, Integer size, String keyword);
+
+    /**
+     * 恢复已逻辑删除的药品
+     */
+    void restoreDrugInfo(Long id);
 
     /**
      * 根据商品码或本位码查询药品信息
@@ -70,7 +84,8 @@ public interface DrugInfoService {
      * @param keyword 关键词（可选）
      * @return 药品信息分页列表
      */
-    Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword);
+    Page<DrugInfo> getDrugInfoListBySupplierId(Long supplierId, Integer page, Integer size, String keyword,
+            String sortField, String sortOrder);
 
     /**
      * 根据供应商ID查询该供应商提供的药品列表（含协议价），用于采购订单带价与供应商维护

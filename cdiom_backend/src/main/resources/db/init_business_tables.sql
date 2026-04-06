@@ -203,11 +203,29 @@ CREATE TABLE IF NOT EXISTS purchase_order_item (
     CONSTRAINT fk_purchase_order_item_drug FOREIGN KEY (drug_id) REFERENCES drug_info(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 采购入库到货批次头（多行入库明细可共用，便于升级为收货单模式）
+CREATE TABLE IF NOT EXISTS inbound_receipt_batch (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_code VARCHAR(50) NOT NULL COMMENT '到货批次号',
+    order_id BIGINT NOT NULL COMMENT '采购订单ID',
+    delivery_note_number VARCHAR(100) NOT NULL COMMENT '随货同行单编号',
+    arrival_time DATETIME NOT NULL COMMENT '本批到货时间',
+    delivery_note_image VARCHAR(500) DEFAULT NULL COMMENT '随货同行单图片路径',
+    operator_id BIGINT DEFAULT NULL COMMENT '登记人',
+    remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_receipt_batch_code (batch_code),
+    KEY idx_receipt_batch_order (order_id),
+    CONSTRAINT fk_inbound_receipt_batch_order FOREIGN KEY (order_id) REFERENCES purchase_order(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购入库到货批次头';
+
 -- 入库记录表
 CREATE TABLE IF NOT EXISTS inbound_record (
     id BIGINT NOT NULL AUTO_INCREMENT,
     record_number VARCHAR(50) NOT NULL COMMENT '入库单号',
     order_id BIGINT DEFAULT NULL COMMENT '关联采购订单ID',
+    receipt_batch_id BIGINT DEFAULT NULL COMMENT '到货批次头ID',
     drug_id BIGINT NOT NULL,
     batch_number VARCHAR(100) NOT NULL COMMENT '批次号',
     quantity INT NOT NULL COMMENT '入库数量',
@@ -215,24 +233,35 @@ CREATE TABLE IF NOT EXISTS inbound_record (
     arrival_date DATE DEFAULT NULL COMMENT '到货日期',
     production_date DATE DEFAULT NULL COMMENT '生产日期',
     manufacturer VARCHAR(200) DEFAULT NULL COMMENT '生产厂家',
+    storage_location VARCHAR(200) DEFAULT NULL COMMENT '入库指定存储位置',
     delivery_note_number VARCHAR(100) DEFAULT NULL COMMENT '随货同行单编号',
     delivery_note_image VARCHAR(500) DEFAULT NULL COMMENT '随货同行单图片路径',
     operator_id BIGINT NOT NULL COMMENT '操作人ID',
     second_operator_id BIGINT DEFAULT NULL COMMENT '第二操作人ID（特殊药品）',
     status VARCHAR(20) DEFAULT 'QUALIFIED' COMMENT 'QUALIFIED-合格/UNQUALIFIED-不合格',
+    second_confirm_status VARCHAR(32) NOT NULL DEFAULT 'CONFIRMED' COMMENT 'NONE/CONFIRMED/PENDING_SECOND/REJECTED/WITHDRAWN/TIMEOUT',
+    second_confirm_time DATETIME DEFAULT NULL,
+    second_confirm_deadline DATETIME DEFAULT NULL,
+    second_reject_reason VARCHAR(500) DEFAULT NULL,
     expiry_check_status VARCHAR(20) DEFAULT 'PASS' COMMENT 'PASS-通过/WARNING-不足180天需确认/FORCE-强制入库',
     expiry_check_reason VARCHAR(500) DEFAULT NULL COMMENT '效期校验说明',
     remark VARCHAR(500) DEFAULT NULL,
+    disposition_code VARCHAR(32) DEFAULT NULL COMMENT '不合格处置意向',
+    disposition_remark VARCHAR(500) DEFAULT NULL COMMENT '处置补充说明',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_record_number (record_number),
     KEY idx_order_id (order_id),
+    KEY idx_receipt_batch_id (receipt_batch_id),
     KEY idx_drug_id (drug_id),
     KEY idx_batch_number (batch_number),
     KEY idx_operator_id (operator_id),
     KEY idx_status (status),
+    KEY idx_second_confirm (second_confirm_status, second_operator_id),
     KEY idx_create_time (create_time),
+    KEY idx_disposition_code (disposition_code),
     CONSTRAINT fk_inbound_record_order FOREIGN KEY (order_id) REFERENCES purchase_order(id) ON DELETE SET NULL,
+    CONSTRAINT fk_inbound_record_receipt_batch FOREIGN KEY (receipt_batch_id) REFERENCES inbound_receipt_batch(id),
     CONSTRAINT fk_inbound_record_drug FOREIGN KEY (drug_id) REFERENCES drug_info(id),
     CONSTRAINT fk_inbound_record_operator FOREIGN KEY (operator_id) REFERENCES sys_user(id),
     CONSTRAINT fk_inbound_record_second_operator FOREIGN KEY (second_operator_id) REFERENCES sys_user(id)
@@ -243,6 +272,7 @@ CREATE TABLE IF NOT EXISTS outbound_apply (
     id BIGINT NOT NULL AUTO_INCREMENT,
     apply_number VARCHAR(50) NOT NULL COMMENT '申领单号',
     applicant_id BIGINT NOT NULL COMMENT '申请人ID',
+    proxy_registrar_id BIGINT DEFAULT NULL COMMENT '代录人ID（仓库管理员代录时）',
     department VARCHAR(100) DEFAULT NULL COMMENT '所属科室',
     purpose VARCHAR(200) DEFAULT NULL COMMENT '用途',
     status VARCHAR(20) DEFAULT 'PENDING' COMMENT 'PENDING-待审批/APPROVED-已通过/REJECTED-已驳回/OUTBOUND-已出库/CANCELLED-已取消',
@@ -257,10 +287,12 @@ CREATE TABLE IF NOT EXISTS outbound_apply (
     PRIMARY KEY (id),
     UNIQUE KEY uk_apply_number (apply_number),
     KEY idx_applicant_id (applicant_id),
+    KEY idx_proxy_registrar_id (proxy_registrar_id),
     KEY idx_approver_id (approver_id),
     KEY idx_status (status),
     KEY idx_create_time (create_time),
     CONSTRAINT fk_outbound_apply_applicant FOREIGN KEY (applicant_id) REFERENCES sys_user(id),
+    CONSTRAINT fk_outbound_apply_proxy_registrar FOREIGN KEY (proxy_registrar_id) REFERENCES sys_user(id),
     CONSTRAINT fk_outbound_apply_approver FOREIGN KEY (approver_id) REFERENCES sys_user(id),
     CONSTRAINT fk_outbound_apply_second_approver FOREIGN KEY (second_approver_id) REFERENCES sys_user(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

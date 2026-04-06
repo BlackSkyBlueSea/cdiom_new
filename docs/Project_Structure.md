@@ -37,10 +37,10 @@ cdiom_new/
 ```
 cdiom_backend/
 └── src/main/java/com/cdiom/backend/
-    ├── CdiomApplication.java                    # Spring Boot 启动类
+    ├── CdiomApplication.java                    # Spring Boot 启动类（含 @EnableScheduling 启用定时任务）
     │
     ├── controller/                              # 控制器层（RESTful API接口）
-    │   ├── AuthController.java                  # 认证控制器：用户登录、登出、获取当前用户信息
+    │   ├── AuthController.java                  # 认证控制器：登录、登出、当前用户、权限列表、管理员联系信息
     │   ├── SysUserController.java               # 用户管理控制器：用户CRUD、状态管理、权限管理
     │   ├── SysRoleController.java               # 角色管理控制器：角色CRUD、状态管理
     │   ├── SysConfigController.java             # 参数配置控制器：系统参数配置管理
@@ -63,6 +63,9 @@ cdiom_backend/
     │   ├── SuperAdminController.java            # 超级管理员控制器：超级管理员启用/停用、邮箱验证
     │   ├── BackendMonitorController.java        # 后端监控控制器：系统信息、日志监控、健康检查
     │   └── LogWebSocketHandler.java            # WebSocket日志处理器：实时日志推送
+    │
+    ├── schedule/                                # 定时任务
+    │   └── LogRetentionCleanupScheduler.java   # 按 log_retention_years 清理过期登录/操作日志
     │
     ├── service/                                 # 服务层（业务逻辑处理）
     │   ├── impl/                                # 服务实现类目录
@@ -152,6 +155,7 @@ cdiom_backend/
     │
     ├── model/                                   # 实体类（数据库表映射）
     │   ├── SysUser.java                         # 系统用户实体：对应sys_user表
+    │   ├── AdminContactInfo.java                # 非表实体：面向用户展示的系统管理员联系信息
     │   ├── SysRole.java                         # 系统角色实体：对应sys_role表
     │   ├── SysConfig.java                       # 系统配置实体：对应sys_config表
     │   ├── SysNotice.java                       # 系统通知实体：对应sys_notice表
@@ -203,16 +207,17 @@ cdiom_backend/
     │       └── ServiceException.java           # 业务异常类：自定义业务异常
     │
     ├── util/                                    # 工具类目录
-    │   ├── JwtUtil.java                         # JWT工具类：Token生成、解析、验证
+    │   ├── JwtUtil.java                         # JWT工具类：Token生成、解析、验证（有效期读取 SystemConfigUtil）
     │   ├── LoginConfigUtil.java                 # 登录配置工具类：登录配置管理
     │   ├── RetryUtil.java                       # 重试工具类：操作重试机制
-    │   └── SystemConfigUtil.java                # 系统配置工具类：系统配置管理
+    │   └── SystemConfigUtil.java                # 系统配置工具类：从 sys_config 读取运行时参数并缓存
     │
     ├── annotation/                              # 自定义注解目录
     │   └── RequiresPermission.java              # 权限注解：标记需要权限验证的接口
     │
     └── constant/                                # 常量类目录
-        └── LoginConfigConstant.java              # 登录配置常量：登录相关常量定义
+        ├── LoginConfigConstant.java              # 登录配置常量：登录相关常量定义
+        └── SysConfigKeys.java                    # sys_config 业务键名常量（与参数表一致）
 ```
 
 ### 资源文件结构
@@ -224,6 +229,8 @@ cdiom_backend/
     ├── application.yml.example                  # 配置文件示例：敏感配置模板
     ├── application-local.yml                    # 本地配置文件：本地开发环境配置（不提交到Git）
     ├── logback-spring.xml                       # 日志配置文件：日志级别、输出格式、文件路径
+    │
+    ├── mapper/                                  # MyBatis XML 映射（如 InventoryMapper.xml）
     │
     └── db/                                      # 数据库脚本目录
         ├── README.md                            # 数据库脚本说明文档：脚本使用指南
@@ -301,7 +308,8 @@ cdiom_frontend/
 │   │   ├── request.js                          # Axios封装：HTTP请求封装、拦截器配置
 │   │   ├── auth.js                             # 认证工具：Token管理、权限检查工具函数
 │   │   ├── permission.js                       # 权限工具：权限检查工具函数
-│   │   └── logger.js                           # 日志工具：日志记录工具函数
+│   │   ├── logger.js                           # 日志工具：日志记录工具函数
+│   │   └── tablePageLayout.js                  # 列表页表格与工具栏布局样式常量
 │   │
 │   ├── styles/                                 # 样式文件目录
 │   │   └── pad-responsive.css                  # Pad端响应式样式：Pad设备适配样式
@@ -375,7 +383,9 @@ docs/
 │   └── System_Test_Report.md                   # 系统测试报告：功能测试、性能测试、安全测试等完整的测试用例和结果
 │
 ├── 📋 维护和版本管理/
-│   └── CHANGELOG.md                            # 版本历史文档：所有版本的完整更新内容，包括功能更新、bug修复等
+│   ├── CHANGELOG.md                            # 版本历史文档：所有版本的完整更新内容，包括功能更新、bug修复等
+│   ├── UPDATE_LOG_20260309_Outbound_Dashboard.md # 出库/审批/仪表盘等变更记录（2026-03-08～09）
+│   └── UPDATE_LOG_20260328.md                  # 系统参数/JWT/日志保留/布局等变更记录（2026-03-28）
 │
 ├── 🚀 部署和运维/
 │   └── Deployment_Guide.md                     # 部署指南：开发环境部署、生产环境部署、Nginx配置等

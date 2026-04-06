@@ -3,11 +3,18 @@ package com.cdiom.backend.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
+import com.cdiom.backend.mapper.DrugInfoMapper;
+import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.OutboundApply;
+import com.cdiom.backend.model.OutboundApplyItem;
+import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.OutboundApplyService;
 import com.cdiom.backend.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,6 +23,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,23 +39,24 @@ import java.util.Map;
 public class OutboundApplyController {
 
     private final OutboundApplyService outboundApplyService;
+    private final DrugInfoMapper drugInfoMapper;
     private final JwtUtil jwtUtil;
 
     /**
      * 分页查询出库申请列表
      */
     @GetMapping
-    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:approve", "outbound:execute"})
+    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:apply:on-behalf", "outbound:approve", "outbound:execute"})
     public Result<Page<OutboundApply>> getOutboundApplyList(
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer size,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Long applicantId,
-            @RequestParam(required = false) Long approverId,
-            @RequestParam(required = false) String department,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(value = "page", defaultValue = "1") Integer page,
+            @RequestParam(value = "size", defaultValue = "10") Integer size,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "applicantId", required = false) Long applicantId,
+            @RequestParam(value = "approverId", required = false) Long approverId,
+            @RequestParam(value = "department", required = false) String department,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         Page<OutboundApply> applyPage = outboundApplyService.getOutboundApplyList(
                 page, size, keyword, applicantId, approverId, department, status, startDate, endDate);
         return Result.success(applyPage);
@@ -56,10 +66,41 @@ public class OutboundApplyController {
      * 获取已有科室列表（供新建出库申请时下拉选择，无则仍可手动输入）
      */
     @GetMapping("/departments")
-    @RequiresPermission({"outbound:view", "outbound:apply"})
+    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:apply:on-behalf"})
     public Result<List<String>> listDepartments() {
         List<String> list = outboundApplyService.listDepartments();
         return Result.success(list);
+    }
+
+    /**
+     * 新建申领时：按药品查询库存批次（医护人员通常无 drug:view，不能调 /inventory）
+     */
+    @GetMapping("/drug-batches")
+    @RequiresPermission({"outbound:apply", "outbound:apply:on-behalf"})
+    public Result<List<Map<String, Object>>> listDrugBatchesForApply(@RequestParam("drugId") Long drugId) {
+        try {
+            return Result.success(outboundApplyService.listDrugBatchesForApply(drugId));
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 代录出库：可选申领医护人员列表（启用、角色为医护人员）
+     */
+    @GetMapping("/medical-applicants")
+    @RequiresPermission({"outbound:apply:on-behalf"})
+    public Result<List<Map<String, Object>>> listMedicalApplicantsForProxy() {
+        return Result.success(outboundApplyService.listMedicalApplicantsForProxy());
+    }
+
+    /**
+     * 特殊药品第二审批人候选：具备出库审核权限（outbound:approve 或 outbound:approve:special）的用户，含超级管理员
+     */
+    @GetMapping("/second-approver-candidates")
+    @RequiresPermission({"outbound:approve", "outbound:approve:special"})
+    public Result<List<SysUser>> listSecondApproverCandidates() {
+        return Result.success(outboundApplyService.listOutboundSecondApproverCandidates());
     }
 
     /**
@@ -111,6 +152,29 @@ public class OutboundApplyController {
 
             OutboundApply created = outboundApplyService.createOutboundApply(apply, request.getItems());
             return Result.success("出库申请创建成功", created);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 仓库管理员代医护人员创建出库申请（现场申领、系统留痕）
+     */
+    @PostMapping("/on-behalf")
+    @RequiresPermission({"outbound:apply:on-behalf"})
+    public Result<OutboundApply> createOutboundApplyOnBehalf(
+            @Valid @RequestBody OutboundApplyOnBehalfRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            Long proxyId = getCurrentUserId(httpRequest);
+            OutboundApply created = outboundApplyService.createOutboundApplyOnBehalf(
+                    proxyId,
+                    request.getApplicantId(),
+                    request.getDepartment(),
+                    request.getPurpose(),
+                    request.getRemark(),
+                    request.getItems());
+            return Result.success("代录出库申请已创建", created);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -218,23 +282,44 @@ public class OutboundApplyController {
     }
 
     /**
+     * 出库拣货汇总：待执行申领单按药品、批次、存储位置汇总，供仓库打印现场拣货单（与执行出库 FIFO 规则一致模拟）。
+     *
+     * @param date  scope=approve_day 时按审批通过日期筛选，默认当天；scope=all_pending 时忽略
+     * @param scope approve_day：指定日审批通过且未出库；all_pending：全部待执行
+     */
+    @GetMapping("/pick-summary")
+    @RequiresPermission({"outbound:execute", "outbound:view", "outbound:approve", "outbound:approve:special"})
+    public Result<Map<String, Object>> getOutboundPickSummary(
+            @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "scope", defaultValue = "approve_day") String scope) {
+        return Result.success(outboundApplyService.getOutboundPickSummary(date, scope));
+    }
+
+    /**
      * 获取出库申请明细列表（列表查看、申请人查看详情等）
      */
     @GetMapping("/{id}/items")
     @RequiresPermission({"drug:view", "drug:manage", "outbound:view", "outbound:apply"})
     public Result<List<Map<String, Object>>> getOutboundApplyItems(@PathVariable Long id) {
         try {
-            List<com.cdiom.backend.model.OutboundApplyItem> items = outboundApplyService.getOutboundApplyItems(id);
-            // 转换为前端需要的格式，包含药品信息
-            List<Map<String, Object>> result = new java.util.ArrayList<>();
-            for (com.cdiom.backend.model.OutboundApplyItem item : items) {
-                Map<String, Object> itemMap = new java.util.HashMap<>();
+            List<OutboundApplyItem> items = outboundApplyService.getOutboundApplyItems(id);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (OutboundApplyItem item : items) {
+                Map<String, Object> itemMap = new HashMap<>();
                 itemMap.put("id", item.getId());
                 itemMap.put("drugId", item.getDrugId());
                 itemMap.put("batchNumber", item.getBatchNumber());
                 itemMap.put("quantity", item.getQuantity());
                 itemMap.put("actualQuantity", item.getActualQuantity());
                 itemMap.put("remark", item.getRemark());
+                DrugInfo drug = drugInfoMapper.selectById(item.getDrugId());
+                if (drug != null) {
+                    itemMap.put("drugName", drug.getDrugName());
+                    itemMap.put("isSpecial", drug.getIsSpecial());
+                } else {
+                    itemMap.put("drugName", null);
+                    itemMap.put("isSpecial", null);
+                }
                 result.add(itemMap);
             }
             return Result.success(result);
@@ -286,6 +371,22 @@ public class OutboundApplyController {
         private String purpose;
         private String remark;
         private List<Map<String, Object>> items; // [{drugId, batchNumber(可选), quantity}]
+    }
+
+    /**
+     * 代录出库申请请求 DTO
+     */
+    @Data
+    public static class OutboundApplyOnBehalfRequest {
+        @NotNull(message = "请选择申领医护人员")
+        private Long applicantId;
+        @NotBlank(message = "请填写所属科室")
+        private String department;
+        @NotBlank(message = "请填写用途说明")
+        private String purpose;
+        private String remark;
+        @NotEmpty(message = "申领明细不能为空")
+        private List<Map<String, Object>> items;
     }
 
     /**

@@ -3,9 +3,13 @@ package com.cdiom.backend.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
+import com.cdiom.backend.model.InboundReceiptBatch;
 import com.cdiom.backend.model.InboundRecord;
+import com.cdiom.backend.model.vo.InboundSplitResult;
+import com.cdiom.backend.model.vo.OrderInboundRemainingRow;
 import com.cdiom.backend.service.InboundRecordService;
 import com.cdiom.backend.util.JwtUtil;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
@@ -15,7 +19,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 入库记录管理控制器
@@ -46,10 +57,12 @@ public class InboundRecordController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String expiryCheckStatus) {
+            @RequestParam(required = false) String expiryCheckStatus,
+            @RequestParam(required = false) String secondConfirmStatus,
+            @RequestParam(required = false) Long secondOperatorId) {
         Page<InboundRecord> recordPage = inboundRecordService.getInboundRecordList(
                 page, size, keyword, orderId, drugId, batchNumber, operatorId,
-                startDate, endDate, status, expiryCheckStatus);
+                startDate, endDate, status, expiryCheckStatus, secondConfirmStatus, secondOperatorId);
         return Result.success(recordPage);
     }
 
@@ -72,6 +85,14 @@ public class InboundRecordController {
     }
 
     /**
+     * 不合格入库处置意向选项（代码 -> 展示名），便于前端下拉与后续扩展统一口径
+     */
+    @GetMapping("/disposition-options")
+    public Result<Map<String, String>> listDispositionOptions() {
+        return Result.success(inboundRecordService.listDispositionOptions());
+    }
+
+    /**
      * 创建入库记录（采购订单入库）
      */
     @PostMapping("/from-order")
@@ -86,9 +107,10 @@ public class InboundRecordController {
             record.setBatchNumber(request.getBatchNumber());
             record.setQuantity(request.getQuantity());
             record.setExpiryDate(request.getExpiryDate());
-            record.setArrivalDate(request.getArrivalDate() != null ? request.getArrivalDate() : LocalDate.now());
+            record.setArrivalDate(request.getArrivalDate());
             record.setProductionDate(request.getProductionDate());
             record.setManufacturer(request.getManufacturer());
+            record.setStorageLocation(request.getStorageLocation());
             record.setDeliveryNoteNumber(request.getDeliveryNoteNumber());
             record.setDeliveryNoteImage(request.getDeliveryNoteImage());
             record.setOperatorId(operatorId);
@@ -97,10 +119,38 @@ public class InboundRecordController {
             record.setExpiryCheckStatus(request.getExpiryCheckStatus());
             record.setExpiryCheckReason(request.getExpiryCheckReason());
             record.setRemark(request.getRemark());
+            record.setDispositionCode(request.getDispositionCode());
+            record.setDispositionRemark(request.getDispositionRemark());
 
             InboundRecord created = inboundRecordService.createInboundRecordFromOrder(
-                    record, request.getOrderId(), request.getDrugId());
-            return Result.success("入库成功", created);
+                    record, request.getOrderId(), request.getDrugId(),
+                    request.getReceiptBatchId(), request.getArrivalAt());
+            String msg = "PENDING_SECOND".equals(created.getSecondConfirmStatus())
+                    ? "已提交，请第二操作人登录系统确认后方可入账（已邮件提醒）"
+                    : "入库成功";
+            return Result.success(msg, created);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 仅登记采购到货批次头（可选：先登记再逐药品入库）
+     */
+    @PostMapping("/receipt-batch")
+    public Result<InboundReceiptBatch> createReceiptBatch(
+            @Valid @RequestBody ReceiptBatchCreateRequest body,
+            HttpServletRequest httpRequest) {
+        try {
+            Long operatorId = getCurrentUserId(httpRequest);
+            InboundReceiptBatch b = inboundRecordService.createReceiptBatchHeader(
+                    body.getOrderId(),
+                    body.getDeliveryNoteNumber(),
+                    body.getArrivalAt() != null ? body.getArrivalAt() : LocalDateTime.now(),
+                    operatorId,
+                    body.getRemark(),
+                    body.getDeliveryNoteImage());
+            return Result.success("到货批次已登记", b);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -123,6 +173,7 @@ public class InboundRecordController {
             record.setArrivalDate(request.getArrivalDate() != null ? request.getArrivalDate() : LocalDate.now());
             record.setProductionDate(request.getProductionDate());
             record.setManufacturer(request.getManufacturer());
+            record.setStorageLocation(request.getStorageLocation());
             record.setDeliveryNoteNumber(request.getDeliveryNoteNumber());
             record.setDeliveryNoteImage(request.getDeliveryNoteImage());
             record.setOperatorId(operatorId);
@@ -131,10 +182,60 @@ public class InboundRecordController {
             record.setExpiryCheckStatus(request.getExpiryCheckStatus());
             record.setExpiryCheckReason(request.getExpiryCheckReason());
             record.setRemark(request.getRemark());
+            record.setDispositionCode(request.getDispositionCode());
+            record.setDispositionRemark(request.getDispositionRemark());
 
             InboundRecord created = inboundRecordService.createInboundRecordTemporary(
                     record, request.getDrugId());
-            return Result.success("临时入库成功", created);
+            String msg = "PENDING_SECOND".equals(created.getSecondConfirmStatus())
+                    ? "已提交，请第二操作人登录系统确认后方可入账（已邮件提醒）"
+                    : "临时入库成功";
+            return Result.success(msg, created);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 同一批号同时登记合格与不合格两条明细（同一追溯码，事务）
+     */
+    @PostMapping("/from-order/split")
+    public Result<InboundSplitResult> createInboundSplitFromOrder(
+            @Valid @RequestBody SplitInboundFromOrderRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            Long operatorId = getCurrentUserId(httpRequest);
+            InboundRecord base = new InboundRecord();
+            base.setBatchNumber(request.getBatchNumber());
+            base.setExpiryDate(request.getExpiryDate());
+            base.setArrivalDate(request.getArrivalDate());
+            base.setProductionDate(request.getProductionDate());
+            base.setManufacturer(request.getManufacturer());
+            base.setStorageLocation(request.getStorageLocation());
+            base.setDeliveryNoteNumber(request.getDeliveryNoteNumber());
+            base.setDeliveryNoteImage(request.getDeliveryNoteImage());
+            base.setOperatorId(operatorId);
+            base.setSecondOperatorId(request.getSecondOperatorId());
+            base.setExpiryCheckStatus(request.getExpiryCheckStatus());
+            base.setExpiryCheckReason(request.getExpiryCheckReason());
+            base.setRemark(request.getRemark());
+
+            InboundSplitResult result = inboundRecordService.createInboundSplitFromOrder(
+                    base,
+                    request.getOrderId(),
+                    request.getDrugId(),
+                    request.getQualifiedQuantity(),
+                    request.getUnqualifiedQuantity(),
+                    request.getUnqualifiedReason(),
+                    request.getUnqualifiedDispositionCode(),
+                    request.getUnqualifiedDispositionRemark(),
+                    request.getReceiptBatchId(),
+                    request.getArrivalAt());
+            String msg = result.getQualifiedRecord() != null
+                    && "PENDING_SECOND".equals(result.getQualifiedRecord().getSecondConfirmStatus())
+                    ? "拆行验收已提交，合格部分请第二操作人确认后方可入账（已邮件提醒）"
+                    : "拆行验收已提交（合格与不合格两条已关联同一追溯码）";
+            return Result.success(msg, result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -167,6 +268,71 @@ public class InboundRecordController {
             @PathVariable Long drugId) {
         Integer quantity = inboundRecordService.getInboundQuantityByOrderAndDrug(orderId, drugId);
         return Result.success(quantity);
+    }
+
+    /**
+     * 订单行已占用到货数量（合格已入账或待第二人确认 + 不合格登记），用于入库时校验不超量
+     */
+    @GetMapping("/order/{orderId}/drug/{drugId}/committed-quantity")
+    public Result<Integer> getInboundCommittedQuantityByOrderAndDrug(
+            @PathVariable Long orderId,
+            @PathVariable Long drugId) {
+        Integer quantity = inboundRecordService.getInboundCommittedQuantityByOrderAndDrug(orderId, drugId);
+        return Result.success(quantity);
+    }
+
+    /**
+     * 订单各药品：订单量、已占用（含待第二人确认）、剩余可入库（用于入库界面动态展示）
+     */
+    @GetMapping("/order/{orderId}/inbound-remaining")
+    public Result<List<OrderInboundRemainingRow>> listOrderInboundRemaining(@PathVariable Long orderId) {
+        List<OrderInboundRemainingRow> rows = inboundRecordService.listOrderInboundRemaining(orderId);
+        return Result.success(rows);
+    }
+
+    /**
+     * 第二操作人确认入库（须登录，特殊药品待确认）
+     */
+    @PostMapping("/{id}/second-confirm")
+    public Result<InboundRecord> secondConfirmInbound(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long uid = getCurrentUserId(httpRequest);
+            InboundRecord updated = inboundRecordService.secondConfirmInbound(id, uid);
+            return Result.success("确认成功，已入账", updated);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 第二操作人驳回
+     */
+    @PostMapping("/{id}/second-reject")
+    public Result<InboundRecord> secondRejectInbound(
+            @PathVariable Long id,
+            @RequestBody SecondRejectRequest body,
+            HttpServletRequest httpRequest) {
+        try {
+            Long uid = getCurrentUserId(httpRequest);
+            InboundRecord updated = inboundRecordService.secondRejectInbound(id, uid, body != null ? body.getReason() : null);
+            return Result.success("已驳回", updated);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 第一操作人撤回待第二人确认的入库单
+     */
+    @PostMapping("/{id}/withdraw-pending-second")
+    public Result<InboundRecord> withdrawPendingSecond(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long uid = getCurrentUserId(httpRequest);
+            InboundRecord updated = inboundRecordService.withdrawPendingSecondInbound(id, uid);
+            return Result.success("已撤回", updated);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     /**
@@ -221,6 +387,11 @@ public class InboundRecordController {
     @Data
     public static class InboundRecordRequest {
         private Long orderId;
+        /** 沿用已登记的到货批次头；为空则按随货单等自动新建一批次 */
+        private Long receiptBatchId;
+        /** 新建批次时的到货时间（精确到秒）；沿用 receiptBatchId 时可不传 */
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+        private LocalDateTime arrivalAt;
         private Long drugId;
         private String batchNumber;
         private Integer quantity;
@@ -228,6 +399,8 @@ public class InboundRecordController {
         private LocalDate arrivalDate;
         private LocalDate productionDate;
         private String manufacturer;
+        /** 合格入库必填：本批药品存放位置 */
+        private String storageLocation;
         private String deliveryNoteNumber;
         private String deliveryNoteImage;
         private Long secondOperatorId;
@@ -235,6 +408,58 @@ public class InboundRecordController {
         private String expiryCheckStatus; // PASS/WARNING/FORCE
         private String expiryCheckReason;
         private String remark;
+        /** 仅不合格：处置意向代码，空则默认 PENDING */
+        private String dispositionCode;
+        private String dispositionRemark;
+    }
+
+    @Data
+    public static class SplitInboundFromOrderRequest {
+        @NotNull
+        private Long orderId;
+        private Long receiptBatchId;
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+        private LocalDateTime arrivalAt;
+        @NotNull
+        private Long drugId;
+        @NotBlank
+        private String batchNumber;
+        @NotNull
+        @Min(1)
+        private Integer qualifiedQuantity;
+        @NotNull
+        @Min(1)
+        private Integer unqualifiedQuantity;
+        @NotBlank
+        private String unqualifiedReason;
+        @NotNull
+        private LocalDate expiryDate;
+        private LocalDate arrivalDate;
+        @NotNull
+        private LocalDate productionDate;
+        private String manufacturer;
+        private String storageLocation;
+        private String deliveryNoteNumber;
+        private String deliveryNoteImage;
+        private Long secondOperatorId;
+        private String expiryCheckStatus;
+        private String expiryCheckReason;
+        private String remark;
+        /** 不合格行处置意向，空则默认 PENDING */
+        private String unqualifiedDispositionCode;
+        private String unqualifiedDispositionRemark;
+    }
+
+    @Data
+    public static class ReceiptBatchCreateRequest {
+        @NotNull
+        private Long orderId;
+        @NotBlank
+        private String deliveryNoteNumber;
+        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+        private LocalDateTime arrivalAt;
+        private String remark;
+        private String deliveryNoteImage;
     }
 
     /**
@@ -252,6 +477,11 @@ public class InboundRecordController {
     public static class ExpiryCheckResponse {
         private String status; // PASS/WARNING/FORCE
         private String message;
+    }
+
+    @Data
+    public static class SecondRejectRequest {
+        private String reason;
     }
 }
 

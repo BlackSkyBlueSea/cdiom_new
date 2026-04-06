@@ -55,5 +55,30 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             "</if>" +
             "</script>")
     Long countDeletedUsers(@Param("keyword") String keyword);
+
+    /**
+     * 具备出库审核权限的用户（outbound:approve 或 outbound:approve:special），含超级管理员角色；用于特殊药品第二审批人候选
+     */
+    @Select("""
+            SELECT u.* FROM sys_user u
+            WHERE u.deleted = 0 AND u.status = 1
+            AND (
+                u.role_id = 6
+                OR EXISTS (
+                    SELECT 1 FROM sys_role_permission rp
+                    INNER JOIN sys_permission p ON p.id = rp.permission_id
+                    WHERE rp.role_id = u.role_id
+                    AND p.permission_code IN ('outbound:approve', 'outbound:approve:special')
+                )
+                OR EXISTS (
+                    SELECT 1 FROM sys_user_permission up
+                    INNER JOIN sys_permission p ON p.id = up.permission_id
+                    WHERE up.user_id = u.id
+                    AND p.permission_code IN ('outbound:approve', 'outbound:approve:special')
+                )
+            )
+            ORDER BY u.username ASC
+            """)
+    java.util.List<SysUser> selectUsersWithOutboundApprovePermissions();
 }
 

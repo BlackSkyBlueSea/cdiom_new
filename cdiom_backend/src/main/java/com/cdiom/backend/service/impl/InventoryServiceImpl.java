@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -92,6 +93,31 @@ public class InventoryServiceImpl implements InventoryService {
             log.error("入库操作异常：药品ID={}, 批次号={}, 数量={}", drugId, batchNumber, quantity, e);
             throw new ServiceException("入库操作失败：" + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStorageLocation(Long inventoryId, String storageLocation) {
+        if (inventoryId == null) {
+            throw new ServiceException("库存ID无效");
+        }
+        if (!StringUtils.hasText(storageLocation)) {
+            throw new ServiceException("存储位置不能为空");
+        }
+        String trimmed = storageLocation.trim();
+        if (trimmed.length() > 200) {
+            throw new ServiceException("存储位置长度不能超过200个字符");
+        }
+        Inventory inv = inventoryMapper.selectById(inventoryId);
+        if (inv == null) {
+            throw new ServiceException("库存记录不存在");
+        }
+        if (inv.getQuantity() == null || inv.getQuantity() <= 0) {
+            throw new ServiceException("仅可维护当前有库存数量的批次");
+        }
+        inv.setStorageLocation(trimmed);
+        inventoryMapper.updateById(inv);
+        log.info("更新库存存储位置：id={}, drugId={}, batchNumber={}, location={}", inventoryId, inv.getDrugId(), inv.getBatchNumber(), trimmed);
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.cdiom.backend.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.model.PurchaseOrder;
 import com.cdiom.backend.model.PurchaseOrderItem;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,7 @@ public interface PurchaseOrderService {
     /**
      * 更新物流单号
      */
+    @Transactional(rollbackFor = Throwable.class)
     void updateLogisticsNumber(Long id, String logisticsNumber);
 }
 

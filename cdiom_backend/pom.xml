@@ -150,6 +150,14 @@
 
     <build>
         <plugins>
+            <!-- 保留方法参数名，供 Spring @RequestParam/@PathVariable 等绑定（否则需每个参数写 name） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

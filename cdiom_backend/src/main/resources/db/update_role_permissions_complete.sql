@@ -46,8 +46,8 @@ WHERE permission_code IN (
     'drug:view', 'drug:manage', 'drug:create', 'drug:update', 'drug:delete',
     -- 供应商审核
     'supplier:audit',
-    -- 出库管理（审核、执行，不包含申领）
-    'outbound:view', 'outbound:approve', 'outbound:execute', 'outbound:reject',
+    -- 出库管理（审核、执行、现场代录申领，不包含自助申领）
+    'outbound:view', 'outbound:approve', 'outbound:execute', 'outbound:reject', 'outbound:apply:on-behalf',
     -- 入库管理
     'inbound:view', 'inbound:create', 'inbound:approve', 'inbound:execute',
     -- 库存管理

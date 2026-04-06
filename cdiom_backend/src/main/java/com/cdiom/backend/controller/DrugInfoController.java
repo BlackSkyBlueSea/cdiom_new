@@ -49,14 +49,16 @@ public class DrugInfoController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer isSpecial,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder,
             @RequestParam(required = false) Long supplierId) {
         Page<DrugInfo> drugPage;
         if (supplierId != null) {
             // 根据供应商ID查询该供应商提供的药品
-            drugPage = drugInfoService.getDrugInfoListBySupplierId(supplierId, page, size, keyword);
+            drugPage = drugInfoService.getDrugInfoListBySupplierId(supplierId, page, size, keyword, sortField, sortOrder);
         } else {
             // 查询所有药品
-            drugPage = drugInfoService.getDrugInfoList(page, size, keyword, isSpecial);
+            drugPage = drugInfoService.getDrugInfoList(page, size, keyword, isSpecial, sortField, sortOrder);
         }
         return Result.success(drugPage);
     }
@@ -105,6 +107,33 @@ public class DrugInfoController {
         try {
             drugInfoService.deleteDrugInfo(id);
             return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 分页查询已逻辑删除的药品（回收站）
+     */
+    @GetMapping("/deleted")
+    @RequiresPermission({"drug:manage"})
+    public Result<Page<DrugInfo>> getDeletedDrugInfoList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String keyword) {
+        Page<DrugInfo> drugPage = drugInfoService.getDeletedDrugInfoList(page, size, keyword);
+        return Result.success(drugPage);
+    }
+
+    /**
+     * 恢复已逻辑删除的药品
+     */
+    @PutMapping("/{id}/restore")
+    @RequiresPermission({"drug:manage"})
+    public Result<Void> restoreDrugInfo(@PathVariable Long id) {
+        try {
+            drugInfoService.restoreDrugInfo(id);
+            return Result.success("恢复成功", null);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }

@@ -52,6 +52,8 @@ export const PERMISSIONS = {
   // 出库管理权限
   OUTBOUND_VIEW: 'outbound:view',
   OUTBOUND_APPLY: 'outbound:apply',
+  /** 仓库管理员代医护人员现场录入出库申请 */
+  OUTBOUND_APPLY_ON_BEHALF: 'outbound:apply:on-behalf',
   OUTBOUND_APPROVE: 'outbound:approve',
   OUTBOUND_APPROVE_SPECIAL: 'outbound:approve:special',
   OUTBOUND_EXECUTE: 'outbound:execute',
@@ -159,6 +161,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.NOTICE_CREATE,
     // 出库管理（查看、审核、执行、驳回、特殊药品审核）
     PERMISSIONS.OUTBOUND_VIEW,
+    PERMISSIONS.OUTBOUND_APPLY_ON_BEHALF,
     PERMISSIONS.OUTBOUND_APPROVE,
     PERMISSIONS.OUTBOUND_APPROVE_SPECIAL,
     PERMISSIONS.OUTBOUND_EXECUTE,
