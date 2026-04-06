@@ -92,6 +92,14 @@
   - 前端列表页布局工具 `tablePageLayout.js`
   - 回归建议与相关文档索引
 
+#### UPDATE_LOG_20260406.md
+- **内容**：近期开发记录（2026-04-06，文档与代码对齐）
+- **包含**：
+  - 药品列表排序、回收站/恢复；按供应商筛选的正确查询方式（`supplierId` 查询参数）
+  - 入库到货批次、拆分入库、不合格处置选项；库存/入库/采购订单展示字段补充
+  - 仓库仪表盘近效期明细接口、`SecurityHeadersFilter`、用户列表按 `permissionId` 筛选
+  - 与 [API_Documentation.md](./API_Documentation.md)、[CHANGELOG.md](./CHANGELOG.md) 的对应关系
+
 ---
 
 ### 🚀 五、部署和运维
@@ -213,7 +221,7 @@
 - 参考 **System_Test_Report.md** 进行测试
 - 参考 **Deployment_Guide.md** 进行系统部署
 - 参考 **CHANGELOG.md** 了解版本变更
-- 近期增量可查阅 **UPDATE_LOG_20260309_Outbound_Dashboard.md**、**UPDATE_LOG_20260328.md**
+- 近期增量可查阅 **UPDATE_LOG_20260309_Outbound_Dashboard.md**、**UPDATE_LOG_20260328.md**、**UPDATE_LOG_20260406.md**
 
 ---
 
@@ -227,9 +235,9 @@
 
 **文档创建时间**：2026年1月13日 10:31:17  
 **最后修改时间**：2026年1月20日  
-**当前更新时间**：2026年3月29日  
+**当前更新时间**：2026年4月6日  
 **文档版本**：v1.7.0
 
 ---
 
-**最后更新**：2026年3月29日
+**最后更新**：2026年4月6日

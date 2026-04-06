@@ -25,17 +25,17 @@
 
 **后端：**
 - Spring Boot 3.2.8
-- MyBatis-Plus 3.5.5
-- Spring Security 6.2.3
+- MyBatis-Plus 3.5.15（见 `cdiom_backend/pom.xml`）
+- Spring Security 6.2.x（随 Spring Boot BOM）
 - JWT认证
 - MySQL 8.0+
 
 **前端：**
 - React 18.2.0
 - Vite 7.3.1
-- Ant Design 5.12.8
-- React Router 6.22.0
-- Axios 1.6.5
+- Ant Design 5.20.6
+- React Router 6.23.1
+- Axios 1.7.2
 
 ### 项目结构
 

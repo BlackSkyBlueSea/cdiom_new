@@ -236,6 +236,7 @@
   - `keyword`: 关键字（用户名/手机号）
   - `roleId`: 角色ID（可选）
   - `status`: 状态（0-禁用/1-正常，可选）
+  - `permissionId`: 权限ID（可选，筛选拥有该直接权限的用户）
 - **响应**: 返回分页用户列表
 
 ### 获取用户详情
@@ -604,6 +605,8 @@
   - `keyword`: 关键字（药品名称、商品码等）
   - `isSpecial`: 是否特殊药品（0-否/1-是，可选）
   - `supplierId`: 供应商ID（可选，根据供应商ID查询该供应商提供的药品）
+  - `sortField`: 排序字段（可选，如 `drugName`、`createTime` 等，与后端白名单一致）
+  - `sortOrder`: 排序方向（可选，`asc` / `desc`）
 
 ### 获取药品信息详情
 
@@ -626,6 +629,17 @@
 - **接口**: `DELETE /api/v1/drugs/{id}`
 - **权限**: 需要 `drug:manage` 权限
 - **说明**: 逻辑删除
+
+### 分页查询已逻辑删除的药品（回收站）
+
+- **接口**: `GET /api/v1/drugs/deleted`
+- **权限**: 需要 `drug:manage` 权限
+- **参数**: `page`, `size`, `keyword`（可选）
+
+### 恢复已逻辑删除的药品
+
+- **接口**: `PUT /api/v1/drugs/{id}/restore`
+- **权限**: 需要 `drug:manage` 权限
 
 ### 根据商品码/本位码/追溯码查询
 
@@ -655,9 +669,9 @@
 
 ### 根据供应商ID查询药品列表
 
-- **接口**: `GET /api/v1/drugs/supplier/{supplierId}`
+- **接口**: `GET /api/v1/drugs?supplierId={supplierId}`（与其它列表参数共用同一 `GET /api/v1/drugs`）
 - **权限**: 需要 `drug:view` 或 `drug:manage` 权限
-- **说明**: 查询指定供应商关联的所有药品
+- **说明**: 传入 `supplierId` 时仅返回该供应商关联药品；可同时使用 `keyword`、`sortField`、`sortOrder` 等参数
 
 ### 导出药品列表
 
@@ -686,6 +700,8 @@
   - `endDate`: 结束日期（可选，格式：YYYY-MM-DD）
   - `status`: 验收状态（QUALIFIED/UNQUALIFIED，可选）
   - `expiryCheckStatus`: 效期校验状态（PASS/WARNING/FORCE，可选）
+  - `secondConfirmStatus`: 第二人确认状态（可选，如 `PENDING_SECOND` 等）
+  - `secondOperatorId`: 第二操作人用户ID（可选）
 
 ### 获取入库记录详情
 
@@ -697,6 +713,19 @@
 - **接口**: `GET /api/v1/inbound/record-number/{recordNumber}`
 - **权限**: 需要 `drug:view` 或 `drug:manage` 权限
 
+### 不合格入库处置意向选项
+
+- **接口**: `GET /api/v1/inbound/disposition-options`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **说明**: 返回代码到展示名的映射，供不合格入库处置下拉使用
+
+### 登记采购到货批次头（可选：先登记再逐药品入库）
+
+- **接口**: `POST /api/v1/inbound/receipt-batch`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限（与入库模块一致）
+- **请求体**（节选）: `orderId`（必填）、`deliveryNoteNumber`（必填）、`arrivalAt`（可选，到货时间）、`remark`、`deliveryNoteImage`
+- **说明**: 创建 `InboundReceiptBatch` 记录；后续从订单入库时可传 `receiptBatchId` 复用该批次头
+
 ### 创建入库记录（从采购订单入库）
 
 - **接口**: `POST /api/v1/inbound/from-order`
@@ -705,6 +734,8 @@
 ```json
 {
   "orderId": 1,
+  "receiptBatchId": null,
+  "arrivalAt": "2026-01-20 10:30:00",
   "drugId": 1,
   "batchNumber": "BATCH001",
   "quantity": 100,
@@ -712,19 +743,31 @@
   "arrivalDate": "2026-01-20",
   "productionDate": "2025-12-01",
   "manufacturer": "生产厂家",
+  "storageLocation": "冷库A-01",
   "deliveryNoteNumber": "DN001",
   "deliveryNoteImage": "/uploads/2026/01/20/image.jpg",
   "secondOperatorId": 2,
   "status": "QUALIFIED",
   "expiryCheckStatus": "PASS",
   "expiryCheckReason": "效期检查通过",
-  "remark": "备注信息"
+  "remark": "备注信息",
+  "dispositionCode": null,
+  "dispositionRemark": null
 }
 ```
 - **说明**: 
   - 从采购订单创建入库记录
-  - 包含效期校验和特殊药品双人操作
+  - `receiptBatchId`：沿用已登记的到货批次头；为空则按随货单等规则自动新建批次
+  - `arrivalAt`：新建批次时的到货时间（精确到秒）；沿用 `receiptBatchId` 时可不传
+  - 不合格入库时可填 `dispositionCode` / `dispositionRemark`（与 `disposition-options` 口径一致）
+  - 包含效期校验和特殊药品双人操作；可能返回待第二人确认状态（`PENDING_SECOND`）
   - 自动验证订单状态和可入库数量
+
+### 同一批号拆分合格/不合格两条明细（从订单）
+
+- **接口**: `POST /api/v1/inbound/from-order/split`
+- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **说明**: 同一追溯码下同时登记合格与不合格数量，事务内处理；请求体含 `orderId`、`drugId`、`batchNumber`、`qualifiedQuantity`、`unqualifiedQuantity`、`unqualifiedReason` 等字段（详见 `SplitInboundFromOrderRequest`）
 
 ### 创建临时入库记录
 
@@ -1232,8 +1275,15 @@
 ### 获取仓库管理员仪表盘数据
 
 - **接口**: `GET /api/v1/dashboard/warehouse`
-- **权限**: 需要 `drug:view` 或 `drug:manage` 权限
+- **权限**: 需要 `drug:view`、`drug:manage`、`inbound:view`、`outbound:view` 中至少一项（与后端 `@RequiresPermission` 一致）
 - **说明**: 返回仓库管理员专用仪表盘数据（近效期预警、待办任务、出入库统计等）
+
+### 近效期预警明细（药品名称、批次、效期等）
+
+- **接口**: `GET /api/v1/dashboard/warehouse/near-expiry-details?level={level}`
+- **权限**: 与仓库管理员仪表盘相同（`drug:view` / `drug:manage` / `inbound:view` / `outbound:view` 至少一项）
+- **参数**: `level` — `yellow`（介于严重预警与预警阈值之间）或 `red`（严重预警区间内）
+- **说明**: 与仪表盘近效期卡片区间一致，用于列表/弹窗展示明细
 
 ### 获取采购专员仪表盘数据
 

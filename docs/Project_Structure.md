@@ -139,6 +139,7 @@ cdiom_backend/
     │   ├── InventoryMapper.java                 # 库存Mapper：库存数据操作
     │   ├── InventoryAdjustmentMapper.java       # 库存调整Mapper：库存调整数据操作
     │   ├── InboundRecordMapper.java             # 入库记录Mapper：入库记录数据操作
+    │   ├── InboundReceiptBatchMapper.java       # 采购到货批次 Mapper：与 InboundReceiptBatch 表对应
     │   ├── OutboundApplyMapper.java             # 出库申请Mapper：出库申请数据操作
     │   ├── OutboundApplyItemMapper.java         # 出库申请明细Mapper：出库明细数据操作
     │   ├── PurchaseOrderMapper.java             # 采购订单Mapper：采购订单数据操作
@@ -168,6 +169,7 @@ cdiom_backend/
     │   ├── Inventory.java                       # 库存实体：对应inventory表
     │   ├── InventoryAdjustment.java             # 库存调整实体：对应inventory_adjustment表
     │   ├── InboundRecord.java                   # 入库记录实体：对应inbound_record表
+    │   ├── InboundReceiptBatch.java             # 采购到货批次实体：对应 inbound_receipt_batch 表（可先登记批次再逐药品入库）
     │   ├── OutboundApply.java                   # 出库申请实体：对应outbound_apply表
     │   ├── OutboundApplyItem.java               # 出库申请明细实体：对应outbound_apply_item表
     │   ├── PurchaseOrder.java                   # 采购订单实体：对应purchase_order表
@@ -196,7 +198,8 @@ cdiom_backend/
     │   ├── LogAppenderInitializer.java          # 日志追加器初始化：日志系统初始化
     │   ├── WebSocketLogAppender.java            # WebSocket日志追加器：实时日志推送
     │   ├── filter/                              # 过滤器目录
-    │   │   └── JwtAuthenticationFilter.java     # JWT认证过滤器：Token验证、用户信息注入
+    │   │   ├── SecurityHeadersFilter.java       # 安全响应头（如 X-Content-Type-Options 等）
+    │   │   └── JwtAuthenticationFilter.java     # JWT认证过滤器：Token验证、用户信息注入（Authorization 优先于 Cookie）
     │   └── interceptor/                         # 拦截器目录
     │       └── PermissionInterceptor.java       # 权限拦截器：接口级权限验证
     │
@@ -385,7 +388,8 @@ docs/
 ├── 📋 维护和版本管理/
 │   ├── CHANGELOG.md                            # 版本历史文档：所有版本的完整更新内容，包括功能更新、bug修复等
 │   ├── UPDATE_LOG_20260309_Outbound_Dashboard.md # 出库/审批/仪表盘等变更记录（2026-03-08～09）
-│   └── UPDATE_LOG_20260328.md                  # 系统参数/JWT/日志保留/布局等变更记录（2026-03-28）
+│   ├── UPDATE_LOG_20260328.md                  # 系统参数/JWT/日志保留/布局等变更记录（2026-03-28）
+│   └── UPDATE_LOG_20260406.md                  # 药品/入库批次/仪表盘明细等文档对齐（2026-04-06）
 │
 ├── 🚀 部署和运维/
 │   └── Deployment_Guide.md                     # 部署指南：开发环境部署、生产环境部署、Nginx配置等
@@ -477,8 +481,8 @@ docs/
 | Controller | 23 | RESTful API控制器 |
 | Service接口 | 26 | 业务服务接口 |
 | Service实现 | 26 | 业务服务实现 |
-| Mapper | 28 | 数据访问层接口 |
-| Model | 28 | 实体类 |
+| Mapper | 27 | 数据访问层接口 |
+| Model | 29 | 实体类（含到货批次等；另有 `model/vo` 下非表 VO） |
 | Config | 11 | 配置类 |
 | Util | 4 | 工具类 |
 | 数据库脚本 | 24 | SQL脚本文件 |
@@ -541,8 +545,8 @@ docs/
 
 ---
 
-**文档版本**: v1.1.0  
-**最后更新**: 2026年3月9日
+**文档版本**: v1.2.0（与代码仓库 `main` 同步，含安全响应头过滤器、到货批次与药品回收站等）  
+**最后更新**: 2026年4月6日
 
 
 

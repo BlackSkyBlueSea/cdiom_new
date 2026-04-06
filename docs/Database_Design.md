@@ -68,7 +68,8 @@
 - **drug_info（药品信息表）**：存储药品基本信息，支持扫码识别（国家本位码、追溯码、商品码）
 - **inventory（库存表）**：按批次管理库存，支持近效期预警，禁止负库存
 - **purchase_order（采购订单表）**：采购订单管理，支持订单状态流转和物流跟踪
-- **inbound_record（入库记录表）**：入库记录管理，支持从订单入库和临时入库，包含效期校验和特殊药品双人操作
+- **inbound_receipt_batch（采购到货批次头表）**：随货单与到货时间挂在批次维度；可先 `POST /api/v1/inbound/receipt-batch` 登记批次，再在从订单入库时填写 `receipt_batch_id`（见 `init_simple.sql`）。
+- **inbound_record（入库记录表）**：入库记录管理，支持从订单入库和临时入库，包含效期校验、特殊药品双人确认（`second_confirm_status` 等）、不合格处置（`disposition_code` 等）；**含 `receipt_batch_id` 关联到货批次头**。完整字段与约束以 **`cdiom_backend/src/main/resources/db/init_simple.sql`** 为准；若下文字段表与脚本不一致，以脚本为准。
 - **outbound_apply（出库申请表）**：出库申请管理，支持审批流程和特殊药品双人审批
 
 ---

@@ -7,6 +7,7 @@
 
 ## 目录
 
+- [工作区变更摘要（2026-04-06）](#工作区变更摘要2026-04-06文档与代码对齐)
 - [工作区变更摘要（2026-03-28）](#工作区变更摘要2026-03-28多轮会话汇总)
 - [v1.6.0 (2026-01-20)](#v160-2026-01-20)
 - [v1.5.2 (2026-01-20)](#v152-2026-01-20)
@@ -16,6 +17,36 @@
 - [v1.2.0 (2026-01-13)](#v120-2026-01-13)
 - [v1.1.0 (2026-01)](#v110-2026-01)
 - [v1.0.0 (2026-01)](#v100-2026-01)
+
+---
+
+## 工作区变更摘要（2026-04-06，文档与代码对齐）
+
+> 详细条目见 **docs/UPDATE_LOG_20260406.md**。以下与当前 `main` 分支实现一致。
+
+### 药品管理
+
+- ✅ **列表**：支持 `sortField` / `sortOrder` 排序；按供应商筛选使用 `GET /api/v1/drugs?supplierId=`（非独立路径 `/drugs/supplier/{id}`）。
+- ✅ **回收站**：`GET /api/v1/drugs/deleted`、`PUT /api/v1/drugs/{id}/restore`（`drug:manage`）。
+
+### 入库与批次
+
+- ✅ **到货批次**：`InboundReceiptBatch` + `InboundReceiptBatchMapper`；`POST /api/v1/inbound/receipt-batch`；从订单入库请求体可带 `receiptBatchId`、`arrivalAt`。
+- ✅ **拆分与处置**：`POST /api/v1/inbound/from-order/split`；`GET /api/v1/inbound/disposition-options`。
+
+### 展示与业务字段
+
+- ✅ **库存 / 入库列表**：接口返回中补充 **药品名称 `drugName`**（联表/JOIN），便于前端直接展示。
+- ✅ **采购订单**：订单级 **供应商名称**；明细级 **药品名称、规格** 等展示字段。
+
+### 仪表盘与用户管理
+
+- ✅ **近效期明细**：`GET /api/v1/dashboard/warehouse/near-expiry-details?level=yellow|red`，与仓库仪表盘预警区间一致。
+- ✅ **用户列表**：可选查询参数 **`permissionId`**（按直接权限筛选用户）。
+
+### 安全
+
+- ✅ **SecurityHeadersFilter**：为 HTTP 响应补充常用安全响应头（与 JWT 过滤器并存）。
 
 ---
 
