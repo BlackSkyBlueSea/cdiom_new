@@ -4,9 +4,21 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.OperationLog;
+import com.cdiom.backend.model.SysUser;
+import com.cdiom.backend.service.AuthService;
+import com.cdiom.backend.service.ExcelExportService;
 import com.cdiom.backend.service.OperationLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 操作日志控制器
@@ -20,6 +32,8 @@ import org.springframework.web.bind.annotation.*;
 public class OperationLogController {
 
     private final OperationLogService operationLogService;
+    private final AuthService authService;
+    private final ExcelExportService excelExportService;
 
     /**
      * 分页查询操作日志列表
@@ -35,6 +49,36 @@ public class OperationLogController {
             @RequestParam(required = false) Integer status) {
         Page<OperationLog> logPage = operationLogService.getLogList(page, size, keyword, userId, module, operationType, status);
         return Result.success(logPage);
+    }
+
+    /**
+     * 导出操作日志（Excel，与当前筛选条件一致，最多 10000 条）
+     */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportOperationLogs(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String module,
+            @RequestParam(required = false) String operationType,
+            @RequestParam(required = false) Integer status) {
+        try {
+            SysUser currentUser = authService.getCurrentUser();
+            if (currentUser == null) {
+                throw new RuntimeException("未登录或登录已过期");
+            }
+            List<OperationLog> logs = operationLogService.listLogsForExport(
+                    keyword, userId, module, operationType, status);
+            byte[] excelBytes = excelExportService.exportOperationLogList(logs, currentUser);
+            String fileName = "操作日志_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", encodedFileName);
+            headers.setContentLength(excelBytes.length);
+            return ResponseEntity.ok().headers(headers).body(excelBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("导出失败: " + e.getMessage(), e);
+        }
     }
 
     /**

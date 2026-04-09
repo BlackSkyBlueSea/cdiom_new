@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 登录日志服务实现类
@@ -27,25 +28,32 @@ public class LoginLogServiceImpl implements LoginLogService {
     @Override
     public Page<LoginLog> getLogList(Integer page, Integer size, String keyword, Long userId, Integer status) {
         Page<LoginLog> pageParam = new Page<>(page, size);
+        LambdaQueryWrapper<LoginLog> wrapper = buildListWrapper(keyword, userId, status);
+        return loginLogMapper.selectPage(pageParam, wrapper);
+    }
+
+    @Override
+    public List<LoginLog> listLogsForExport(String keyword, Long userId, Integer status) {
+        Page<LoginLog> pageParam = new Page<>(1, EXPORT_MAX_ROWS);
+        LambdaQueryWrapper<LoginLog> wrapper = buildListWrapper(keyword, userId, status);
+        return loginLogMapper.selectPage(pageParam, wrapper).getRecords();
+    }
+
+    private LambdaQueryWrapper<LoginLog> buildListWrapper(String keyword, Long userId, Integer status) {
         LambdaQueryWrapper<LoginLog> wrapper = new LambdaQueryWrapper<>();
-        
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(LoginLog::getUsername, keyword)
                     .or().like(LoginLog::getIp, keyword)
                     .or().like(LoginLog::getLocation, keyword));
         }
-        
         if (userId != null) {
             wrapper.eq(LoginLog::getUserId, userId);
         }
-        
         if (status != null) {
             wrapper.eq(LoginLog::getStatus, status);
         }
-        
         wrapper.orderByDesc(LoginLog::getLoginTime);
-        
-        return loginLogMapper.selectPage(pageParam, wrapper);
+        return wrapper;
     }
 
     @Override

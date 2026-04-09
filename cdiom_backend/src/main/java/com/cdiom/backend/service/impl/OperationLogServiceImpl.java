@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 操作日志服务实现类
@@ -25,33 +26,38 @@ public class OperationLogServiceImpl implements OperationLogService {
     @Override
     public Page<OperationLog> getLogList(Integer page, Integer size, String keyword, Long userId, String module, String operationType, Integer status) {
         Page<OperationLog> pageParam = new Page<>(page, size);
+        LambdaQueryWrapper<OperationLog> wrapper = buildListWrapper(keyword, userId, module, operationType, status);
+        return operationLogMapper.selectPage(pageParam, wrapper);
+    }
+
+    @Override
+    public List<OperationLog> listLogsForExport(String keyword, Long userId, String module, String operationType, Integer status) {
+        Page<OperationLog> pageParam = new Page<>(1, EXPORT_MAX_ROWS);
+        LambdaQueryWrapper<OperationLog> wrapper = buildListWrapper(keyword, userId, module, operationType, status);
+        return operationLogMapper.selectPage(pageParam, wrapper).getRecords();
+    }
+
+    private LambdaQueryWrapper<OperationLog> buildListWrapper(String keyword, Long userId, String module, String operationType, Integer status) {
         LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<>();
-        
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(OperationLog::getUsername, keyword)
                     .or().like(OperationLog::getModule, keyword)
                     .or().like(OperationLog::getOperationContent, keyword));
         }
-        
         if (userId != null) {
             wrapper.eq(OperationLog::getUserId, userId);
         }
-        
         if (StringUtils.hasText(module)) {
             wrapper.eq(OperationLog::getModule, module);
         }
-        
         if (StringUtils.hasText(operationType)) {
             wrapper.eq(OperationLog::getOperationType, operationType);
         }
-        
         if (status != null) {
             wrapper.eq(OperationLog::getStatus, status);
         }
-        
         wrapper.orderByDesc(OperationLog::getOperationTime);
-        
-        return operationLogMapper.selectPage(pageParam, wrapper);
+        return wrapper;
     }
 
     @Override

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Table, Input, Select, Space, Button, Tag, Tooltip } from 'antd'
-import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons'
+import Cookies from 'js-cookie'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import dayjs from 'dayjs'
@@ -14,6 +15,9 @@ import {
   TABLE_SCROLL_Y,
 } from '../utils/tablePageLayout'
 
+const getAuthToken = () =>
+  sessionStorage.getItem('cdiom_token') || Cookies.get('cdiom_token') || ''
+
 const LoginLog = () => {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
@@ -26,6 +30,7 @@ const LoginLog = () => {
     keyword: '',
     status: undefined,
   })
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetchLogs()
@@ -60,6 +65,47 @@ const LoginLog = () => {
       keyword: '',
       status: undefined,
     })
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const token = getAuthToken()
+      if (!token) {
+        message.error('未登录，请重新登录')
+        return
+      }
+      const params = new URLSearchParams()
+      if (filters.keyword) params.append('keyword', filters.keyword)
+      if (filters.status !== undefined && filters.status !== null) {
+        params.append('status', String(filters.status))
+      }
+      const q = params.toString()
+      const url = `/api/v1/login-logs/export${q ? `?${q}` : ''}`
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        throw new Error('导出失败')
+      }
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `登录日志_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      message.success('导出成功（最多 10000 条）')
+    } catch (error) {
+      logger.error('导出登录日志失败', error)
+      message.error('导出失败：' + (error.message || '未知错误'))
+    } finally {
+      setExporting(false)
+    }
   }
 
   const columns = [
@@ -167,6 +213,16 @@ const LoginLog = () => {
             </Select>
           </div>
           <Space size={4} style={{ flexShrink: 0 }}>
+            <Tooltip title="导出 Excel（与当前筛选一致，最多 10000 条）">
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                loading={exporting}
+                onClick={handleExport}
+              >
+                导出
+              </Button>
+            </Tooltip>
             <Tooltip title="重置"><Button icon={<ReloadOutlined />} onClick={handleReset} /></Tooltip>
           </Space>
         </div>

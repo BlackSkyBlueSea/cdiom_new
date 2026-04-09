@@ -2,6 +2,8 @@ package com.cdiom.backend.service;
 
 import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.Inventory;
+import com.cdiom.backend.model.LoginLog;
+import com.cdiom.backend.model.OperationLog;
 import com.cdiom.backend.model.PurchaseOrder;
 import com.cdiom.backend.model.SysUser;
 import org.apache.poi.ss.usermodel.*;
@@ -26,6 +28,7 @@ public class ExcelExportService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int EXCEL_CELL_MAX_CHARS = 32000;
 
     /**
      * 导出药品列表到Excel
@@ -266,6 +269,149 @@ public class ExcelExportService {
         workbook.write(outputStream);
         workbook.close();
         return outputStream.toByteArray();
+    }
+
+    /**
+     * 导出操作日志到 Excel（与列表筛选条件一致的数据子集）
+     */
+    public byte[] exportOperationLogList(List<OperationLog> logs, SysUser exporter) throws IOException {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("操作日志");
+
+        CellStyle headerStyle = createHeaderStyle(workbook);
+        CellStyle dataStyle = createDataStyle(workbook);
+
+        Row titleRow = sheet.createRow(0);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("操作日志");
+        titleCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 12));
+
+        Row headerRow = sheet.createRow(1);
+        String[] headers = {
+                "ID", "用户ID", "用户名", "操作模块", "操作类型", "操作内容", "请求方法", "请求URL",
+                "请求参数", "IP", "状态", "错误信息", "操作时间"
+        };
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        int rowNum = 2;
+        for (OperationLog log : logs) {
+            Row row = sheet.createRow(rowNum++);
+            int col = 0;
+            setLongCell(row, col++, log.getId());
+            setLongCell(row, col++, log.getUserId());
+            row.createCell(col++).setCellValue(nullToEmpty(log.getUsername()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getModule()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getOperationType()));
+            row.createCell(col++).setCellValue(truncateForCell(log.getOperationContent()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getRequestMethod()));
+            row.createCell(col++).setCellValue(truncateForCell(log.getRequestUrl()));
+            row.createCell(col++).setCellValue(truncateForCell(log.getRequestParams()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getIp()));
+            row.createCell(col++).setCellValue(log.getStatus() != null && log.getStatus() == 1 ? "成功" : "失败");
+            row.createCell(col++).setCellValue(truncateForCell(log.getErrorMsg()));
+            row.createCell(col++).setCellValue(log.getOperationTime() != null
+                    ? log.getOperationTime().format(DATETIME_FORMATTER) : "");
+            for (int i = 0; i < headers.length; i++) {
+                row.getCell(i).setCellStyle(dataStyle);
+            }
+        }
+
+        addWatermark(sheet, exporter, workbook);
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+            sheet.setColumnWidth(i, Math.min(sheet.getColumnWidth(i) + 1000, 255 * 256));
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        workbook.close();
+        return outputStream.toByteArray();
+    }
+
+    /**
+     * 导出登录日志到 Excel
+     */
+    public byte[] exportLoginLogList(List<LoginLog> logs, SysUser exporter) throws IOException {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("登录日志");
+
+        CellStyle headerStyle = createHeaderStyle(workbook);
+        CellStyle dataStyle = createDataStyle(workbook);
+
+        Row titleRow = sheet.createRow(0);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("登录日志");
+        titleCell.setCellStyle(headerStyle);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 9));
+
+        Row headerRow = sheet.createRow(1);
+        String[] headers = {
+                "ID", "用户ID", "用户名", "IP", "登录地点", "浏览器", "操作系统", "状态", "消息", "登录时间"
+        };
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        int rowNum = 2;
+        for (LoginLog log : logs) {
+            Row row = sheet.createRow(rowNum++);
+            int col = 0;
+            setLongCell(row, col++, log.getId());
+            setLongCell(row, col++, log.getUserId());
+            row.createCell(col++).setCellValue(nullToEmpty(log.getUsername()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getIp()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getLocation()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getBrowser()));
+            row.createCell(col++).setCellValue(nullToEmpty(log.getOs()));
+            row.createCell(col++).setCellValue(log.getStatus() != null && log.getStatus() == 1 ? "成功" : "失败");
+            row.createCell(col++).setCellValue(truncateForCell(log.getMsg()));
+            row.createCell(col++).setCellValue(log.getLoginTime() != null
+                    ? log.getLoginTime().format(DATETIME_FORMATTER) : "");
+            for (int i = 0; i < headers.length; i++) {
+                row.getCell(i).setCellStyle(dataStyle);
+            }
+        }
+
+        addWatermark(sheet, exporter, workbook);
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+            sheet.setColumnWidth(i, Math.min(sheet.getColumnWidth(i) + 1000, 255 * 256));
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        workbook.close();
+        return outputStream.toByteArray();
+    }
+
+    private static String nullToEmpty(String s) {
+        return s != null ? s : "";
+    }
+
+    private static String truncateForCell(String s) {
+        if (s == null) {
+            return "";
+        }
+        if (s.length() <= EXCEL_CELL_MAX_CHARS) {
+            return s;
+        }
+        return s.substring(0, EXCEL_CELL_MAX_CHARS) + "...(已截断)";
+    }
+
+    private static void setLongCell(Row row, int col, Long value) {
+        Cell c = row.createCell(col);
+        if (value != null) {
+            c.setCellValue(value);
+        } else {
+            c.setCellValue("");
+        }
     }
 
     /**
