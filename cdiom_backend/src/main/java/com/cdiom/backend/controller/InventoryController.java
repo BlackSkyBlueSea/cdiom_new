@@ -1,12 +1,9 @@
 package com.cdiom.backend.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
-import com.cdiom.backend.mapper.DrugInfoMapper;
 import com.cdiom.backend.mapper.InventoryMapper;
-import com.cdiom.backend.model.DrugInfo;
 import com.cdiom.backend.model.Inventory;
 import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
@@ -21,7 +18,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
@@ -31,7 +27,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 库存管理控制器
@@ -48,7 +43,6 @@ public class InventoryController {
     private final ExcelExportService excelExportService;
     private final AuthService authService;
     private final InventoryMapper inventoryMapper;
-    private final DrugInfoMapper drugInfoMapper;
 
     /**
      * 分页查询库存列表
@@ -128,68 +122,10 @@ public class InventoryController {
                 throw new RuntimeException("未登录或登录已过期");
             }
 
-            // 构建查询条件（与列表查询保持一致）
-            LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
-            
-            // 如果有关键字，需要关联drug_info表查询
-            if (StringUtils.hasText(keyword)) {
-                // 先查询药品ID
-                LambdaQueryWrapper<DrugInfo> drugWrapper = new LambdaQueryWrapper<>();
-                drugWrapper.and(w -> w.like(DrugInfo::getDrugName, keyword)
-                        .or().like(DrugInfo::getNationalCode, keyword)
-                        .or().like(DrugInfo::getApprovalNumber, keyword));
-                List<DrugInfo> drugs = drugInfoMapper.selectList(drugWrapper);
-                if (!drugs.isEmpty()) {
-                    List<Long> drugIds = drugs.stream().map(DrugInfo::getId).collect(Collectors.toList());
-                    wrapper.in(Inventory::getDrugId, drugIds);
-                } else {
-                    // 如果没有找到药品，返回空结果
-                    wrapper.eq(Inventory::getId, -1);
-                }
-            }
-            
-            if (drugId != null) {
-                wrapper.eq(Inventory::getDrugId, drugId);
-            }
-            
-            if (StringUtils.hasText(batchNumber)) {
-                wrapper.like(Inventory::getBatchNumber, batchNumber);
-            }
-            
-            if (StringUtils.hasText(storageLocation)) {
-                wrapper.like(Inventory::getStorageLocation, storageLocation);
-            }
-            
-            if (expiryDateStart != null) {
-                wrapper.ge(Inventory::getExpiryDate, expiryDateStart);
-            }
-            
-            if (expiryDateEnd != null) {
-                wrapper.le(Inventory::getExpiryDate, expiryDateEnd);
-            }
-            
-            // 特殊药品筛选（需要关联drug_info表）
-            if (isSpecial != null) {
-                LambdaQueryWrapper<DrugInfo> drugWrapper = new LambdaQueryWrapper<>();
-                drugWrapper.eq(DrugInfo::getIsSpecial, isSpecial);
-                List<DrugInfo> drugs = drugInfoMapper.selectList(drugWrapper);
-                if (!drugs.isEmpty()) {
-                    List<Long> drugIds = drugs.stream().map(DrugInfo::getId).collect(Collectors.toList());
-                    wrapper.in(Inventory::getDrugId, drugIds);
-                } else {
-                    wrapper.eq(Inventory::getId, -1);
-                }
-            }
-            
-            // 只查询数量大于0的库存
-            wrapper.gt(Inventory::getQuantity, 0);
-            
-            // 按有效期排序（最早到期的在前，FIFO）
-            wrapper.orderByAsc(Inventory::getExpiryDate);
-            wrapper.orderByDesc(Inventory::getCreateTime);
-            
-            // 查询所有数据（不分页）
-            List<Inventory> inventoryList = inventoryMapper.selectList(wrapper);
+            // 与分页列表使用同一套 JOIN 条件，避免导出与界面筛选不一致
+            List<Inventory> inventoryList = inventoryMapper.selectInventoryListWithJoin(
+                    keyword, drugId, batchNumber, storageLocation,
+                    expiryDateStart, expiryDateEnd, isSpecial);
 
             // 生成Excel
             byte[] excelBytes = excelExportService.exportInventoryList(inventoryList, currentUser);

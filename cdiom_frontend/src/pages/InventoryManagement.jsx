@@ -29,8 +29,6 @@ const InventoryManagement = () => {
   const [filters, setFilters] = useState({
     keyword: '',
     drugId: undefined,
-    batchNumber: '',
-    storageLocation: '',
     expiryDateStart: undefined,
     expiryDateEnd: undefined,
     isSpecial: undefined,
@@ -57,8 +55,6 @@ const InventoryManagement = () => {
         size: pagination.pageSize,
         keyword: filters.keyword || undefined,
         drugId: filters.drugId,
-        batchNumber: filters.batchNumber || undefined,
-        storageLocation: filters.storageLocation || undefined,
         expiryDateStart: filters.expiryDateStart ? filters.expiryDateStart.format('YYYY-MM-DD') : undefined,
         expiryDateEnd: filters.expiryDateEnd ? filters.expiryDateEnd.format('YYYY-MM-DD') : undefined,
         isSpecial: filters.isSpecial,
@@ -107,8 +103,6 @@ const InventoryManagement = () => {
     setFilters({
       keyword: '',
       drugId: undefined,
-      batchNumber: '',
-      storageLocation: '',
       expiryDateStart: undefined,
       expiryDateEnd: undefined,
       isSpecial: undefined,
@@ -125,12 +119,6 @@ const InventoryManagement = () => {
       }
       if (filters.drugId) {
         params.append('drugId', filters.drugId)
-      }
-      if (filters.batchNumber) {
-        params.append('batchNumber', filters.batchNumber)
-      }
-      if (filters.storageLocation) {
-        params.append('storageLocation', filters.storageLocation)
       }
       if (filters.expiryDateStart) {
         params.append('expiryDateStart', filters.expiryDateStart.format('YYYY-MM-DD'))
@@ -437,34 +425,16 @@ const InventoryManagement = () => {
       <div style={toolbarRowCompactStyle}>
         <h2 style={{ ...toolbarPageTitleStyle, whiteSpace: 'nowrap' }}>库存管理</h2>
         <div style={compactFilterRowStyle}>
-          <div style={filterCellFlex('1.4 1 72px', 72, 200)}>
+          <div style={filterCellFlex('2.2 1 300px', 300, 450)}>
             <Input
-              placeholder="搜索药品名称、批次号"
+              placeholder="搜索药品名称、本位码、批准文号、批次号、存储位置"
               value={filters.keyword}
               onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
               style={{ width: '100%' }}
               allowClear
             />
           </div>
-          <div style={filterCellFlex('0.85 1 56px', 56, 130)}>
-            <Input
-              placeholder="批次号"
-              value={filters.batchNumber}
-              onChange={(e) => setFilters({ ...filters, batchNumber: e.target.value })}
-              style={{ width: '100%' }}
-              allowClear
-            />
-          </div>
-          <div style={filterCellFlex('0.85 1 56px', 56, 130)}>
-            <Input
-              placeholder="存储位置"
-              value={filters.storageLocation}
-              onChange={(e) => setFilters({ ...filters, storageLocation: e.target.value })}
-              style={{ width: '100%' }}
-              allowClear
-            />
-          </div>
-          <div style={{ flex: '0 0 auto', width: 96, minWidth: 88 }}>
+          <div style={{ flex: '0 0 auto', width: 120, minWidth: 80 }}>
             <Select
               placeholder="特殊药品"
               value={filters.isSpecial}
@@ -476,7 +446,7 @@ const InventoryManagement = () => {
               <Select.Option value={0}>否</Select.Option>
             </Select>
           </div>
-          <div style={filterCellFlex('1.15 1 180px', 168, 300)}>
+          <div style={filterCellFlex('1.15 1 100px', 100, 250)}>
             <RangePicker
               placeholder={['有效期开始', '有效期结束']}
               value={filters.expiryDateStart && filters.expiryDateEnd

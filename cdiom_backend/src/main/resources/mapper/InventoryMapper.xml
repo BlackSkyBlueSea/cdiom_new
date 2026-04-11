@@ -13,7 +13,9 @@
         <if test="keyword != null and keyword != ''">
             AND (d.drug_name LIKE CONCAT('%', #{keyword}, '%')
             OR d.national_code LIKE CONCAT('%', #{keyword}, '%')
-            OR d.approval_number LIKE CONCAT('%', #{keyword}, '%'))
+            OR d.approval_number LIKE CONCAT('%', #{keyword}, '%')
+            OR i.batch_number LIKE CONCAT('%', #{keyword}, '%')
+            OR i.storage_location LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="drugId != null">
             AND i.drug_id = #{drugId}
