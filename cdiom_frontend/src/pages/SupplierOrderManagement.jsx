@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Tooltip } from 'antd'
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckOutlined, CloseOutlined, SendOutlined, EditOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Input, Select, Tag, Modal, Form, message, DatePicker, Tooltip, Image } from 'antd'
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckOutlined, CloseOutlined, SendOutlined, EditOutlined, BarcodeOutlined, DownloadOutlined } from '@ant-design/icons'
+import Cookies from 'js-cookie'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   pageRootStyle,
   tableAreaStyle,
@@ -16,7 +17,6 @@ import {
 } from '../utils/tablePageLayout'
 
 const SupplierOrderManagement = () => {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
@@ -39,6 +39,9 @@ const SupplierOrderManagement = () => {
   const [shipForm] = Form.useForm()
   const [logisticsForm] = Form.useForm()
   const [actionOrderId, setActionOrderId] = useState(null)
+  const [barcodeModalVisible, setBarcodeModalVisible] = useState(false)
+  const [currentBarcode, setCurrentBarcode] = useState(null)
+  const [currentBarcodeOrderId, setCurrentBarcodeOrderId] = useState(null)
 
   useEffect(() => {
     fetchOrders()
@@ -177,13 +180,41 @@ const SupplierOrderManagement = () => {
     }
   }
 
+  const openOrderBarcode = async (record) => {
+    try {
+      const res = await request.get(`/purchase-orders/${record.id}/barcode`)
+      if (res.code === 200) {
+        setCurrentBarcode(res.data)
+        setCurrentBarcodeOrderId(record.id)
+        setBarcodeModalVisible(true)
+      } else {
+        message.error(res.msg || '获取条形码失败')
+      }
+    } catch (error) {
+      message.error('获取条形码失败')
+    }
+  }
+
   const columns = [
     {
       title: '订单编号',
       dataIndex: 'orderNumber',
       key: 'orderNumber',
-      width: 150,
+      width: 180,
       ellipsis: true,
+      render: (text, record) => (
+        <Space>
+          <span>{text}</span>
+          <Tooltip title="条形码（与采购端一致，可下载）">
+            <Button
+              type="link"
+              size="small"
+              icon={<BarcodeOutlined />}
+              onClick={() => openOrderBarcode(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
     },
     {
       title: '订单状态',
@@ -394,7 +425,18 @@ const SupplierOrderManagement = () => {
         {currentOrder && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <p><strong>订单编号：</strong>{currentOrder.orderNumber}</p>
+              <p>
+                <strong>订单编号：</strong>
+                {currentOrder.orderNumber}
+                <Tooltip title="条形码">
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<BarcodeOutlined />}
+                    onClick={() => openOrderBarcode(currentOrder)}
+                  />
+                </Tooltip>
+              </p>
               <p><strong>订单状态：</strong>{getStatusTag(currentOrder.status)}</p>
               {currentOrder.logisticsNumber && (
                 <p><strong>物流单号：</strong>{currentOrder.logisticsNumber}</p>
@@ -504,6 +546,83 @@ const SupplierOrderManagement = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 订单条形码（与采购订单管理相同接口） */}
+      <Modal
+        title="订单条形码"
+        open={barcodeModalVisible}
+        onCancel={() => {
+          setBarcodeModalVisible(false)
+          setCurrentBarcode(null)
+          setCurrentBarcodeOrderId(null)
+        }}
+        footer={[
+          <Tooltip key="download" title="下载条形码">
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={async () => {
+                if (!currentBarcodeOrderId || !currentBarcode?.orderNumber) return
+                try {
+                  let token = sessionStorage.getItem('cdiom_token')
+                  if (!token) token = Cookies.get('cdiom_token')
+                  const headers = {}
+                  if (token) headers.Authorization = `Bearer ${token}`
+                  const response = await fetch(
+                    `/api/v1/purchase-orders/${currentBarcodeOrderId}/barcode/download`,
+                    { method: 'GET', credentials: 'include', headers }
+                  )
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `barcode_${currentBarcode.orderNumber}.png`
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                    document.body.removeChild(a)
+                    message.success('条形码下载成功')
+                  } else {
+                    message.error('下载条形码失败')
+                  }
+                } catch (error) {
+                  message.error('下载条形码失败')
+                }
+              }}
+            />
+          </Tooltip>,
+          <Tooltip key="close" title="关闭">
+            <Button
+              icon={<CloseOutlined />}
+              onClick={() => {
+                setBarcodeModalVisible(false)
+                setCurrentBarcode(null)
+                setCurrentBarcodeOrderId(null)
+              }}
+            />
+          </Tooltip>,
+        ]}
+        width={500}
+      >
+        {currentBarcode && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ marginBottom: '20px', fontSize: '16px', fontWeight: 'bold' }}>
+              订单编号：{currentBarcode.orderNumber}
+            </p>
+            {currentBarcode.barcodeBase64 && (
+              <Image
+                src={currentBarcode.barcodeBase64}
+                alt="订单条形码"
+                style={{ maxWidth: '100%' }}
+              />
+            )}
+            <p style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+              符合 GSP 规范的 Code128 条形码，可用于扫码枪扫描
+            </p>
+          </div>
+        )}
       </Modal>
 
       {/* 更新物流单号模态框 */}

@@ -43,7 +43,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/purchase-orders")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
+@RequiresPermission({"drug:view", "drug:manage", "purchase:view"})
 public class PurchaseOrderController {
 
     private final PurchaseOrderService purchaseOrderService;
@@ -281,8 +281,9 @@ public class PurchaseOrderController {
      * 生成订单条形码（Base64）
      */
     @GetMapping("/{id}/barcode")
-    public Result<Map<String, String>> generateBarcode(@PathVariable Long id) {
+    public Result<Map<String, String>> generateBarcode(@PathVariable Long id, HttpServletRequest httpRequest) {
         try {
+            checkSupplierOrderPermission(id, httpRequest);
             PurchaseOrder order = purchaseOrderService.getPurchaseOrderById(id);
             if (order == null) {
                 return Result.error("订单不存在");
@@ -312,7 +313,17 @@ public class PurchaseOrderController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "300") int width,
             @RequestParam(defaultValue = "100") int height,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+        try {
+            checkSupplierOrderPermission(id, httpRequest);
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            response.setStatus(msg.contains("未登录")
+                    ? HttpServletResponse.SC_UNAUTHORIZED
+                    : HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
         try {
             PurchaseOrder order = purchaseOrderService.getPurchaseOrderById(id);
             if (order == null) {
