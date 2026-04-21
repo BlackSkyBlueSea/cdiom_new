@@ -194,13 +194,21 @@ const Dashboard = () => {
     if (!isRefresh) setLoading(true)
     else setRefreshing(true)
     try {
-      // 获取统计数据
-      const statsRes = await request.get('/dashboard/statistics')
-      if (statsRes.code === 200) {
-        setStatistics(statsRes.data)
+      // 全站汇总统计：后端仅允许 user:manage / role:manage / config:manage（系统管理员、超管）
+      if (roleId === 1 || roleId === 6) {
+        try {
+          const statsRes = await request.get('/dashboard/statistics')
+          if (statsRes.code === 200) {
+            setStatistics(statsRes.data || {})
+          }
+        } catch (error) {
+          logger.warn('获取统计数据失败:', error.message)
+        }
+      } else {
+        setStatistics({})
       }
 
-      // 仓库管理员专用数据
+      // 仓库管理员专用数据（含药品/通知简报字段，不依赖 /dashboard/statistics）
       if (roleId === 2) {
         try {
           const warehouseRes = await request.get('/dashboard/warehouse')
@@ -217,6 +225,14 @@ const Dashboard = () => {
               inboundCounts: Array.isArray(d.inboundCounts) ? d.inboundCounts.map(v => Number(v)) : [],
               outboundCounts: Array.isArray(d.outboundCounts) ? d.outboundCounts.map(v => Number(v)) : []
             })
+            setStatistics((prev) => ({
+              ...prev,
+              totalDrugs: Number(d.totalDrugs ?? 0),
+              specialDrugs: Number(d.specialDrugs ?? 0),
+              normalDrugs: Number(d.normalDrugs ?? 0),
+              totalNotices: Number(d.totalNotices ?? 0),
+              activeNotices: Number(d.activeNotices ?? 0),
+            }))
           } else {
             setWarehouseStats({
               nearExpiryWarning: { yellow: 0, red: 0 },

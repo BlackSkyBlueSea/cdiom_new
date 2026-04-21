@@ -25,7 +25,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/inventory-adjustments")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
+@RequiresPermission({"inventory:view", "drug:manage"})
 public class InventoryAdjustmentController {
 
     private final InventoryAdjustmentService inventoryAdjustmentService;

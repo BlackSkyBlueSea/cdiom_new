@@ -21,6 +21,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -338,6 +339,22 @@ public class SysUserServiceImpl implements SysUserService {
         if (deletedCount == 0) {
             throw new ServiceException("用户不存在或已被永久删除");
         }
+    }
+
+    @Override
+    public List<SysUser> listActiveUsersForSecondOperatorPick(int limit) {
+        int cap = limit <= 0 ? 500 : Math.min(limit, 2000);
+        LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
+        w.eq(SysUser::getStatus, 1)
+                .orderByAsc(SysUser::getUsername);
+        List<SysUser> list = sysUserMapper.selectList(w.last("LIMIT " + cap));
+        if (list == null || list.isEmpty()) {
+            return Collections.emptyList();
+        }
+        for (SysUser u : list) {
+            u.setPassword(null);
+        }
+        return list;
     }
 }
 

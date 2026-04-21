@@ -19,7 +19,7 @@ public interface OutboundApplyMapper extends BaseMapper<OutboundApply> {
     /**
      * 查询待审批的出库申请数量
      */
-    @Select("SELECT COUNT(*) FROM outbound_apply WHERE status = 'PENDING'")
+    @Select("SELECT COUNT(*) FROM outbound_apply WHERE status IN ('PENDING', 'PENDING_SECOND')")
     Long countPendingOutbound();
 
     /**

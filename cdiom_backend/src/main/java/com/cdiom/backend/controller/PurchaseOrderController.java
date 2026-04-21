@@ -189,11 +189,10 @@ public class PurchaseOrderController {
      * 供应商可以确认自己的订单
      */
     @PostMapping("/{id}/confirm")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"drug:manage", "purchase:view"})
     public Result<Void> confirmOrder(@PathVariable Long id, HttpServletRequest request) {
         try {
-            // 检查权限：供应商只能确认自己的订单
-            checkSupplierOrderPermission(id, request);
+            assertSupplierOrSuperAdminOwnsOrder(id, request);
             purchaseOrderService.confirmOrder(id);
             return Result.success();
         } catch (Exception e) {
@@ -206,14 +205,13 @@ public class PurchaseOrderController {
      * 供应商可以拒绝自己的订单
      */
     @PostMapping("/{id}/reject")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"drug:manage", "purchase:view"})
     public Result<Void> rejectOrder(
             @PathVariable Long id,
             @RequestBody RejectOrderRequest request,
             HttpServletRequest httpRequest) {
         try {
-            // 检查权限：供应商只能拒绝自己的订单
-            checkSupplierOrderPermission(id, httpRequest);
+            assertSupplierOrSuperAdminOwnsOrder(id, httpRequest);
             purchaseOrderService.rejectOrder(id, request.getReason());
             return Result.success();
         } catch (Exception e) {
@@ -226,14 +224,13 @@ public class PurchaseOrderController {
      * 供应商可以对自己的订单发货
      */
     @PostMapping("/{id}/ship")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"drug:manage", "purchase:view"})
     public Result<Void> shipOrder(
             @PathVariable Long id,
             @RequestBody ShipOrderRequest request,
             HttpServletRequest httpRequest) {
         try {
-            // 检查权限：供应商只能对自己的订单发货
-            checkSupplierOrderPermission(id, httpRequest);
+            assertSupplierOrSuperAdminOwnsOrder(id, httpRequest);
             purchaseOrderService.shipOrder(id, request.getLogisticsNumber());
             return Result.success();
         } catch (Exception e) {
@@ -262,14 +259,13 @@ public class PurchaseOrderController {
      * 供应商可以更新自己订单的物流单号
      */
     @PutMapping("/{id}/logistics")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"drug:manage", "purchase:view"})
     public Result<Void> updateLogisticsNumber(
             @PathVariable Long id,
             @RequestBody UpdateLogisticsRequest request,
             HttpServletRequest httpRequest) {
         try {
-            // 检查权限：供应商只能更新自己订单的物流单号
-            checkSupplierOrderPermission(id, httpRequest);
+            assertSupplierOrSuperAdminOwnsOrder(id, httpRequest);
             purchaseOrderService.updateLogisticsNumber(id, request.getLogisticsNumber());
             return Result.success();
         } catch (Exception e) {
@@ -421,8 +417,8 @@ public class PurchaseOrderController {
     }
 
     /**
-     * 检查供应商订单权限
-     * 供应商只能操作自己的订单
+     * 检查供应商订单权限（读类接口：如条形码）
+     * 供应商只能访问自己的订单；其他角色不在此方法限制（由列表查询等控制数据范围）
      */
     private void checkSupplierOrderPermission(Long orderId, HttpServletRequest request) {
         SysUser currentUser = authService.getCurrentUser();
@@ -444,6 +440,26 @@ public class PurchaseOrderController {
                 throw new RuntimeException("无权操作此订单");
             }
         }
+    }
+
+    /**
+     * 确认/拒绝/发货/改物流：仅供应商本人订单，或超级管理员。
+     * 拦截器允许 purchase:view（供应商）与 drug:manage（院内）通过其一即可进入，此处禁止非供应商凭 purchase:view 代操作。
+     */
+    private void assertSupplierOrSuperAdminOwnsOrder(Long orderId, HttpServletRequest request) {
+        SysUser currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("未登录");
+        }
+        Long roleId = currentUser.getRoleId();
+        if (roleId != null && roleId == 6L) {
+            return;
+        }
+        if (roleId != null && roleId == 5L) {
+            checkSupplierOrderPermission(orderId, request);
+            return;
+        }
+        throw new RuntimeException("仅供应商账号可确认、拒绝、发货或更新本订单物流信息");
     }
 
     /**

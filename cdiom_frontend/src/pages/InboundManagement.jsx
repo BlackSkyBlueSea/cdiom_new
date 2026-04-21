@@ -198,21 +198,25 @@ const InboundManagement = () => {
   const fetchUsers = async () => {
     setLoadingUsers(true)
     try {
-      const res = await request.get('/users', {
-        params: { page: 1, size: 1000, status: 1 },
-      })
+      const res = await request.get('/inbound/second-operator-candidates')
       if (res.code === 200) {
-        setUsers(res.data.records || [])
+        setUsers(Array.isArray(res.data) ? res.data : [])
       }
     } catch (error) {
-      logger.error('获取用户列表失败:', error)
+      logger.error('获取第二操作人候选失败:', error)
     } finally {
       setLoadingUsers(false)
     }
   }
 
   useEffect(() => {
-    if (modalVisible && hasPermission(PERMISSIONS.DRUG_MANAGE)) {
+    if (
+      modalVisible &&
+      (hasPermission(PERMISSIONS.DRUG_MANAGE) ||
+        hasPermission(PERMISSIONS.INBOUND_CREATE) ||
+        hasPermission(PERMISSIONS.INBOUND_APPROVE) ||
+        hasPermission(PERMISSIONS.INBOUND_EXECUTE))
+    ) {
       fetchUsers()
     }
   }, [modalVisible])
@@ -263,12 +267,12 @@ const InboundManagement = () => {
     }
   }, [inboundType])
 
-  // 药品选项（用于AutoComplete）
+  // 药品选项（用于 AutoComplete）：value 须为字符串，避免 combobox 下 number 类型警告
   const drugOptions = useMemo(() => {
-    return drugs.map(drug => ({
-      value: drug.id,
-      label: `${drug.drugName} (${drug.specification || ''})`,
-      drug: drug
+    return drugs.map((drug) => ({
+      value: String(drug.id),
+      label: `${drug.drugName || ''} (${drug.specification || ''})`.replace(/\s*\(\s*\)$/, '').trim() || String(drug.id),
+      drug,
     }))
   }, [drugs])
 
@@ -342,14 +346,16 @@ const InboundManagement = () => {
 
   const fetchDrugs = async () => {
     try {
-      const res = await request.get('/drugs', {
-        params: { page: 1, size: 10000 }
+      const res = await request.get('/drugs/options-for-business', {
+        params: { page: 1, size: 2000 },
       })
       if (res.code === 200) {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      logger.error('获取药品列表失败:', error)
+      if (!error?.isPermissionForbidden) {
+        logger.error('获取药品列表失败:', error)
+      }
     }
   }
 
@@ -466,7 +472,9 @@ const InboundManagement = () => {
   const handleDrugSelect = (value, option) => {
     const drug = option.drug
     setSelectedDrug(drug)
+    const drugId = value != null && String(value) !== '' ? Number(value) : undefined
     form.setFieldsValue({
+      drugId: Number.isFinite(drugId) ? drugId : undefined,
       manufacturer: drug.manufacturer || '',
       storageLocation: drug.storageLocation || '',
     })
@@ -521,7 +529,7 @@ const InboundManagement = () => {
         message.error('请选择本批到货时间')
         return
       }
-      const orderItem = orderItems.find((item) => item.drugId === values.drugId)
+      const orderItem = orderItems.find((item) => Number(item.drugId) === Number(values.drugId))
       if (!orderItem) {
         message.error('所选药品不在该采购订单中')
         return
@@ -693,7 +701,7 @@ const InboundManagement = () => {
           message.error('请选择本批到货时间')
           return
         }
-        const orderItem = orderItems.find(item => item.drugId === values.drugId)
+        const orderItem = orderItems.find((item) => Number(item.drugId) === Number(values.drugId))
         if (!orderItem) {
           message.error('所选药品不在该采购订单中')
           return
@@ -1504,7 +1512,7 @@ const InboundManagement = () => {
                 options={drugOptions}
                 placeholder="请输入或选择药品"
                 filterOption={(inputValue, option) =>
-                  option.label.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                  (option?.label ?? '').toString().toUpperCase().indexOf((inputValue || '').toUpperCase()) !== -1
                 }
                 onSelect={handleDrugSelect}
                 onChange={(value) => {
@@ -1910,7 +1918,12 @@ const InboundManagement = () => {
       >
         <Spin spinning={detailLoading}>
           {detailRecord && (
-            <Descriptions bordered column={2} size="small" labelStyle={{ width: 132 }}>
+            <Descriptions
+              bordered
+              column={2}
+              size="small"
+              styles={{ label: { width: 132 } }}
+            >
               <Descriptions.Item label="入库单号">{detailRecord.recordNumber}</Descriptions.Item>
               <Descriptions.Item label="关联订单ID">{detailRecord.orderId ?? '—'}</Descriptions.Item>
               <Descriptions.Item label="到货批次">{detailRecord.receiptBatchCode || '—'}</Descriptions.Item>
@@ -1962,7 +1975,7 @@ const InboundManagement = () => {
               <Descriptions.Item label="生产厂家">{detailRecord.manufacturer || '—'}</Descriptions.Item>
               <Descriptions.Item label="存储位置">{detailRecord.storageLocation || '—'}</Descriptions.Item>
               <Descriptions.Item label="随货同行单号">{detailRecord.deliveryNoteNumber || '—'}</Descriptions.Item>
-              <Descriptions.Item label="随货单图片">
+              <Descriptions.Item label="随货单图片" span={2}>
                 {detailRecord.deliveryNoteImage || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="不合格处置意向">
@@ -1979,7 +1992,7 @@ const InboundManagement = () => {
               <Descriptions.Item label="备注" span={2}>
                 {detailRecord.remark || '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="创建时间">
+              <Descriptions.Item label="创建时间" span={2}>
                 {detailRecord.createTime ? dayjs(detailRecord.createTime).format('YYYY-MM-DD HH:mm:ss') : '—'}
               </Descriptions.Item>
             </Descriptions>

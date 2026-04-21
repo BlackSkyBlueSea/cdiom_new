@@ -15,6 +15,9 @@ import {
   TABLE_SCROLL_Y_STACKED,
 } from '../utils/tablePageLayout'
 
+/** 与后端 spring.servlet.multipart.max-file-size 一致（前端预检） */
+const LICENSE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+
 const SupplierManagement = () => {
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -83,6 +86,23 @@ const SupplierManagement = () => {
     setPagination({ ...pagination, current: 1 })
   }
 
+  /**
+   * Form.Item 包裹 Upload 时，licenseImage 可能被写成 fileList 数组而非字符串；
+   * 删除/提交前统一解析为后端存储用的 URL 字符串。
+   */
+  const pickLicenseImageUrl = (raw, list, fileFromRemove) => {
+    const fromRemove =
+      fileFromRemove && typeof fileFromRemove === 'object'
+        ? fileFromRemove.url || (typeof fileFromRemove.response === 'string' ? fileFromRemove.response : undefined)
+        : undefined
+    if (typeof fromRemove === 'string' && fromRemove.trim()) return fromRemove.trim()
+    if (typeof raw === 'string' && raw.trim()) return raw.trim()
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.url) return String(raw.url).trim()
+    if (Array.isArray(raw) && raw[0]?.url) return String(raw[0].url).trim()
+    if (list?.[0]?.url) return String(list[0].url).trim()
+    return undefined
+  }
+
   const handleSubmit = async (values) => {
     try {
       // 处理日期格式；状态为字符串 Option 时转为数字
@@ -91,7 +111,7 @@ const SupplierManagement = () => {
         licenseExpiryDate: values.licenseExpiryDate 
           ? dayjs(values.licenseExpiryDate).format('YYYY-MM-DD') 
           : undefined,
-        licenseImage: values.licenseImage || undefined,
+        licenseImage: pickLicenseImageUrl(values.licenseImage, fileList) || undefined,
         status: values.status !== undefined && values.status !== null ? Number(values.status) : values.status,
       }
       const url = editingSupplier 
@@ -116,16 +136,16 @@ const SupplierManagement = () => {
   }
 
   const handleUpload = async (file) => {
+    if (file?.size != null && file.size > LICENSE_UPLOAD_MAX_BYTES) {
+      message.error(`文件过大（超过 ${(LICENSE_UPLOAD_MAX_BYTES / (1024 * 1024)).toFixed(0)}MB），请压缩或更换更小的图片后再试`)
+      return false
+    }
     setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
-    
+
     try {
-      const res = await request.post('/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      const res = await request.post('/upload', formData)
       if (res.code === 200) {
         const fileUrl = res.data
         form.setFieldsValue({ licenseImage: fileUrl })
@@ -143,19 +163,31 @@ const SupplierManagement = () => {
       }
     } catch (error) {
       logger.error('文件上传失败:', error)
-      message.error('文件上传失败')
+      const backendMsg = error?.response?.data?.msg
+      const status = error?.response?.status
+      if (backendMsg) {
+        message.error(backendMsg)
+      } else if (status === 413) {
+        message.error('上传内容过大，请使用不超过 10MB 的图片')
+      } else if (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
+        message.error(
+          '上传请求失败：请确认后端已启动（开发环境多为 http://localhost:8080），或检查网络与代理；超过 10MB 的文件请先压缩。'
+        )
+      } else {
+        message.error(error?.message || '文件上传失败')
+      }
       return false
     } finally {
       setUploading(false)
     }
   }
 
-  const handleRemove = async () => {
-    const licenseImage = form.getFieldValue('licenseImage')
-    if (licenseImage) {
+  const handleRemove = async (file) => {
+    const imageUrl = pickLicenseImageUrl(form.getFieldValue('licenseImage'), fileList, file)
+    if (imageUrl) {
       try {
         await request.delete('/upload', {
-          params: { url: licenseImage },
+          params: { url: imageUrl },
         })
       } catch (error) {
         logger.error('删除文件失败:', error)

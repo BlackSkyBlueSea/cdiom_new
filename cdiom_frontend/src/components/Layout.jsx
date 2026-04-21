@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   Layout as AntLayout,
@@ -14,6 +14,7 @@ import {
   Tag,
   Spin,
   Typography,
+  Result,
 } from 'antd'
 import {
   DashboardOutlined,
@@ -38,9 +39,40 @@ import {
 } from '@ant-design/icons'
 import request from '../utils/request'
 import { removeToken, getUser, getUserRoleId } from '../utils/auth'
+import {
+  clearPermissionCache,
+  fetchUserPermissions,
+  hasPermission,
+} from '../utils/permission'
+import {
+  APP_MENU_LABELS,
+  APP_MENU_ORDER,
+  MENU_ITEM_ROLES,
+  canAccessFunctionRoute,
+  getPrimaryRouteKey,
+} from '../config/appAccessPolicy'
 import './Layout.css'
 
 const { Header, Sider, Content } = AntLayout
+
+const MENU_ICONS = {
+  dashboard: <DashboardOutlined />,
+  drugs: <MedicineBoxOutlined />,
+  inventory: <DatabaseOutlined />,
+  inbound: <InboxOutlined />,
+  outbound: <ExportOutlined />,
+  'purchase-orders': <ShoppingCartOutlined />,
+  suppliers: <ShopOutlined />,
+  users: <UserOutlined />,
+  roles: <TeamOutlined />,
+  configs: <SettingOutlined />,
+  notices: <BellOutlined />,
+  'operation-logs': <FileTextOutlined />,
+  'login-logs': <LoginOutlined />,
+  'supplier-dashboard': <DashboardOutlined />,
+  'supplier-drugs': <MedicineBoxOutlined />,
+  'supplier-orders': <ShoppingCartOutlined />,
+}
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false)
@@ -53,130 +85,56 @@ const Layout = () => {
   const [profileDetail, setProfileDetail] = useState(null)
   const [profilePermissions, setProfilePermissions] = useState([])
   const [adminContact, setAdminContact] = useState(null)
+  const warned403PathRef = useRef('')
 
+  // 侧栏：按角色展示该角色全部导航项；细粒度权限由内容区 canAccessFunctionRoute 拦截
   useEffect(() => {
-    const currentUser = getUser()
-    setUserState(currentUser)
-    const roleId = getUserRoleId()
-    
-    // 根据角色显示不同菜单
-    // 角色ID: 1-系统管理员, 2-仓库管理员, 3-采购专员, 4-医护人员, 5-供应商, 6-超级管理员
-    // 系统管理员只负责系统功能，不涉及业务功能
-    // 超级管理员拥有所有功能，主要用于系统测试和维护
-    // 供应商使用专用菜单（轻量化操作风格）
-    const allMenuItems = roleId === 5 ? [
-      {
-        key: 'supplier-dashboard',
-        icon: <DashboardOutlined />,
-        label: '工作台',
-        roles: [5],
-      },
-      {
-        key: 'supplier-drugs',
-        icon: <MedicineBoxOutlined />,
-        label: '可供应药品',
-        roles: [5],
-      },
-      {
-        key: 'supplier-orders',
-        icon: <ShoppingCartOutlined />,
-        label: '订单管理',
-        roles: [5],
-      },
-      {
-        key: 'notices',
-        icon: <BellOutlined />,
-        label: '通知公告',
-        roles: [5],
-      },
-    ] : [
-      {
-        key: 'dashboard',
-        icon: <DashboardOutlined />,
-        label: '仪表盘',
-        roles: [1, 2, 3, 4, 6], // 所有角色可见（除供应商）
-      },
-      {
-        key: 'drugs',
-        icon: <MedicineBoxOutlined />,
-        label: '药品信息管理',
-        roles: [2, 6], // 仓库管理员、超级管理员可见
-      },
-      {
-        key: 'inventory',
-        icon: <DatabaseOutlined />,
-        label: '库存管理',
-        roles: [2, 6], // 仓库管理员、超级管理员可见
-      },
-      {
-        key: 'inbound',
-        icon: <InboxOutlined />,
-        label: '入库管理',
-        roles: [2, 6], // 仓库管理员、超级管理员可见
-      },
-      {
-        key: 'outbound',
-        icon: <ExportOutlined />,
-        label: '出库管理',
-        roles: [2, 4, 6], // 仓库管理员、医护人员、超级管理员可见
-      },
-      {
-        key: 'purchase-orders',
-        icon: <ShoppingCartOutlined />,
-        label: '采购订单',
-        roles: [3, 6], // 采购专员、超级管理员可见
-      },
-      {
-        key: 'suppliers',
-        icon: <ShopOutlined />,
-        label: '供应商管理',
-        roles: [3, 6], // 采购专员、超级管理员可见
-      },
-      {
-        key: 'users',
-        icon: <UserOutlined />,
-        label: '用户管理',
-        roles: [1, 6], // 系统管理员、超级管理员可见
-      },
-      {
-        key: 'roles',
-        icon: <TeamOutlined />,
-        label: '角色管理',
-        roles: [1, 6], // 系统管理员、超级管理员可见
-      },
-      {
-        key: 'configs',
-        icon: <SettingOutlined />,
-        label: '参数配置',
-        roles: [1, 6], // 系统管理员、超级管理员可见
-      },
-      {
-        key: 'notices',
-        icon: <BellOutlined />,
-        label: '通知公告',
-        roles: [1, 2, 3, 4, 5], // 所有角色可见
-      },
-      {
-        key: 'operation-logs',
-        icon: <FileTextOutlined />,
-        label: '操作日志',
-        roles: [1, 6], // 系统管理员、超级管理员可见
-      },
-      {
-        key: 'login-logs',
-        icon: <LoginOutlined />,
-        label: '登录日志',
-        roles: [1, 6], // 系统管理员、超级管理员可见
-      },
-    ]
-    
-    // 根据角色过滤菜单
-    const filteredMenuItems = allMenuItems.filter(item => 
-      item.roles.includes(roleId)
+    let cancelled = false
+    ;(async () => {
+      if (!getUser()) return
+      try {
+        await fetchUserPermissions()
+      } catch {
+        /* 忽略 */
+      }
+      if (cancelled) return
+
+      setUserState(getUser())
+      const roleId = getUserRoleId()
+
+      const visible = APP_MENU_ORDER.filter((key) => {
+        const allowedRoles = MENU_ITEM_ROLES[key]
+        return Array.isArray(allowedRoles) && allowedRoles.includes(roleId)
+      })
+
+      setMenuItems(
+        visible.map((key) => ({
+          key,
+          icon: MENU_ICONS[key],
+          label: APP_MENU_LABELS[key] || key,
+        })),
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname])
+
+  // 无权限访问功能页时：403 区 + 顶部友好提示（离开无权限页后再次进入会再次提示）
+  useEffect(() => {
+    const path = location.pathname
+    const routeKey = getPrimaryRouteKey(path)
+    if (canAccessFunctionRoute(path, hasPermission, getUserRoleId)) {
+      warned403PathRef.current = ''
+      return
+    }
+    if (routeKey === 'dashboard') return
+    if (warned403PathRef.current === path) return
+    warned403PathRef.current = path
+    message.warning(
+      '当前账号无访问该功能的权限，页面已拦截。如需开通请联系系统管理员。',
     )
-    
-    setMenuItems(filteredMenuItems)
-  }, [])
+  }, [location.pathname])
 
   const handleMenuClick = ({ key }) => {
     navigate(key)
@@ -186,10 +144,12 @@ const Layout = () => {
     try {
       await request.post('/auth/logout')
       removeToken()
+      clearPermissionCache()
       message.success('登出成功')
       navigate('/')
     } catch (error) {
       removeToken()
+      clearPermissionCache()
       navigate('/')
     }
   }
@@ -399,7 +359,20 @@ const Layout = () => {
           </Spin>
         </Modal>
         <Content className="content">
-          <Outlet />
+          {canAccessFunctionRoute(location.pathname, hasPermission, getUserRoleId) ? (
+            <Outlet />
+          ) : (
+            <Result
+              status="403"
+              title="403 权限不足"
+              subTitle="您没有访问该功能的权限，无法打开此页面。如需开通相应权限，请联系系统管理员。"
+              extra={
+                <Button type="primary" onClick={() => navigate('dashboard')}>
+                  返回仪表盘
+                </Button>
+              }
+            />
+          )}
         </Content>
       </AntLayout>
 

@@ -30,7 +30,6 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/suppliers")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
 public class SupplierController {
 
     private final SupplierService supplierService;
@@ -42,6 +41,7 @@ public class SupplierController {
      * 分页查询供应商列表
      */
     @GetMapping
+    @RequiresPermission({"drug:view", "drug:manage"})
     public Result<Page<Supplier>> getSupplierList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
@@ -195,6 +195,7 @@ public class SupplierController {
      * 获取供应商提供的药品列表（含协议价），用于采购订单带价与供应商维护
      */
     @GetMapping("/{id}/drugs")
+    @RequiresPermission({"drug:view", "drug:manage", "purchase:view"})
     public Result<Page<SupplierDrugVO>> getSupplierDrugs(
             @PathVariable Long id,
             @RequestParam(defaultValue = "1") Integer page,

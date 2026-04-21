@@ -46,6 +46,11 @@ public class SysUser {
     private Long roleId;
 
     /**
+     * 是否在用户管理中保存过「完整权限清单」：1 时有效权限仅以 sys_user_permission 为准；0 时为角色权限与直接附加权限并集
+     */
+    private Integer permissionCustomized;
+
+    /**
      * 角色名称（非表字段，登录/当前用户接口填充）
      */
     @TableField(exist = false)

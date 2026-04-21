@@ -3,6 +3,8 @@ package com.cdiom.backend.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cdiom.backend.model.SysUser;
 
+import java.util.List;
+
 /**
  * 系统用户服务接口
  * 
@@ -64,5 +66,12 @@ public interface SysUserService {
      * 物理删除用户（真正从数据库删除）
      */
     void permanentlyDeleteUser(Long id);
+
+    /**
+     * 双人操作/第二审批等场景：启用中的用户简要列表（不含密码），非用户管理接口，不按 user:manage 鉴权。
+     *
+     * @param limit 最大条数，内部会做上限保护
+     */
+    List<SysUser> listActiveUsersForSecondOperatorPick(int limit);
 }
 

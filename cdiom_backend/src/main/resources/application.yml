@@ -18,6 +18,8 @@ server:
     max-connections: 10000  # 最大连接数
     accept-count: 100  # 等待队列长度
     connection-timeout: 20000  # 连接超时时间（毫秒）
+    # 默认 2MB 会导致大于 2MB 的 multipart 在到达 Spring 前被 Tomcat 拒绝，表现为连接重置
+    max-http-form-post-size: 12MB
 
 spring:
   # 应用名称
@@ -50,7 +52,8 @@ spring:
     multipart:
       enabled: true  # 启用文件上传
       max-file-size: 10MB  # 单个文件最大大小
-      max-request-size: 10MB  # 请求最大大小
+      # 略高于单文件，容纳 multipart 边界与表单字段开销
+      max-request-size: 12MB
       file-size-threshold: 2KB  # 文件写入磁盘的阈值
   
   # 163邮箱配置（用于发送验证码）

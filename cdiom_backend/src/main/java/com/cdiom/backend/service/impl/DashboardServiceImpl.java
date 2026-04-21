@@ -236,7 +236,7 @@ public class DashboardServiceImpl implements DashboardService {
             pendingInboundWrapper.eq(PurchaseOrder::getStatus, "SHIPPED");
             long pendingInboundCount = purchaseOrderMapper.selectCount(pendingInboundWrapper);
             
-            // 待审批出库数：状态为PENDING（待审批）的出库申请
+            // 待审批出库数：待第一审批(PENDING) + 待第二审批(PENDING_SECOND)
             Long pendingOutboundCount = outboundApplyMapper.countPendingOutbound();
             if (pendingOutboundCount == null) {
                 pendingOutboundCount = 0L;
@@ -312,6 +312,26 @@ public class DashboardServiceImpl implements DashboardService {
             result.put("inboundCounts", inboundCounts);
             result.put("outboundCounts", outboundCounts);
 
+            // 药品与通知简报（供仓库工作台展示，避免调用需系统管理权限的 /dashboard/statistics）
+            LambdaQueryWrapper<DrugInfo> drugWrapper = new LambdaQueryWrapper<>();
+            drugWrapper.eq(DrugInfo::getDeleted, 0);
+            long drugCount = drugInfoMapper.selectCount(drugWrapper);
+            drugWrapper.clear();
+            drugWrapper.eq(DrugInfo::getDeleted, 0).eq(DrugInfo::getIsSpecial, 1);
+            long specialDrugCount = drugInfoMapper.selectCount(drugWrapper);
+            result.put("totalDrugs", drugCount);
+            result.put("specialDrugs", specialDrugCount);
+            result.put("normalDrugs", drugCount - specialDrugCount);
+
+            LambdaQueryWrapper<SysNotice> noticeWrapper = new LambdaQueryWrapper<>();
+            noticeWrapper.eq(SysNotice::getDeleted, 0);
+            long noticeCount = sysNoticeMapper.selectCount(noticeWrapper);
+            noticeWrapper.clear();
+            noticeWrapper.eq(SysNotice::getDeleted, 0).eq(SysNotice::getStatus, 1);
+            long activeNoticeCount = sysNoticeMapper.selectCount(noticeWrapper);
+            result.put("totalNotices", noticeCount);
+            result.put("activeNotices", activeNoticeCount);
+
             return result;
         } catch (Exception e) {
             // 记录异常日志，但返回默认空数据，避免前端报错
@@ -333,6 +353,11 @@ public class DashboardServiceImpl implements DashboardService {
             result.put("dates", new ArrayList<>());
             result.put("inboundCounts", new ArrayList<>());
             result.put("outboundCounts", new ArrayList<>());
+            result.put("totalDrugs", 0L);
+            result.put("specialDrugs", 0L);
+            result.put("normalDrugs", 0L);
+            result.put("totalNotices", 0L);
+            result.put("activeNotices", 0L);
             try {
                 result.put("expiryWarningDays", systemConfigUtil.getExpiryWarningDays());
                 result.put("expiryCriticalDays", systemConfigUtil.getExpiryCriticalDays());
@@ -438,7 +463,7 @@ public class DashboardServiceImpl implements DashboardService {
             
             // 申请状态统计
             Map<String, Long> statusStats = new HashMap<>();
-            String[] statuses = {"PENDING", "APPROVED", "REJECTED", "OUTBOUND", "CANCELLED"};
+            String[] statuses = {"PENDING", "PENDING_SECOND", "APPROVED", "REJECTED", "OUTBOUND", "CANCELLED"};
             for (String status : statuses) {
                 LambdaQueryWrapper<OutboundApply> statusWrapper = new LambdaQueryWrapper<>();
                 statusWrapper.eq(OutboundApply::getApplicantId, applicantId);

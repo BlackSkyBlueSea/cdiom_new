@@ -238,18 +238,26 @@ const UserManagement = () => {
         const data = res.data;
         setRolePermissions(data.rolePermissions || []);
         setUserDirectPermissions(data.userPermissions || []);
-        // 设置选中的权限ID（用户直接权限 + 角色权限，因为用户可以移除角色权限）
-        const allUserPermissionIds = [
-          ...(data.rolePermissions || []).map((p) => p.id),
-          ...(data.userPermissions || []).map((p) => p.id),
-        ];
-        setSelectedPermissionIds(allUserPermissionIds);
+        // 已在用户管理中保存过完整清单时，有效权限仅以 userPermissions 为准（与后端 permission_customized 一致）
+        const customized =
+          data.permissionCustomized === true || data.permissionCustomized === 1;
+        const allUserPermissionIds = customized
+          ? [...(data.userPermissions || []).map((p) => p.id)]
+          : [
+              ...(data.rolePermissions || []).map((p) => p.id),
+              ...(data.userPermissions || []).map((p) => p.id),
+            ];
+        setSelectedPermissionIds([...new Set(allUserPermissionIds)]);
 
         // 初始化可见标签（基于用户拥有的权限分类）
-        const userPermissionCodes = new Set([
-          ...(data.rolePermissions || []).map((p) => p.permissionCode),
-          ...(data.userPermissions || []).map((p) => p.permissionCode),
-        ]);
+        const userPermissionCodes = new Set(
+          customized
+            ? (data.userPermissions || []).map((p) => p.permissionCode)
+            : [
+                ...(data.rolePermissions || []).map((p) => p.permissionCode),
+                ...(data.userPermissions || []).map((p) => p.permissionCode),
+              ],
+        );
         const categories = new Set();
         allPermissions.forEach((p) => {
           if (userPermissionCodes.has(p.permissionCode)) {

@@ -172,6 +172,16 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
                 }
             }
         }
+        if (apply.getSecondApproverId() != null) {
+            SysUser second = sysUserMapper.selectById(apply.getSecondApproverId());
+            if (second != null) {
+                apply.setSecondApproverName(second.getUsername());
+                if (second.getRoleId() != null) {
+                    SysRole role = sysRoleMapper.selectById(second.getRoleId());
+                    apply.setSecondApproverRoleName(role != null ? role.getRoleName() : null);
+                }
+            }
+        }
     }
 
     @Override
@@ -321,15 +331,66 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         if (!insufficientList.isEmpty()) {
             throw new ServiceException("以下药品库存不足，无法审批通过：" + String.join("；", insufficientList));
         }
-        
-        apply.setStatus("APPROVED");
+
         apply.setApproverId(approverId);
-        apply.setSecondApproverId(secondApproverId);
+        apply.setRejectReason(null);
+        apply.setRejectOperatorId(null);
+        if (hasSpecialDrug) {
+            apply.setSecondApproverId(secondApproverId);
+            apply.setStatus("PENDING_SECOND");
+            apply.setFirstApproveTime(LocalDateTime.now());
+            apply.setApproveTime(null);
+            outboundApplyMapper.updateById(apply);
+            log.info("出库申请第一审批通过，待第二审批：申请ID={}, 第一审批人ID={}, 第二审批人ID={}", id, approverId, secondApproverId);
+        } else {
+            apply.setSecondApproverId(null);
+            apply.setFirstApproveTime(null);
+            apply.setStatus("APPROVED");
+            apply.setApproveTime(LocalDateTime.now());
+            outboundApplyMapper.updateById(apply);
+            log.info("审批通过出库申请：申请ID={}, 审批人ID={}", id, approverId);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void secondApproveOutboundApply(Long id, Long secondApproverUserId) {
+        OutboundApply apply = outboundApplyMapper.selectById(id);
+        if (apply == null) {
+            throw new ServiceException("出库申请不存在");
+        }
+        if (!"PENDING_SECOND".equals(apply.getStatus())) {
+            throw new ServiceException("申请状态不是待第二审批，无法执行第二审批");
+        }
+        if (apply.getSecondApproverId() == null || !apply.getSecondApproverId().equals(secondApproverUserId)) {
+            throw new ServiceException("仅指定的第二审批人本人可确认通过");
+        }
+        if (apply.getApplicantId() != null && apply.getApplicantId().equals(secondApproverUserId)) {
+            throw new ServiceException("申请人和第二审批人不能是同一人");
+        }
+
+        List<OutboundApplyItem> items = outboundApplyItemMapper.selectByApplyId(id);
+        List<String> insufficientList = new java.util.ArrayList<>();
+        for (OutboundApplyItem item : items) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                continue;
+            }
+            int available = inventoryService.getTotalAvailableQuantity(item.getDrugId());
+            if (available < item.getQuantity()) {
+                DrugInfo drug = drugInfoMapper.selectById(item.getDrugId());
+                String name = drug != null ? (drug.getDrugName() + (StringUtils.hasText(drug.getSpecification()) ? " " + drug.getSpecification() : "")) : "药品ID:" + item.getDrugId();
+                insufficientList.add(name + " 需要" + item.getQuantity() + " 可用" + available);
+            }
+        }
+        if (!insufficientList.isEmpty()) {
+            throw new ServiceException("以下药品库存不足，无法通过第二审批：" + String.join("；", insufficientList));
+        }
+
+        apply.setStatus("APPROVED");
         apply.setApproveTime(LocalDateTime.now());
-        
+        apply.setRejectOperatorId(null);
         outboundApplyMapper.updateById(apply);
-        
-        log.info("审批通过出库申请：申请ID={}, 审批人ID={}, 第二审批人ID={}", id, approverId, secondApproverId);
+        log.info("出库申请第二审批通过：申请ID={}, 第二审批人ID={}", id, secondApproverUserId);
     }
 
     @Override
@@ -339,19 +400,35 @@ public class OutboundApplyServiceImpl implements OutboundApplyService {
         if (apply == null) {
             throw new ServiceException("出库申请不存在");
         }
-        
-        if (!"PENDING".equals(apply.getStatus())) {
-            throw new ServiceException("申请状态不是待审批，无法驳回");
+
+        String st = apply.getStatus();
+        if (!"PENDING".equals(st) && !"PENDING_SECOND".equals(st)) {
+            throw new ServiceException("当前状态不可驳回");
         }
-        
+
+        if (apply.getApplicantId() != null && apply.getApplicantId().equals(approverId)) {
+            throw new ServiceException("申请人不可驳回自己的申请");
+        }
+
+        if ("PENDING_SECOND".equals(st)) {
+            boolean first = apply.getApproverId() != null && apply.getApproverId().equals(approverId);
+            boolean second = apply.getSecondApproverId() != null && apply.getSecondApproverId().equals(approverId);
+            if (!first && !second) {
+                throw new ServiceException("仅第一审批人或第二审批人可驳回该申请");
+            }
+            apply.setRejectOperatorId(approverId);
+        } else {
+            apply.setApproverId(approverId);
+            apply.setRejectOperatorId(null);
+        }
+
         apply.setStatus("REJECTED");
-        apply.setApproverId(approverId);
         apply.setRejectReason(rejectReason);
         apply.setApproveTime(LocalDateTime.now());
-        
+
         outboundApplyMapper.updateById(apply);
-        
-        log.info("驳回出库申请：申请ID={}, 审批人ID={}, 驳回理由={}", id, approverId, rejectReason);
+
+        log.info("驳回出库申请：申请ID={}, 操作人ID={}, 状态原值={}, 驳回理由={}", id, approverId, st, rejectReason);
     }
 
     @Override

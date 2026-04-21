@@ -68,6 +68,11 @@ public interface OutboundApplyService {
     void approveOutboundApply(Long id, Long approverId, Long secondApproverId);
 
     /**
+     * 特殊药品第二审批：第一审批已完成（PENDING_SECOND）时，由第二审批人本人确认通过，状态变为 APPROVED。
+     */
+    void secondApproveOutboundApply(Long id, Long secondApproverUserId);
+
+    /**
      * 审批出库申请（驳回）
      */
     void rejectOutboundApply(Long id, Long approverId, String rejectReason);

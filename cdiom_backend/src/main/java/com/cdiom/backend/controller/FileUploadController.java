@@ -11,11 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -73,30 +71,22 @@ public class FileUploadController {
     }
 
     /**
-     * 验证文件魔数（文件头）
+     * 根据文件头验证魔数（不依赖 {@link java.io.InputStream#mark(int)}，
+     * 因 multipart 请求体流通常不支持 mark/reset）。
      */
-    private boolean validateFileMagicNumber(InputStream inputStream, String extension) throws IOException {
+    private boolean validateFileMagicNumber(byte[] fileBytes, String extension) {
         byte[][] expectedMagicNumbers = FILE_MAGIC_NUMBERS.get(extension);
-        if (expectedMagicNumbers == null) {
+        if (expectedMagicNumbers == null || fileBytes == null || fileBytes.length < 2) {
             return false;
         }
 
-        // 读取文件前几个字节
-        byte[] fileHeader = new byte[8];
-        int bytesRead = inputStream.read(fileHeader);
-        if (bytesRead < 2) {
-            return false;
-        }
+        int bytesRead = Math.min(fileBytes.length, 16);
 
-        // 重置流以便后续使用
-        inputStream.reset();
-
-        // 检查是否匹配任一预期的魔数
         for (byte[] magicNumber : expectedMagicNumbers) {
             if (bytesRead >= magicNumber.length) {
                 boolean matches = true;
                 for (int i = 0; i < magicNumber.length; i++) {
-                    if (fileHeader[i] != magicNumber[i]) {
+                    if (fileBytes[i] != magicNumber[i]) {
                         matches = false;
                         break;
                     }
@@ -157,21 +147,19 @@ public class FileUploadController {
                 return Result.error("文件类型验证失败：MIME类型与文件扩展名不匹配");
             }
 
-            // 验证文件魔数（文件头）
-            InputStream inputStream = file.getInputStream();
-            inputStream.mark(16); // 标记以便重置
-            boolean magicNumberValid = validateFileMagicNumber(inputStream, extension);
-            inputStream.reset(); // 重置流以便后续使用
-            if (!magicNumberValid) {
-                log.warn("文件魔数验证失败：扩展名={}, 文件名={}", extension, originalFilename);
-                return Result.error("文件类型验证失败：文件内容与扩展名不匹配");
-            }
-
-            // 验证文件大小（从配置读取）
+            // 验证文件大小（先限制再读入内存，避免超大请求占用堆）
             long maxSizeBytes = maxFileSize.toBytes();
             if (file.getSize() > maxSizeBytes) {
                 String maxSizeMB = String.format("%.1f", maxSizeBytes / (1024.0 * 1024.0));
                 return Result.error("文件大小不能超过" + maxSizeMB + "MB");
+            }
+
+            byte[] fileBytes = file.getBytes();
+
+            // 验证文件魔数（文件头）
+            if (!validateFileMagicNumber(fileBytes, extension)) {
+                log.warn("文件魔数验证失败：扩展名={}, 文件名={}", extension, originalFilename);
+                return Result.error("文件类型验证失败：文件内容与扩展名不匹配");
             }
 
             // 创建上传目录（按日期分类）
@@ -186,8 +174,8 @@ public class FileUploadController {
             String fileName = UUID.randomUUID().toString() + extension;
             Path filePath = Paths.get(fullUploadPath, fileName);
 
-            // 保存文件
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            // 保存文件（使用已校验的字节；默认 CREATE + TRUNCATE_EXISTING + WRITE）
+            Files.write(filePath, fileBytes);
 
             // 返回文件访问URL
             String fileUrl = urlPrefix + "/" + dateDir + "/" + fileName;

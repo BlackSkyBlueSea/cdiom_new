@@ -16,6 +16,7 @@ import com.cdiom.backend.common.exception.ServiceException;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  * 
  * @author cdiom
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DrugInfoServiceImpl implements DrugInfoService {
@@ -299,27 +301,39 @@ public class DrugInfoServiceImpl implements DrugInfoService {
     @Override
     public DrugInfo searchDrugByCode(String code) {
         if (!StringUtils.hasText(code)) {
+            log.info("[药品码查询] 服务层: code 为空, 跳过查询");
             return null;
         }
 
+        String q = code.trim();
+        log.info("[药品码查询] 服务层: 开始按码查询, code={}", q);
+
         // 先查询本地数据库
         LambdaQueryWrapper<DrugInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.and(w -> w.eq(DrugInfo::getProductCode, code)
-                .or().eq(DrugInfo::getNationalCode, code)
-                .or().eq(DrugInfo::getTraceCode, code)
-                .or().like(DrugInfo::getApprovalNumber, code));
+        wrapper.and(w -> w.eq(DrugInfo::getProductCode, q)
+                .or().eq(DrugInfo::getNationalCode, q)
+                .or().eq(DrugInfo::getTraceCode, q)
+                .or().like(DrugInfo::getApprovalNumber, q));
         DrugInfo localDrug = drugInfoMapper.selectOne(wrapper);
         
         if (localDrug != null) {
+            log.info("[药品码查询] 服务层: 本地库命中 id={}, 名称={}, 商品码={}, 本位码={}, 追溯码={}",
+                    localDrug.getId(), localDrug.getDrugName(),
+                    localDrug.getProductCode(), localDrug.getNationalCode(), localDrug.getTraceCode());
             return localDrug;
         }
 
+        log.info("[药品码查询] 服务层: 本地库未命中, 调用第三方(极速数据)按商品码查询…");
+
         // 如果本地数据库未找到，调用极速数据API（根据商品码查询）
-        DrugInfo jisuDrug = jisuApiService.searchByProductCode(code);
+        DrugInfo jisuDrug = jisuApiService.searchByProductCode(q);
         if (jisuDrug != null) {
+            log.info("[药品码查询] 服务层: 第三方返回命中 名称={}, 商品码={}, 本位码={}",
+                    jisuDrug.getDrugName(), jisuDrug.getProductCode(), jisuDrug.getNationalCode());
             return jisuDrug;
         }
-        
+
+        log.info("[药品码查询] 服务层: 第三方仍未命中, 返回空");
         return null;
     }
 

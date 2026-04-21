@@ -5,9 +5,11 @@ import com.cdiom.backend.annotation.RequiresPermission;
 import com.cdiom.backend.common.Result;
 import com.cdiom.backend.model.InboundReceiptBatch;
 import com.cdiom.backend.model.InboundRecord;
+import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.model.vo.InboundSplitResult;
 import com.cdiom.backend.model.vo.OrderInboundRemainingRow;
 import com.cdiom.backend.service.InboundRecordService;
+import com.cdiom.backend.service.SysUserService;
 import com.cdiom.backend.util.JwtUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,10 +38,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/inbound")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
+@RequiresPermission({"inbound:view", "drug:manage"})
 public class InboundRecordController {
 
     private final InboundRecordService inboundRecordService;
+    private final SysUserService sysUserService;
     private final JwtUtil jwtUtil;
 
     /**
@@ -90,6 +93,15 @@ public class InboundRecordController {
     @GetMapping("/disposition-options")
     public Result<Map<String, String>> listDispositionOptions() {
         return Result.success(inboundRecordService.listDispositionOptions());
+    }
+
+    /**
+     * 第二操作人候选（启用用户，不含密码）。方法级权限：入库查看/创建/审核/执行或药品维护之一即可，无需 user:manage。
+     */
+    @GetMapping("/second-operator-candidates")
+    @RequiresPermission({"inbound:view", "inbound:create", "inbound:approve", "inbound:execute", "drug:manage"})
+    public Result<List<SysUser>> listSecondOperatorCandidates() {
+        return Result.success(sysUserService.listActiveUsersForSecondOperatorPick(1000));
     }
 
     /**

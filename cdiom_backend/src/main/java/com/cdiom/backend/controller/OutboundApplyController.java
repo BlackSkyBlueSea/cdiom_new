@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +37,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/outbound")
 @RequiredArgsConstructor
+@Slf4j
 public class OutboundApplyController {
 
     private final OutboundApplyService outboundApplyService;
@@ -46,7 +48,14 @@ public class OutboundApplyController {
      * 分页查询出库申请列表
      */
     @GetMapping
-    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:apply:on-behalf", "outbound:approve", "outbound:execute"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute"
+    })
     public Result<Page<OutboundApply>> getOutboundApplyList(
             @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
@@ -57,8 +66,12 @@ public class OutboundApplyController {
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        log.info("[INT-FE-02][BE出库] GET /outbound list page={} size={} status={} keyword={}",
+                page, size, status, keyword);
         Page<OutboundApply> applyPage = outboundApplyService.getOutboundApplyList(
                 page, size, keyword, applicantId, approverId, department, status, startDate, endDate);
+        log.info("[INT-FE-02][BE出库] GET /outbound list ok total={} records={}",
+                applyPage.getTotal(), applyPage.getRecords() != null ? applyPage.getRecords().size() : 0);
         return Result.success(applyPage);
     }
 
@@ -107,9 +120,22 @@ public class OutboundApplyController {
      * 根据ID查询出库申请（列表查看、申请人查看详情等）
      */
     @GetMapping("/{id}")
-    @RequiresPermission({"drug:view", "drug:manage", "outbound:view", "outbound:apply"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute",
+            "drug:manage"
+    })
     public Result<OutboundApply> getOutboundApplyById(@PathVariable Long id) {
+        log.info("[INT-FE-02][BE出库] GET /outbound/{}", id);
         OutboundApply apply = outboundApplyService.getOutboundApplyById(id);
+        if (apply != null) {
+            log.info("[INT-FE-02][BE出库] GET /outbound/{} ok applyNumber={} status={}",
+                    id, apply.getApplyNumber(), apply.getStatus());
+        }
         return Result.success(apply);
     }
 
@@ -117,9 +143,19 @@ public class OutboundApplyController {
      * 校验出库申请所需库存是否充足（审批前在界面展示，不足时禁止通过）
      */
     @GetMapping("/{id}/stock-check")
-    @RequiresPermission({"outbound:view", "outbound:apply", "outbound:approve", "outbound:approve:special"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute"
+    })
     public Result<Map<String, Object>> checkStockForApply(@PathVariable Long id) {
+        log.info("[INT-FE-02][BE出库] GET /outbound/{}/stock-check", id);
         Map<String, Object> data = outboundApplyService.checkStockForApply(id);
+        log.info("[INT-FE-02][BE出库] GET /outbound/{}/stock-check ok sufficient={}",
+                id, data != null ? data.get("sufficient") : null);
         return Result.success(data);
     }
 
@@ -127,7 +163,15 @@ public class OutboundApplyController {
      * 根据申领单号查询出库申请
      */
     @GetMapping("/apply-number/{applyNumber}")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute",
+            "drug:manage"
+    })
     public Result<OutboundApply> getOutboundApplyByApplyNumber(@PathVariable String applyNumber) {
         OutboundApply apply = outboundApplyService.getOutboundApplyByApplyNumber(applyNumber);
         return Result.success(apply);
@@ -150,9 +194,14 @@ public class OutboundApplyController {
             apply.setStatus("PENDING");
             apply.setRemark(request.getRemark());
 
+            log.info("[INT-FE-02][BE出库] POST /outbound create applicantId={} items={}",
+                    applicantId, request.getItems() != null ? request.getItems().size() : 0);
             OutboundApply created = outboundApplyService.createOutboundApply(apply, request.getItems());
+            log.info("[INT-FE-02][BE出库] POST /outbound create ok id={} applyNumber={} status={}",
+                    created.getId(), created.getApplyNumber(), created.getStatus());
             return Result.success("出库申请创建成功", created);
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound create fail: {}", e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -167,6 +216,8 @@ public class OutboundApplyController {
             HttpServletRequest httpRequest) {
         try {
             Long proxyId = getCurrentUserId(httpRequest);
+            log.info("[INT-FE-02][BE出库] POST /outbound/on-behalf proxyId={} applicantId={} items={}",
+                    proxyId, request.getApplicantId(), request.getItems() != null ? request.getItems().size() : 0);
             OutboundApply created = outboundApplyService.createOutboundApplyOnBehalf(
                     proxyId,
                     request.getApplicantId(),
@@ -174,8 +225,11 @@ public class OutboundApplyController {
                     request.getPurpose(),
                     request.getRemark(),
                     request.getItems());
+            log.info("[INT-FE-02][BE出库] POST /outbound/on-behalf ok id={} applyNumber={} status={}",
+                    created.getId(), created.getApplyNumber(), created.getStatus());
             return Result.success("代录出库申请已创建", created);
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/on-behalf fail: {}", e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -191,9 +245,31 @@ public class OutboundApplyController {
             HttpServletRequest httpRequest) {
         try {
             Long approverId = getCurrentUserId(httpRequest);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/approve approverId={} secondApproverId={}",
+                    id, approverId, request != null ? request.getSecondApproverId() : null);
             outboundApplyService.approveOutboundApply(id, approverId, request.getSecondApproverId());
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/approve ok", id);
             return Result.success();
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/approve fail: {}", id, e.getMessage());
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 特殊药品第二审批：第一审批已完成（PENDING_SECOND）时，由第二审批人本人确认通过。
+     */
+    @PostMapping("/{id}/second-approve")
+    @RequiresPermission({"outbound:approve", "outbound:approve:special"})
+    public Result<Void> secondApproveOutboundApply(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long uid = getCurrentUserId(httpRequest);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/second-approve operatorId={}", id, uid);
+            outboundApplyService.secondApproveOutboundApply(id, uid);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/second-approve ok", id);
+            return Result.success();
+        } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/second-approve fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -202,16 +278,19 @@ public class OutboundApplyController {
      * 审批出库申请（驳回）
      */
     @PostMapping("/{id}/reject")
-    @RequiresPermission({"drug:manage"})
+    @RequiresPermission({"outbound:approve", "outbound:approve:special"})
     public Result<Void> rejectOutboundApply(
             @PathVariable Long id,
             @RequestBody RejectRequest request,
             HttpServletRequest httpRequest) {
         try {
             Long approverId = getCurrentUserId(httpRequest);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/reject approverId={}", id, approverId);
             outboundApplyService.rejectOutboundApply(id, approverId, request.getRejectReason());
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/reject ok", id);
             return Result.success();
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/reject fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -225,9 +304,13 @@ public class OutboundApplyController {
             @PathVariable Long id,
             @RequestBody ExecuteOutboundRequest request) {
         try {
+            int n = request.getOutboundItems() != null ? request.getOutboundItems().size() : 0;
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/execute outboundLines={}", id, n);
             outboundApplyService.executeOutbound(id, request.getOutboundItems());
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/execute ok (状态应变为已出库，库存与仪表盘统计随后一致)", id);
             return Result.success();
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/execute fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -239,9 +322,12 @@ public class OutboundApplyController {
     @RequiresPermission({"drug:manage"})
     public Result<Void> cancelOutboundApply(@PathVariable Long id) {
         try {
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/cancel", id);
             outboundApplyService.cancelOutboundApply(id);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/cancel ok", id);
             return Result.success();
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/cancel fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -254,9 +340,12 @@ public class OutboundApplyController {
     public Result<Void> withdrawOutboundApply(@PathVariable Long id, HttpServletRequest httpRequest) {
         try {
             Long applicantId = getCurrentUserId(httpRequest);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/withdraw applicantId={}", id, applicantId);
             outboundApplyService.withdrawOutboundApply(id, applicantId);
+            log.info("[INT-FE-02][BE出库] POST /outbound/{}/withdraw ok", id);
             return Result.success();
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] POST /outbound/{}/withdraw fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -265,7 +354,14 @@ public class OutboundApplyController {
      * 查询待审批的出库申请数量
      */
     @GetMapping("/pending-count")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute",
+            "outbound:apply:on-behalf",
+            "drug:manage"
+    })
     public Result<Long> getPendingOutboundCount() {
         Long count = outboundApplyService.getPendingOutboundCount();
         return Result.success(count);
@@ -275,7 +371,14 @@ public class OutboundApplyController {
      * 查询今日出库数量
      */
     @GetMapping("/today-count")
-    @RequiresPermission({"drug:view", "drug:manage"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute",
+            "outbound:apply:on-behalf",
+            "drug:manage"
+    })
     public Result<Long> getTodayOutboundCount() {
         Long count = outboundApplyService.getTodayOutboundCount();
         return Result.success(count);
@@ -299,9 +402,18 @@ public class OutboundApplyController {
      * 获取出库申请明细列表（列表查看、申请人查看详情等）
      */
     @GetMapping("/{id}/items")
-    @RequiresPermission({"drug:view", "drug:manage", "outbound:view", "outbound:apply"})
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute",
+            "drug:manage"
+    })
     public Result<List<Map<String, Object>>> getOutboundApplyItems(@PathVariable Long id) {
         try {
+            log.info("[INT-FE-02][BE出库] GET /outbound/{}/items", id);
             List<OutboundApplyItem> items = outboundApplyService.getOutboundApplyItems(id);
             List<Map<String, Object>> result = new ArrayList<>();
             for (OutboundApplyItem item : items) {
@@ -315,15 +427,19 @@ public class OutboundApplyController {
                 DrugInfo drug = drugInfoMapper.selectById(item.getDrugId());
                 if (drug != null) {
                     itemMap.put("drugName", drug.getDrugName());
+                    itemMap.put("specification", drug.getSpecification());
                     itemMap.put("isSpecial", drug.getIsSpecial());
                 } else {
                     itemMap.put("drugName", null);
+                    itemMap.put("specification", null);
                     itemMap.put("isSpecial", null);
                 }
                 result.add(itemMap);
             }
+            log.info("[INT-FE-02][BE出库] GET /outbound/{}/items ok rows={}", id, result.size());
             return Result.success(result);
         } catch (Exception e) {
+            log.warn("[INT-FE-02][BE出库] GET /outbound/{}/items fail: {}", id, e.getMessage());
             return Result.error(e.getMessage());
         }
     }

@@ -70,7 +70,7 @@ public class OutboundApply {
     private String purpose;
 
     /**
-     * 申请状态：PENDING-待审批/APPROVED-已通过/REJECTED-已驳回/OUTBOUND-已出库/CANCELLED-已取消
+     * 申请状态：PENDING-待审批/PENDING_SECOND-待第二审批（特殊药品）/APPROVED-已通过/REJECTED-已驳回/OUTBOUND-已出库/CANCELLED-已取消
      */
     private String status;
 
@@ -97,7 +97,24 @@ public class OutboundApply {
     private Long secondApproverId;
 
     /**
-     * 审批时间
+     * 第二审批人姓名（非表字段）
+     */
+    @TableField(exist = false)
+    private String secondApproverName;
+
+    /**
+     * 第二审批人角色名称（非表字段）
+     */
+    @TableField(exist = false)
+    private String secondApproverRoleName;
+
+    /**
+     * 第一审批通过时间（特殊药品：进入待第二审批时写入；终批见 approveTime）
+     */
+    private LocalDateTime firstApproveTime;
+
+    /**
+     * 终批通过时间（非特殊药品一次审批即写入；特殊药品在第二人确认后写入）
      */
     private LocalDateTime approveTime;
 
@@ -105,6 +122,11 @@ public class OutboundApply {
      * 驳回理由
      */
     private String rejectReason;
+
+    /**
+     * 驳回操作人（待第二审批状态下由第二人驳回时记录；普通待审批驳回时可为空，以 approverId 为准）
+     */
+    private Long rejectOperatorId;
 
     /**
      * 出库时间

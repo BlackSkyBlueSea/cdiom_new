@@ -4,7 +4,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import request from '../utils/request'
 import { setToken, setUser } from '../utils/auth'
-import { fetchUserPermissions } from '../utils/permission'
+import { clearPermissionCache, fetchUserPermissions } from '../utils/permission'
 import './Login.css'
 
 const Login = () => {
@@ -26,6 +26,7 @@ const Login = () => {
         if (res.data.user) {
           setUser(res.data.user, isMultiLogin)
         }
+        clearPermissionCache()
         // 获取用户权限
         await fetchUserPermissions()
         message.success('登录成功')

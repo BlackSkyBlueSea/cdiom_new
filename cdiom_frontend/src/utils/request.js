@@ -24,7 +24,11 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    // 确保请求头使用UTF-8编码
+    // FormData 须让浏览器/axios 自动带 boundary；axios 约定将 Content-Type 设为 false 可跳过默认的 application/json
+    if (config.data instanceof FormData) {
+      config.headers['Content-Type'] = false
+      return config
+    }
     if (!config.headers['Content-Type']) {
       config.headers['Content-Type'] = 'application/json;charset=UTF-8'
     }
@@ -51,6 +55,13 @@ function isAuthExpiredCode(code, msg) {
   return false
 }
 
+/** 细粒度权限不足（非登录过期），页面可静默处理、避免 logger.error 刷屏 */
+function rejectPermissionDenied(messageText) {
+  const err = new Error(messageText || '权限不足')
+  err.isPermissionForbidden = true
+  return Promise.reject(err)
+}
+
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
@@ -65,7 +76,11 @@ request.interceptors.response.use(
     }
     // 其他非 200：按原逻辑决定是否提示
     const errorMsg = res.msg || '请求失败'
-    if (res.code !== 403 && res.code !== 500) {
+    if (res.code === 403) {
+      message.warning(errorMsg)
+      return rejectPermissionDenied(errorMsg)
+    }
+    if (res.code !== 500) {
       message.error(errorMsg)
     }
     return Promise.reject(new Error(errorMsg))
@@ -82,9 +97,21 @@ request.interceptors.response.use(
         return Promise.reject(error)
       }
       if (status === 403) {
+        const msg =
+          (typeof data === 'object' && data && data.msg) ||
+          '权限不足，无法访问该资源'
+        message.warning(msg)
+        error.isPermissionForbidden = true
         return Promise.reject(error)
       }
       if (status === 500) {
+        return Promise.reject(error)
+      }
+      if (status === 413) {
+        message.error(
+          (typeof data === 'object' && data?.msg) ||
+            '上传内容过大，请使用更小的文件（例如单张图片不超过 10MB）'
+        )
         return Promise.reject(error)
       }
       message.error(data?.msg || `请求失败: ${status}`)
@@ -92,6 +119,11 @@ request.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+/** 业务 code=403 或 HTTP 403（权限不足）时 request 拦截器会打上此标记 */
+export function isPermissionForbiddenError(error) {
+  return Boolean(error?.isPermissionForbidden)
+}
 
 export default request
 

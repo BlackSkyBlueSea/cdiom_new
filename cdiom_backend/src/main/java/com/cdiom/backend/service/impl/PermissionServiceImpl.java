@@ -1,6 +1,7 @@
 package com.cdiom.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cdiom.backend.common.exception.ServiceException;
 import com.cdiom.backend.mapper.SysPermissionMapper;
 import com.cdiom.backend.mapper.SysUserMapper;
@@ -162,6 +163,7 @@ public class PermissionServiceImpl implements PermissionService {
                 result.put("rolePermissions", new ArrayList<>());
                 result.put("userPermissions", new ArrayList<>());
                 result.put("allPermissions", new ArrayList<>());
+                result.put("permissionCustomized", false);
                 return result;
             }
 
@@ -171,6 +173,7 @@ public class PermissionServiceImpl implements PermissionService {
                 result.put("rolePermissions", new ArrayList<>());
                 result.put("userPermissions", new ArrayList<>());
                 result.put("allPermissions", new ArrayList<>());
+                result.put("permissionCustomized", false);
                 return result;
             }
 
@@ -180,8 +183,13 @@ public class PermissionServiceImpl implements PermissionService {
                 result.put("rolePermissions", allPermissions);
                 result.put("userPermissions", new ArrayList<>());
                 result.put("allPermissions", allPermissions);
+                result.put("permissionCustomized", false);
                 return result;
             }
+
+            boolean permissionCustomized =
+                    user.getPermissionCustomized() != null && user.getPermissionCustomized() == 1;
+            result.put("permissionCustomized", permissionCustomized);
 
             // 获取角色权限
             List<String> rolePermissionCodes = permissionMapper.selectPermissionCodesByRoleId(user.getRoleId());
@@ -215,6 +223,7 @@ public class PermissionServiceImpl implements PermissionService {
             result.put("rolePermissions", new ArrayList<>());
             result.put("userPermissions", new ArrayList<>());
             result.put("allPermissions", new ArrayList<>());
+            result.put("permissionCustomized", false);
             return result;
         }
     }
@@ -263,6 +272,11 @@ public class PermissionServiceImpl implements PermissionService {
                     userPermissionMapper.insert(userPermission);
                 }
             }
+
+            // 与用户管理界面勾选保存一致：此后有效权限仅以 sys_user_permission 为准（可少于角色默认）
+            LambdaUpdateWrapper<SysUser> uw = new LambdaUpdateWrapper<>();
+            uw.eq(SysUser::getId, userId).set(SysUser::getPermissionCustomized, 1);
+            userMapper.update(null, uw);
 
             log.info("更新用户权限成功，userId: {}, permissionIds: {}", userId, permissionIds);
         } catch (Exception e) {

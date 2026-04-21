@@ -32,10 +32,11 @@ public class DashboardController {
     private final SupplierService supplierService;
 
     /**
-     * 获取统计数据
-     * 所有登录用户都可以访问
+     * 全站汇总统计（用户/角色/配置/药品/登录/操作等），仅系统管理类权限可访问。
+     * 仓库工作台所需药品与通知简报由 {@link #getWarehouseDashboard()} 返回，避免低权限账号调用本接口。
      */
     @GetMapping("/statistics")
+    @RequiresPermission({"user:manage", "role:manage", "config:manage"})
     public Result<Map<String, Object>> getStatistics() {
         Map<String, Object> statistics = dashboardService.getStatistics();
         return Result.success(statistics);
@@ -64,11 +65,18 @@ public class DashboardController {
     }
 
     /**
-     * 获取仓库管理员仪表盘数据
-     * 仓库管理员可访问（具备入库/出库/药品任一相关权限即可）
+     * 仓库工作台：需具备库存/入库/出库执行或审核/代录/药品维护等之一；不包含仅 outbound:view（医护）或仅 drug:view。
      */
     @GetMapping("/warehouse")
-    @RequiresPermission({"drug:view", "drug:manage", "inbound:view", "outbound:view"})
+    @RequiresPermission({
+            "inventory:view",
+            "inbound:view",
+            "outbound:execute",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "drug:manage"
+    })
     public Result<Map<String, Object>> getWarehouseDashboard() {
         Map<String, Object> data = dashboardService.getWarehouseDashboard();
         return Result.success(data);
@@ -80,17 +88,25 @@ public class DashboardController {
      * @param level yellow — 介于严重预警天数与预警天数之间；red — 至多到严重预警天数
      */
     @GetMapping("/warehouse/near-expiry-details")
-    @RequiresPermission({"drug:view", "drug:manage", "inbound:view", "outbound:view"})
+    @RequiresPermission({
+            "inventory:view",
+            "inbound:view",
+            "outbound:execute",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "drug:manage"
+    })
     public Result<List<Inventory>> getWarehouseNearExpiryDetails(@RequestParam String level) {
         List<Inventory> list = dashboardService.getWarehouseNearExpiryDetails(level);
         return Result.success(list);
     }
 
     /**
-     * 获取采购专员仪表盘数据
-     * 采购专员可以访问
+     * 采购专员仪表盘数据
      */
     @GetMapping("/purchaser")
+    @RequiresPermission({"purchase:view", "drug:view", "drug:manage"})
     public Result<Map<String, Object>> getPurchaserDashboard() {
         SysUser currentUser = authService.getCurrentUser();
         if (currentUser == null) {
@@ -101,10 +117,17 @@ public class DashboardController {
     }
 
     /**
-     * 获取医护人员仪表盘数据
-     * 医护人员可以访问
+     * 医护人员仪表盘数据（与出库功能路由权限 OR 对齐）
      */
     @GetMapping("/medical-staff")
+    @RequiresPermission({
+            "outbound:view",
+            "outbound:apply",
+            "outbound:apply:on-behalf",
+            "outbound:approve",
+            "outbound:approve:special",
+            "outbound:execute"
+    })
     public Result<Map<String, Object>> getMedicalStaffDashboard() {
         SysUser currentUser = authService.getCurrentUser();
         if (currentUser == null) {
@@ -116,9 +139,9 @@ public class DashboardController {
 
     /**
      * 获取供应商仪表盘数据
-     * 供应商可以访问
      */
     @GetMapping("/supplier")
+    @RequiresPermission({"purchase:view", "drug:view", "drug:manage"})
     public Result<Map<String, Object>> getSupplierDashboard() {
         SysUser currentUser = authService.getCurrentUser();
         if (currentUser == null) {

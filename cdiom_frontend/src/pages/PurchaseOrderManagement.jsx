@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
-import { getUserRoleId } from '../utils/auth'
+import { getUserRoleId, getToken } from '../utils/auth'
 import {
   pageRootStyle,
   tableAreaStyle,
@@ -180,6 +180,11 @@ const PurchaseOrderManagement = () => {
   const handleExport = async () => {
     setExporting(true)
     try {
+      const token = getToken()
+      if (!token) {
+        message.error('未登录，请重新登录')
+        return
+      }
       const params = new URLSearchParams()
       if (filters.keyword) {
         params.append('keyword', filters.keyword)
@@ -198,7 +203,7 @@ const PurchaseOrderManagement = () => {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         credentials: 'include',
       })

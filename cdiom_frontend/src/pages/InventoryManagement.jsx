@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, message, Modal, Form, InputNumber, Alert, Tooltip } from 'antd'
 import { SearchOutlined, ReloadOutlined, WarningOutlined, EditOutlined, DownloadOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import request from '../utils/request'
+import request, { isPermissionForbiddenError } from '../utils/request'
+import { getToken } from '../utils/auth'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS } from '../utils/permission'
 import {
@@ -45,7 +46,10 @@ const InventoryManagement = () => {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [adjustmentQuantity, setAdjustmentQuantity] = useState(0)
   const [exporting, setExporting] = useState(false)
+  /** 与系统参数一致，供「效期状态」标签展示（仓库角色无 config:manage 时从库存接口拉取） */
+  const [expiryThresholds, setExpiryThresholds] = useState({ warning: 180, critical: 90 })
   const fetchInventoryRef = useRef(null)
+  const fetchExpiryThresholdsRef = useRef(null)
 
   const fetchInventory = async () => {
     setLoading(true)
@@ -70,6 +74,11 @@ const InventoryManagement = () => {
         message.error(res.msg || '获取库存列表失败')
       }
     } catch (error) {
+      if (isPermissionForbiddenError(error)) {
+        setInventory([])
+        setPagination((prev) => ({ ...prev, total: 0 }))
+        return
+      }
       logger.error('获取库存列表失败:', error)
       message.error('获取库存列表失败')
     } finally {
@@ -78,6 +87,27 @@ const InventoryManagement = () => {
   }
   fetchInventoryRef.current = fetchInventory
 
+  const fetchExpiryThresholds = async () => {
+    try {
+      const res = await request.get('/inventory/expiry-thresholds')
+      if (res.code === 200 && res.data) {
+        setExpiryThresholds({
+          warning: Number(res.data.expiryWarningDays ?? 180),
+          critical: Number(res.data.expiryCriticalDays ?? 90),
+        })
+      }
+    } catch (error) {
+      if (!isPermissionForbiddenError(error)) {
+        logger.warn('获取效期阈值失败，沿用上次或默认 180/90:', error)
+      }
+    }
+  }
+  fetchExpiryThresholdsRef.current = fetchExpiryThresholds
+
+  useEffect(() => {
+    fetchExpiryThresholds()
+  }, [])
+
   useEffect(() => {
     fetchInventory()
   }, [pagination.current, pagination.pageSize, filters])
@@ -85,7 +115,9 @@ const InventoryManagement = () => {
   // 切回本页/本标签时刷新列表，以便执行出库后看到最新库存
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && fetchInventoryRef.current) fetchInventoryRef.current()
+      if (document.visibilityState !== 'visible') return
+      if (fetchInventoryRef.current) fetchInventoryRef.current()
+      if (fetchExpiryThresholdsRef.current) fetchExpiryThresholdsRef.current()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -113,6 +145,11 @@ const InventoryManagement = () => {
   const handleExport = async () => {
     setExporting(true)
     try {
+      const token = getToken()
+      if (!token) {
+        message.error('未登录，请重新登录')
+        return
+      }
       const params = new URLSearchParams()
       if (filters.keyword) {
         params.append('keyword', filters.keyword)
@@ -134,7 +171,7 @@ const InventoryManagement = () => {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         credentials: 'include',
       })
@@ -164,6 +201,8 @@ const InventoryManagement = () => {
 
   const getExpiryWarning = (expiryDate) => {
     if (!expiryDate) return null
+    const warn = expiryThresholds.warning
+    const crit = expiryThresholds.critical
     const end = dayjs(expiryDate).startOf('day')
     const today = dayjs().startOf('day')
     const days = end.diff(today, 'day')
@@ -175,27 +214,38 @@ const InventoryManagement = () => {
         </Tag>
       )
     }
-    if (days <= 90) {
-      return <Tag color="red" icon={<WarningOutlined />}>红色预警（≤90天）</Tag>
+    if (days <= crit) {
+      return (
+        <Tag color="red" icon={<WarningOutlined />}>
+          红色预警（≤{crit} 天）
+        </Tag>
+      )
     }
-    if (days <= 180) {
-      return <Tag color="orange" icon={<WarningOutlined />}>黄色预警（90-180天）</Tag>
+    if (warn > crit && days <= warn) {
+      return (
+        <Tag color="orange" icon={<WarningOutlined />}>
+          黄色预警（{crit + 1}～{warn} 天）
+        </Tag>
+      )
     }
     return null
+  }
+
+  const handleSearchRefresh = () => {
+    fetchExpiryThresholds()
+    fetchInventory()
   }
 
   // 获取用户列表（用于选择第二操作人）
   const fetchUsers = async () => {
     setLoadingUsers(true)
     try {
-      const res = await request.get('/users', {
-        params: { page: 1, size: 1000, status: 1 }
-      })
+      const res = await request.get('/inventory/second-operator-candidates')
       if (res.code === 200) {
-        setUsers(res.data.records || [])
+        setUsers(Array.isArray(res.data) ? res.data : [])
       }
     } catch (error) {
-      logger.error('获取用户列表失败:', error)
+      logger.error('获取第二操作人候选失败:', error)
     } finally {
       setLoadingUsers(false)
     }
@@ -364,7 +414,7 @@ const InventoryManagement = () => {
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>效期状态</span>,
       key: 'warning',
-      width: 150,
+      width: 190,
       render: (_, record) => getExpiryWarning(record.expiryDate),
     },
     {
@@ -467,7 +517,7 @@ const InventoryManagement = () => {
               <Button
                 type="primary"
                 icon={<SearchOutlined />}
-                onClick={fetchInventory}
+                onClick={handleSearchRefresh}
               />
             </Tooltip>
             <Tooltip title="重置">

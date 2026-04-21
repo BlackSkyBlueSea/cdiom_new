@@ -4,6 +4,7 @@ import { Table, Button, Space, Modal, Form, Input, Select, AutoComplete, message
 import { PlusOutlined, EditOutlined, DeleteOutlined, ScanOutlined, SearchOutlined, DownloadOutlined, InboxOutlined, UndoOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
+import { getToken } from '../utils/auth'
 import logger from '../utils/logger'
 import { hasPermission, PERMISSIONS, PermissionWrapper } from '../utils/permission'
 import {
@@ -225,17 +226,30 @@ const DrugManagement = () => {
     }
 
     setScanning(true)
+    const trimmed = code.trim()
     try {
+      console.info('[药品码查询 HW-02] 前端: 请求 GET /api/v1/drugs/search', { code: trimmed })
       const res = await request.get('/drugs/search', {
-        params: { code: code.trim() }
+        params: { code: trimmed }
       })
-      
+      console.info('[药品码查询 HW-02] 前端: 接口响应', {
+        httpCode: res.code,
+        msg: res.msg,
+        drugId: res.data?.id,
+        drugName: res.data?.drugName,
+        productCode: res.data?.productCode,
+        nationalCode: res.data?.nationalCode,
+        traceCode: res.data?.traceCode,
+      })
       if (res.code === 200 && res.data) {
-        fillFormData(res.data, code.trim())
+        console.info('[药品码查询 HW-02] 前端: 将用返回数据填充表单')
+        fillFormData(res.data, trimmed)
       } else {
+        console.warn('[药品码查询 HW-02] 前端: 未查到药品', res.msg)
         message.warning(res.msg || '未找到药品信息')
       }
     } catch (error) {
+      console.error('[药品码查询 HW-02] 前端: 请求异常', error?.response?.data || error)
       logger.error('扫描失败:', error)
       const errorMsg = error.response?.data?.msg || error.message || '扫描失败'
       message.error(errorMsg)
@@ -407,6 +421,11 @@ const DrugManagement = () => {
   const handleExport = async () => {
     setExporting(true)
     try {
+      const token = getToken()
+      if (!token) {
+        message.error('未登录，请重新登录')
+        return
+      }
       const params = new URLSearchParams()
       if (filters.keyword) {
         params.append('keyword', filters.keyword)
@@ -419,7 +438,7 @@ const DrugManagement = () => {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         credentials: 'include',
       })
@@ -667,7 +686,7 @@ const DrugManagement = () => {
         onCancel={() => setRecycleOpen(false)}
         footer={null}
         width={800}
-        destroyOnClose
+        destroyOnHidden
       >
         <Space.Compact block style={{ width: '100%', marginBottom: 12 }}>
           <Input
@@ -743,24 +762,23 @@ const DrugManagement = () => {
 
           {/* 第一行：药品名称和国家本位码 */}
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item
-              name="drugName"
-              label="药品名称"
-              rules={[{ required: true, message: '请输入药品名称' }]}
-              style={{ flex: 1 }}
-            >
-              <Input 
-                addonAfter={
-                  <Button
-                    type="text"
-                    icon={<SearchOutlined />}
-                    loading={searchingByName}
-                    onClick={handleSearchByName}
-                    title="搜索药品信息"
-                  />
-                }
-                placeholder="请输入药品名称，点击右侧搜索"
-              />
+            <Form.Item label="药品名称" style={{ flex: 1 }}>
+              <Space.Compact block style={{ width: '100%' }}>
+                <Form.Item
+                  name="drugName"
+                  noStyle
+                  rules={[{ required: true, message: '请输入药品名称' }]}
+                >
+                  <Input placeholder="请输入药品名称，点击右侧搜索" />
+                </Form.Item>
+                <Button
+                  type="text"
+                  icon={<SearchOutlined />}
+                  loading={searchingByName}
+                  onClick={handleSearchByName}
+                  title="搜索药品信息"
+                />
+              </Space.Compact>
             </Form.Item>
             
             <Form.Item
@@ -815,23 +833,19 @@ const DrugManagement = () => {
           
           {/* 批准文号和生产厂家共占一行 */}
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item
-              name="approvalNumber"
-              label="批准文号"
-              style={{ flex: 1 }}
-            >
-              <Input 
-                placeholder="请输入批准文号，点击右侧搜索"
-                addonAfter={
-                  <Button
-                    type="text"
-                    icon={<SearchOutlined />}
-                    loading={searchingByApproval}
-                    onClick={handleSearchByApproval}
-                    title="搜索药品信息"
-                  />
-                }
-              />
+            <Form.Item label="批准文号" style={{ flex: 1 }}>
+              <Space.Compact block style={{ width: '100%' }}>
+                <Form.Item name="approvalNumber" noStyle>
+                  <Input placeholder="请输入批准文号，点击右侧搜索" />
+                </Form.Item>
+                <Button
+                  type="text"
+                  icon={<SearchOutlined />}
+                  loading={searchingByApproval}
+                  onClick={handleSearchByApproval}
+                  title="搜索药品信息"
+                />
+              </Space.Compact>
             </Form.Item>
             
             <Form.Item

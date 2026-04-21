@@ -69,6 +69,9 @@ export const PERMISSIONS = {
   INVENTORY_VIEW: 'inventory:view',
   INVENTORY_ADJUST: 'inventory:adjust',
   INVENTORY_ADJUST_APPROVE: 'inventory:adjust:approve',
+
+  // 采购订单（列表可与药品权限或采购查看组合）
+  PURCHASE_VIEW: 'purchase:view',
   
   // 供应商审批流程权限
   SUPPLIER_APPROVAL_APPLY: 'supplier:approval:apply',
@@ -206,9 +209,10 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.OUTBOUND_VIEW,
     PERMISSIONS.OUTBOUND_APPLY,
   ],
-  5: [ // 供应商
+  5: [ // 供应商（与后端 grant_supplier_purchase_view、采购订单接口一致）
     PERMISSIONS.NOTICE_VIEW,
     PERMISSIONS.NOTICE_CREATE,
+    PERMISSIONS.PURCHASE_VIEW,
   ],
 }
 
@@ -225,12 +229,8 @@ export const fetchUserPermissions = async () => {
     if (!user) {
       return []
     }
-    
-    // 如果用户ID没变，使用缓存
-    if (cachedUserPermissions && cachedUserId === user.id) {
-      return cachedUserPermissions
-    }
-    
+
+    // 始终请求后端，避免管理员改权限后仍命中旧缓存
     const res = await request.get('/auth/permissions')
     if (res.code === 200) {
       cachedUserPermissions = res.data || []

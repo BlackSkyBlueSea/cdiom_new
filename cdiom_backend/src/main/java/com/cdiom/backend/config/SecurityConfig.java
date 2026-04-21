@@ -2,6 +2,7 @@ package com.cdiom.backend.config;
 
 import com.cdiom.backend.config.filter.JwtAuthenticationFilter;
 import com.cdiom.backend.config.filter.SecurityHeadersFilter;
+import com.cdiom.backend.config.security.JsonUnauthorizedAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JsonUnauthorizedAuthenticationEntryPoint jsonUnauthorizedAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -32,6 +34,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 // 禁用Session（使用JWT，无状态）
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 未认证访问受保护资源：HTTP 401 + 与业务一致的 Result JSON
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jsonUnauthorizedAuthenticationEntryPoint))
                 // 配置请求授权
                 .authorizeHttpRequests(auth -> auth
                         // 允许访问登录接口

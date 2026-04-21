@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Alert, Tooltip } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EyeOutlined, RollbackOutlined, PrinterOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined, DeleteOutlined, EyeOutlined, RollbackOutlined, PrinterOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import request from '../utils/request'
 import logger from '../utils/logger'
@@ -18,6 +18,20 @@ import {
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input
+
+/** INT-FE-02：出库申请—审批—执行全链路，浏览器控制台与后端日志前缀对齐，便于测试截图 */
+function outboundTestTrace(step, detail) {
+  console.log('[INT-FE-02][FE出库]', step, detail !== undefined ? detail : '')
+}
+
+/** 明细接口已带 drugName/specification 时优先使用，避免依赖药品信息管理页的药品全量缓存 */
+function formatOutboundApplyItemDrugLabel(item, drugsList = []) {
+  if (item?.drugName) {
+    return item.specification ? `${item.drugName} (${item.specification})` : item.drugName
+  }
+  const drug = drugsList.find((d) => Number(d.id) === Number(item?.drugId))
+  return drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item?.drugId ?? '-'}`
+}
 
 const OutboundManagement = () => {
   const [outboundApplies, setOutboundApplies] = useState([])
@@ -211,12 +225,12 @@ const OutboundManagement = () => {
     }
   }
 
-  // 药品选项（用于AutoComplete）
+  // 药品选项（用于 AutoComplete）：value 须为字符串，避免 combobox 下 number 类型警告
   const drugOptions = useMemo(() => {
-    return drugs.map(drug => ({
-      value: drug.id,
-      label: `${drug.drugName} (${drug.specification || ''})`,
-      drug: drug
+    return drugs.map((drug) => ({
+      value: String(drug.id),
+      label: `${drug.drugName || ''} (${drug.specification || ''})`.replace(/\s*\(\s*\)$/, '').trim() || String(drug.id),
+      drug,
     }))
   }, [drugs])
 
@@ -255,14 +269,16 @@ const OutboundManagement = () => {
 
   const fetchDrugs = async () => {
     try {
-      const res = await request.get('/drugs', {
-        params: { page: 1, size: 10000 }
+      const res = await request.get('/drugs/options-for-business', {
+        params: { page: 1, size: 2000 },
       })
       if (res.code === 200) {
         setDrugs(res.data.records || [])
       }
     } catch (error) {
-      logger.error('获取药品列表失败:', error)
+      if (!error?.isPermissionForbidden) {
+        logger.error('获取药品列表失败:', error)
+      }
     }
   }
 
@@ -288,18 +304,30 @@ const OutboundManagement = () => {
         const batchesMap = {}
         for (const item of list) {
           try {
-            const inventoryRes = await request.get('/inventory', {
-              params: {
-                page: 1,
-                size: 100,
-                drugId: item.drugId,
+            if (hasPermission(PERMISSIONS.INVENTORY_VIEW)) {
+              const inventoryRes = await request.get('/inventory', {
+                params: {
+                  page: 1,
+                  size: 100,
+                  drugId: item.drugId,
+                },
+              })
+              if (inventoryRes.code === 200) {
+                batchesMap[item.drugId] = inventoryRes.data.records || []
               }
-            })
-            if (inventoryRes.code === 200) {
-              batchesMap[item.drugId] = inventoryRes.data.records || []
+            } else {
+              const batchRes = await request.get('/outbound/drug-batches', {
+                params: { drugId: item.drugId },
+              })
+              if (batchRes.code === 200) {
+                const records = Array.isArray(batchRes.data) ? batchRes.data : []
+                batchesMap[item.drugId] = records
+              }
             }
           } catch (error) {
-            logger.error(`获取药品${item.drugId}的库存批次失败:`, error)
+            if (!error?.isPermissionForbidden) {
+              logger.error(`获取药品${item.drugId}的库存批次失败:`, error)
+            }
           }
         }
         setInventoryBatches(batchesMap)
@@ -326,15 +354,30 @@ const OutboundManagement = () => {
       }
       const res = await request.get('/outbound', { params })
       if (res.code === 200) {
-        setOutboundApplies(res.data.records || [])
+        const records = res.data.records || []
+        setOutboundApplies(records)
         setPagination({
           ...pagination,
           total: res.data.total || 0,
         })
+        const byStatus = records.reduce((acc, r) => {
+          const s = r.status || '?'
+          acc[s] = (acc[s] || 0) + 1
+          return acc
+        }, {})
+        outboundTestTrace('GET /outbound 列表成功', {
+          total: res.data.total,
+          page: params.page,
+          pageSize: params.size,
+          statusFilter: params.status ?? '(全部)',
+          本页状态分布: byStatus,
+        })
       } else {
+        outboundTestTrace('GET /outbound 列表失败', { code: res.code, msg: res.msg })
         message.error(res.msg || '获取出库申请失败')
       }
     } catch (error) {
+      outboundTestTrace('GET /outbound 异常', error?.response?.data || error?.message)
       logger.error('获取出库申请失败:', error)
       message.error('获取出库申请失败')
     } finally {
@@ -397,10 +440,16 @@ const OutboundManagement = () => {
       const res = await request.get(`/outbound/${applyId}/stock-check`)
       if (res.code === 200 && res.data) {
         setStockCheckResult(res.data)
+        outboundTestTrace(`GET /outbound/${applyId}/stock-check`, {
+          sufficient: res.data.sufficient,
+          message: res.data.message,
+        })
       } else {
         setStockCheckResult({ sufficient: true, message: '', details: [] })
+        outboundTestTrace(`GET /outbound/${applyId}/stock-check 无有效 data，按充足处理`)
       }
     } catch (e) {
+      outboundTestTrace(`GET /outbound/${applyId}/stock-check 异常`, e?.response?.data || e?.message)
       logger.error('库存校验请求失败:', e)
       setStockCheckResult({ sufficient: true, message: '', details: [] })
     }
@@ -408,6 +457,11 @@ const OutboundManagement = () => {
 
   // 打开查看详情弹窗（拉取申请明细）
   const openDetailModal = async (record) => {
+    outboundTestTrace('打开详情', {
+      id: record.id,
+      applyNumber: record.applyNumber,
+      status: record.status,
+    })
     setCurrentRecord(record)
     setDetailItems([])
     setDetailModalVisible(true)
@@ -415,6 +469,7 @@ const OutboundManagement = () => {
       const res = await request.get(`/outbound/${record.id}/items`)
       if (res.code === 200) {
         setDetailItems(res.data || [])
+        outboundTestTrace(`GET /outbound/${record.id}/items 详情明细行数`, (res.data || []).length)
       }
     } catch (e) {
       logger.error('获取申请明细失败:', e)
@@ -424,16 +479,20 @@ const OutboundManagement = () => {
 
   // 申请人撤回出库申请（仅待审批状态）
   const handleWithdraw = async (id) => {
+    outboundTestTrace(`POST /outbound/${id}/withdraw 请求`)
     try {
       const res = await request.post(`/outbound/${id}/withdraw`)
       if (res.code === 200) {
+        outboundTestTrace(`POST /outbound/${id}/withdraw 成功`)
         message.success('已撤回')
         setDetailModalVisible(false)
         fetchOutboundApplies()
       } else {
+        outboundTestTrace(`POST /outbound/${id}/withdraw 失败`, res.msg)
         message.error(res.msg || '撤回失败')
       }
     } catch (error) {
+      outboundTestTrace(`POST /outbound/${id}/withdraw 异常`, error.response?.data || error.message)
       message.error(error.response?.data?.msg || error.message || '撤回失败')
     }
   }
@@ -464,10 +523,16 @@ const OutboundManagement = () => {
         }
       }
 
+      outboundTestTrace(`POST /outbound/${currentRecord.id}/approve 请求`, {
+        applyNumber: currentRecord.applyNumber,
+        secondApproverId: values.secondApproverId || null,
+        hasSpecialDrug,
+      })
       const res = await request.post(`/outbound/${currentRecord.id}/approve`, {
         secondApproverId: values.secondApproverId || null,
       })
       if (res.code === 200) {
+        outboundTestTrace(`POST /outbound/${currentRecord.id}/approve 成功 → 状态应为 APPROVED`)
         message.success('审批通过')
         setApproveModalVisible(false)
         setTimeout(() => {
@@ -477,10 +542,12 @@ const OutboundManagement = () => {
         setHasSpecialDrug(false)
         fetchOutboundApplies()
       } else {
+        outboundTestTrace(`POST /outbound/${currentRecord.id}/approve 失败`, res.msg)
         message.error(res.msg || '审批失败')
       }
     } catch (error) {
       const errorMsg = error.response?.data?.msg || error.message || '审批失败'
+      outboundTestTrace('审批异常', errorMsg)
       message.error(errorMsg)
     }
   }
@@ -491,18 +558,41 @@ const OutboundManagement = () => {
       return
     }
     try {
+      outboundTestTrace(`POST /outbound/${applyId}/reject 请求`, { reasonLen: reason?.length ?? 0 })
       const res = await request.post(`/outbound/${applyId}/reject`, {
         rejectReason: reason,
       })
       if (res.code === 200) {
+        outboundTestTrace(`POST /outbound/${applyId}/reject 成功 → 状态应为 REJECTED`)
         message.success('已驳回')
         fetchOutboundApplies()
       } else {
+        outboundTestTrace(`POST /outbound/${applyId}/reject 失败`, res.msg)
         message.error(res.msg || '驳回失败')
       }
     } catch (error) {
+      outboundTestTrace(`POST /outbound/${applyId}/reject 异常`, error?.response?.data || error?.message)
       logger.error('驳回失败:', error)
       message.error('驳回失败')
+    }
+  }
+
+  /** 特殊药品：第二审批人本人确认通过（PENDING_SECOND → APPROVED） */
+  const handleSecondApprove = async (applyId) => {
+    try {
+      outboundTestTrace(`POST /outbound/${applyId}/second-approve 请求`)
+      const res = await request.post(`/outbound/${applyId}/second-approve`, {})
+      if (res.code === 200) {
+        outboundTestTrace(`POST /outbound/${applyId}/second-approve 成功 → APPROVED`)
+        message.success('第二审批已通过，可执行出库')
+        fetchOutboundApplies()
+      } else {
+        outboundTestTrace(`POST /outbound/${applyId}/second-approve 失败`, res.msg)
+        message.error(res.msg || '第二审批失败')
+      }
+    } catch (error) {
+      outboundTestTrace('第二审批异常', error?.response?.data || error?.message)
+      message.error(error.response?.data?.msg || error.message || '第二审批失败')
     }
   }
 
@@ -559,6 +649,10 @@ const OutboundManagement = () => {
         return
       }
 
+      outboundTestTrace(useOnBehalf ? 'POST /outbound/on-behalf 请求' : 'POST /outbound 请求', {
+        itemCount: validItems.length,
+        department: basePayload.department,
+      })
       const res = useOnBehalf
         ? await request.post('/outbound/on-behalf', {
             ...basePayload,
@@ -567,6 +661,11 @@ const OutboundManagement = () => {
         : await request.post('/outbound', basePayload)
 
       if (res.code === 200) {
+        outboundTestTrace(useOnBehalf ? 'POST /outbound/on-behalf 成功' : 'POST /outbound 成功', {
+          id: res.data?.id,
+          applyNumber: res.data?.applyNumber,
+          status: res.data?.status,
+        })
         message.success(useOnBehalf ? '代录出库申请已创建' : '出库申请创建成功')
         setModalVisible(false)
         setTimeout(() => {
@@ -575,9 +674,11 @@ const OutboundManagement = () => {
         }, 0)
         fetchOutboundApplies()
       } else {
+        outboundTestTrace(useOnBehalf ? '创建代录申请失败' : '创建申请失败', res.msg)
         message.error(res.msg || '创建出库申请失败')
       }
     } catch (error) {
+      outboundTestTrace('创建出库申请异常', error.response?.data || error.message)
       logger.error('创建出库申请失败:', error)
       message.error(error.response?.data?.msg || error.message || '创建出库申请失败')
     }
@@ -604,10 +705,16 @@ const OutboundManagement = () => {
         })
       }
 
+      outboundTestTrace(`POST /outbound/${currentRecord.id}/execute 请求`, {
+        applyNumber: currentRecord.applyNumber,
+        outboundLines: outboundItems.length,
+        outboundItems,
+      })
       const res = await request.post(`/outbound/${currentRecord.id}/execute`, {
         outboundItems: outboundItems,
       })
       if (res.code === 200) {
+        outboundTestTrace(`POST /outbound/${currentRecord.id}/execute 成功 → 状态应为 OUTBOUND，可与仪表盘/库存对照`)
         message.success('出库执行成功')
         setExecuteModalVisible(false)
         setTimeout(() => {
@@ -617,9 +724,11 @@ const OutboundManagement = () => {
         setInventoryBatches({})
         fetchOutboundApplies()
       } else {
+        outboundTestTrace(`POST /outbound/${currentRecord.id}/execute 失败`, res.msg)
         message.error(res.msg || '出库执行失败')
       }
     } catch (error) {
+      outboundTestTrace('执行出库异常', error.response?.data || error.message)
       logger.error('出库执行失败:', error)
       message.error(error.response?.data?.msg || error.message || '出库执行失败')
     }
@@ -637,6 +746,7 @@ const OutboundManagement = () => {
   const getStatusTag = (status) => {
     const statusMap = {
       PENDING: { color: 'orange', text: '待审批' },
+      PENDING_SECOND: { color: 'gold', text: '待第二审批' },
       APPROVED: { color: 'green', text: '已通过' },
       REJECTED: { color: 'red', text: '已驳回' },
       OUTBOUND: { color: 'blue', text: '已出库' },
@@ -711,15 +821,42 @@ const OutboundManagement = () => {
       title: <span style={{ whiteSpace: 'nowrap' }}>审批人</span>,
       dataIndex: 'approverName',
       key: 'approverName',
-      width: 100,
+      width: 140,
       ellipsis: true,
+      render: (name, record) => {
+        const first =
+          record.approverRoleName != null && record.approverRoleName !== ''
+            ? `${name || '-'}（${record.approverRoleName}）`
+            : (name ?? '-')
+        if (!record.secondApproverId && !record.secondApproverName) return first
+        const sec =
+          record.secondApproverRoleName != null && record.secondApproverRoleName !== ''
+            ? `${record.secondApproverName || '-'}（${record.secondApproverRoleName}）`
+            : (record.secondApproverName ?? '-')
+        return (
+          <div style={{ fontSize: 12, lineHeight: 1.45 }}>
+            <div>一：{first}</div>
+            <div style={{ color: 'rgba(0,0,0,0.55)', marginTop: 2 }}>二：{sec}</div>
+          </div>
+        )
+      },
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>审批时间</span>,
       dataIndex: 'approveTime',
       key: 'approveTime',
-      width: 180,
-      render: (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-',
+      width: 200,
+      render: (time, record) => {
+        if (record.status === 'PENDING_SECOND' && record.firstApproveTime) {
+          return (
+            <div style={{ fontSize: 12, lineHeight: 1.45 }}>
+              <div>一：{dayjs(record.firstApproveTime).format('YYYY-MM-DD HH:mm:ss')}</div>
+              <div style={{ color: 'rgba(0,0,0,0.45)', marginTop: 2 }}>终批：待第二人</div>
+            </div>
+          )
+        }
+        return time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
+      },
     },
     {
       title: <span style={{ whiteSpace: 'nowrap' }}>出库时间</span>,
@@ -740,6 +877,12 @@ const OutboundManagement = () => {
         const currentUser = getUser()
         const isApplicant = currentUser && record.applicantId === currentUser.id
         const canWithdraw = hasPermission(PERMISSIONS.OUTBOUND_APPLY) && record.status === 'PENDING' && isApplicant
+        const isSecondApprover =
+          currentUser && record.secondApproverId != null && Number(record.secondApproverId) === Number(currentUser.id)
+        const isFirstApprover =
+          currentUser && record.approverId != null && Number(record.approverId) === Number(currentUser.id)
+        const canRejectPendingSecond =
+          record.status === 'PENDING_SECOND' && canApprove && (isFirstApprover || isSecondApprover)
 
         return (
           <Space>
@@ -778,12 +921,20 @@ const OutboundManagement = () => {
                     size="small"
                     icon={<CheckCircleOutlined />}
                     onClick={async () => {
+                      outboundTestTrace('点击「审批」打开弹窗', {
+                        id: record.id,
+                        applyNumber: record.applyNumber,
+                        status: record.status,
+                      })
                       setCurrentRecord(record)
                       setStockCheckResult(null)
                       await checkSpecialDrugs(record.id)
                       await fetchStockCheckForApply(record.id)
                       await fetchSecondApproverCandidates()
                       setApproveModalVisible(true)
+                      outboundTestTrace('审批弹窗已打开（已请求明细/库存校验/第二审批人候选）', {
+                        applyId: record.id,
+                      })
                     }}
                   />
                 </Tooltip>
@@ -811,6 +962,47 @@ const OutboundManagement = () => {
                 </Tooltip>
               </>
             )}
+            {record.status === 'PENDING_SECOND' && canApprove && isSecondApprover && (
+              <Tooltip title="第二审批人本人确认通过">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: '第二审批确认',
+                      content:
+                        '请确认已复核本单药品、用途与数量。通过后申请将变为「已通过」，可由仓库执行出库。',
+                      onOk: () => handleSecondApprove(record.id),
+                    })
+                  }}
+                />
+              </Tooltip>
+            )}
+            {canRejectPendingSecond && (
+              <Tooltip title="驳回申请">
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  onClick={() => {
+                    const applyId = record.id
+                    Modal.confirm({
+                      title: '确认驳回',
+                      content: '请输入驳回理由',
+                      onOk: (close) => {
+                        const reason = prompt('请输入驳回理由:')
+                        if (reason) {
+                          handleReject(applyId, reason)
+                          close()
+                        }
+                      },
+                    })
+                  }}
+                />
+              </Tooltip>
+            )}
             {record.status === 'APPROVED' && canExecute && (
               <Tooltip title="执行出库">
                 <Button
@@ -818,9 +1010,15 @@ const OutboundManagement = () => {
                   size="small"
                   icon={<PlayCircleOutlined />}
                   onClick={async () => {
+                    outboundTestTrace('点击「执行出库」', {
+                      id: record.id,
+                      applyNumber: record.applyNumber,
+                      status: record.status,
+                    })
                     setCurrentRecord(record)
                     await fetchApplyItems(record.id)
                     setExecuteModalVisible(true)
+                    outboundTestTrace('执行出库弹窗已打开', { applyId: record.id })
                   }}
                 />
               </Tooltip>
@@ -863,6 +1061,7 @@ const OutboundManagement = () => {
               allowClear
             >
               <Select.Option value="PENDING">待审批</Select.Option>
+              <Select.Option value="PENDING_SECOND">待第二审批</Select.Option>
               <Select.Option value="APPROVED">已通过</Select.Option>
               <Select.Option value="REJECTED">已驳回</Select.Option>
               <Select.Option value="OUTBOUND">已出库</Select.Option>
@@ -1084,10 +1283,11 @@ const OutboundManagement = () => {
                         }
                         onSelect={(value) => {
                           const newItems = [...applyFormItems]
-                          newItems[index].drugId = value
+                          const drugId = value != null && String(value) !== '' ? Number(value) : undefined
+                          newItems[index].drugId = Number.isFinite(drugId) ? drugId : undefined
                           newItems[index].batchNumber = undefined
                           setApplyFormItems(newItems)
-                          loadBatchesForApplyDrug(value)
+                          loadBatchesForApplyDrug(newItems[index].drugId)
                         }}
                         onChange={(value) => {
                           if (value == null || String(value).trim() === '') {
@@ -1207,7 +1407,7 @@ const OutboundManagement = () => {
 
       {/* 审批模态框 */}
       <Modal
-        title="审批出库申请"
+        title={hasSpecialDrug ? '第一审批（出库申请 · 含特殊药品）' : '审批出库申请'}
         open={approveModalVisible}
         onCancel={() => {
           setApproveModalVisible(false)
@@ -1269,8 +1469,8 @@ const OutboundManagement = () => {
 
         {hasSpecialDrug && (
           <Alert
-            message="特殊药品提醒"
-            description="此申请包含特殊药品，必须指定第二审批人进行双人审批确认。"
+            message="特殊药品双人审批说明"
+            description="此申请含特殊药品：您完成第一审批并指定第二审批人后，申请将进入「待第二审批」，须由第二审批人本人登录系统并点击「第二审批通过」后，本单才变为「已通过」并可执行出库。"
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
@@ -1282,15 +1482,17 @@ const OutboundManagement = () => {
             <strong>申请明细：</strong>
             <ul style={{ marginTop: 8, marginBottom: 0 }}>
               {approveItems.map((item, index) => {
-                const drug = drugs.find(d => d.id === item.drugId)
+                const drug = drugs.find((d) => Number(d.id) === Number(item.drugId))
+                const special =
+                  Number(item.isSpecial) === 1 || (drug != null && Number(drug.isSpecial) === 1) // 接口 isSpecial 优先
                 return (
                   <li key={index}>
-                    {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
+                    {formatOutboundApplyItemDrugLabel(item, drugs)}
                     {' '}× {item.quantity}
                     {item.batchNumber ? <>，批次 <strong>{item.batchNumber}</strong></> : null}
-                    {drug && drug.isSpecial === 1 && (
+                    {special ? (
                       <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
-                    )}
+                    ) : null}
                   </li>
                 )
               })}
@@ -1384,21 +1586,46 @@ const OutboundManagement = () => {
             {currentRecord.remark ? <p><strong>申请备注：</strong>{currentRecord.remark}</p> : null}
             {currentRecord.rejectReason ? <p><strong>审核备注：</strong>{currentRecord.rejectReason}</p> : null}
             <p><strong>申请状态：</strong>{getStatusTag(currentRecord.status)}</p>
+            {currentRecord.status === 'PENDING_SECOND' && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="等待第二审批人确认"
+                description="第一审批已完成。请第二审批人本人登录后在列表中点击盾牌图标「第二审批通过」，或通过筛选「待第二审批」查找本单。"
+              />
+            )}
+            {currentRecord.firstApproveTime ? (
+              <p>
+                <strong>第一审批时间：</strong>
+                {dayjs(currentRecord.firstApproveTime).format('YYYY-MM-DD HH:mm:ss')}
+              </p>
+            ) : null}
+            {currentRecord.secondApproverName ? (
+              <p>
+                <strong>第二审批人：</strong>
+                {currentRecord.secondApproverRoleName
+                  ? `${currentRecord.secondApproverName}（${currentRecord.secondApproverRoleName}）`
+                  : currentRecord.secondApproverName}
+              </p>
+            ) : null}
             {detailItems.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <strong>申请明细：</strong>
                 <ul style={{ marginTop: 8, marginBottom: 0 }}>
                   {detailItems.map((item, index) => {
-                    const drug = drugs.find(d => d.id === item.drugId)
+                    const drug = drugs.find((d) => Number(d.id) === Number(item.drugId))
+                    const special =
+                      Number(item.isSpecial) === 1 || (drug != null && Number(drug.isSpecial) === 1)
                     return (
                       <li key={index}>
-                        {drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
+                        {formatOutboundApplyItemDrugLabel(item, drugs)}
                         {' '}× {item.quantity}
                         {item.batchNumber ? <>，指定批次：<strong>{item.batchNumber}</strong></> : null}
                         {item.remark ? <>（备注：{item.remark}）</> : null}
-                        {drug && drug.isSpecial === 1 && (
+                        {special ? (
                           <Tag color="red" style={{ marginLeft: 8 }}>特殊药品</Tag>
-                        )}
+                        ) : null}
                       </li>
                     )
                   })}
@@ -1463,13 +1690,13 @@ const OutboundManagement = () => {
           onFinish={handleExecute}
         >
           {applyItems.map((item) => {
-            const drug = drugs.find(d => d.id === item.drugId)
             const batches = inventoryBatches[item.drugId] || []
             return (
               <div key={item.id} style={{ marginBottom: 16, padding: 16, border: '1px solid #d9d9d9', borderRadius: 4 }}>
                 <Space direction="vertical" style={{ width: '100%' }} size="small">
                   <div>
-                    <strong>药品：</strong>{drug ? `${drug.drugName} (${drug.specification || ''})` : `药品ID: ${item.drugId}`}
+                    <strong>药品：</strong>
+                    {formatOutboundApplyItemDrugLabel(item, drugs)}
                   </div>
                   <div>
                     <strong>申请数量：</strong>{item.quantity}
@@ -1579,7 +1806,9 @@ const OutboundManagement = () => {
         <Table
           size="small"
           loading={pickSummaryLoading}
-          rowKey={(r, i) => `${r.drugId}-${r.batchNumber}-${r.storageLocation}-${i}`}
+          rowKey={(r) =>
+            [r.drugId, r.batchNumber ?? '', r.storageLocation ?? ''].join('\u0000')
+          }
           dataSource={pickSummaryData?.summary || []}
           pagination={false}
           scroll={{ x: 'max-content' }}
@@ -1601,7 +1830,17 @@ const OutboundManagement = () => {
         <Table
           size="small"
           loading={pickSummaryLoading}
-          rowKey={(r, i) => `${r.applyNumber}-${r.drugId}-${r.batchNumber}-${i}`}
+          rowKey={(r) =>
+            [
+              r.applyNumber,
+              r.drugId,
+              r.batchNumber ?? '',
+              r.storageLocation ?? '',
+              r.expiryDate ?? '',
+              r.quantity,
+              r.approveTime ?? '',
+            ].join('\u0000')
+          }
           dataSource={pickSummaryData?.pickLines || []}
           pagination={false}
           scroll={{ x: 'max-content', y: 280 }}

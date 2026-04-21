@@ -11,6 +11,7 @@ import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.DrugInfoService;
 import com.cdiom.backend.service.ExcelExportService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -29,10 +30,10 @@ import java.util.List;
  * 
  * @author cdiom
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/drugs")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
 public class DrugInfoController {
 
     private final DrugInfoService drugInfoService;
@@ -41,9 +42,35 @@ public class DrugInfoController {
     private final DrugInfoMapper drugInfoMapper;
 
     /**
-     * 分页查询药品信息列表
+     * 出入库等业务表单下拉用：不要求「药品信息管理」页的 drug:view；与 {@link #getDrugInfoList} 区分。
+     */
+    @GetMapping("/options-for-business")
+    @RequiresPermission({
+            "outbound:view", "outbound:apply", "outbound:apply:on-behalf",
+            "outbound:approve", "outbound:approve:special", "outbound:execute",
+            "inbound:view", "inbound:create", "inbound:approve", "inbound:execute",
+            "inventory:view", "inventory:adjust",
+            "drug:view", "drug:manage", "purchase:view"
+    })
+    public Result<Page<DrugInfo>> listDrugOptionsForBusiness(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "500") Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer isSpecial) {
+        int p = page == null || page < 1 ? 1 : page;
+        int sz = size == null ? 500 : size;
+        if (sz > 2000) {
+            sz = 2000;
+        }
+        Page<DrugInfo> drugPage = drugInfoService.getDrugInfoList(p, sz, keyword, isSpecial, null, null);
+        return Result.success(drugPage);
+    }
+
+    /**
+     * 分页查询药品信息列表（药品信息管理、采购等）
      */
     @GetMapping
+    @RequiresPermission({"drug:view", "drug:manage", "purchase:view"})
     public Result<Page<DrugInfo>> getDrugInfoList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
@@ -64,9 +91,16 @@ public class DrugInfoController {
     }
 
     /**
-     * 根据ID查询药品信息
+     * 根据ID查询药品信息（药品管理模块或出入库/库存等业务只读场景）
      */
     @GetMapping("/{id}")
+    @RequiresPermission({
+            "drug:view", "drug:manage", "purchase:view",
+            "outbound:view", "outbound:apply", "outbound:apply:on-behalf",
+            "outbound:approve", "outbound:approve:special", "outbound:execute",
+            "inbound:view", "inbound:create", "inbound:approve", "inbound:execute",
+            "inventory:view", "inventory:adjust"
+    })
     public Result<DrugInfo> getDrugInfoById(@PathVariable Long id) {
         DrugInfo drugInfo = drugInfoService.getDrugInfoById(id);
         return Result.success(drugInfo);
@@ -76,6 +110,7 @@ public class DrugInfoController {
      * 创建药品信息
      */
     @PostMapping
+    @RequiresPermission({"drug:manage"})
     public Result<DrugInfo> createDrugInfo(@Valid @RequestBody DrugInfo drugInfo) {
         try {
             DrugInfo createdDrug = drugInfoService.createDrugInfo(drugInfo);
@@ -89,6 +124,7 @@ public class DrugInfoController {
      * 更新药品信息
      */
     @PutMapping("/{id}")
+    @RequiresPermission({"drug:manage"})
     public Result<DrugInfo> updateDrugInfo(@PathVariable Long id, @Valid @RequestBody DrugInfo drugInfo) {
         try {
             drugInfo.setId(id);
@@ -103,6 +139,7 @@ public class DrugInfoController {
      * 删除药品信息
      */
     @DeleteMapping("/{id}")
+    @RequiresPermission({"drug:manage"})
     public Result<Void> deleteDrugInfo(@PathVariable Long id) {
         try {
             drugInfoService.deleteDrugInfo(id);
@@ -144,15 +181,22 @@ public class DrugInfoController {
      * 先查询本地数据库，如果未找到则查询极速数据API
      */
     @GetMapping("/search")
+    @RequiresPermission({"drug:view", "drug:manage"})
     public Result<DrugInfo> searchDrugByCode(@RequestParam String code) {
+        String trimmed = StringUtils.hasText(code) ? code.trim() : "";
+        log.info("[药品码查询] 接口 GET /api/v1/drugs/search 收到请求, code长度={}, code={}",
+                trimmed.length(), trimmed.isEmpty() ? "(空)" : trimmed);
         try {
             DrugInfo drugInfo = drugInfoService.searchDrugByCode(code);
             if (drugInfo != null) {
+                log.info("[药品码查询] 接口返回成功: drugId={}, drugName={}", drugInfo.getId(), drugInfo.getDrugName());
                 return Result.success("查询成功", drugInfo);
             } else {
+                log.info("[药品码查询] 接口返回: 未找到药品信息");
                 return Result.error("未找到药品信息");
             }
         } catch (Exception e) {
+            log.warn("[药品码查询] 接口异常: {}", e.getMessage());
             return Result.error("查询失败: " + e.getMessage());
         }
     }
@@ -161,6 +205,7 @@ public class DrugInfoController {
      * 根据药品名称查询药品信息（调用万维易源API）
      */
     @GetMapping("/search/name")
+    @RequiresPermission({"drug:view", "drug:manage"})
     public Result<DrugInfo> searchDrugByName(@RequestParam String drugName) {
         try {
             DrugInfo drugInfo = drugInfoService.searchDrugByName(drugName);
@@ -178,6 +223,7 @@ public class DrugInfoController {
      * 根据批准文号查询药品信息（调用万维易源API）
      */
     @GetMapping("/search/approval")
+    @RequiresPermission({"drug:view", "drug:manage"})
     public Result<DrugInfo> searchDrugByApprovalNumber(@RequestParam String approvalNumber) {
         try {
             DrugInfo drugInfo = drugInfoService.searchDrugByApprovalNumber(approvalNumber);
@@ -195,6 +241,7 @@ public class DrugInfoController {
      * 导出药品列表到Excel
      */
     @GetMapping("/export")
+    @RequiresPermission({"drug:manage"})
     public ResponseEntity<byte[]> exportDrugInfoList(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer isSpecial) {

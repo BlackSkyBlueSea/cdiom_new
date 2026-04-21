@@ -9,6 +9,8 @@ import com.cdiom.backend.model.SysUser;
 import com.cdiom.backend.service.AuthService;
 import com.cdiom.backend.service.ExcelExportService;
 import com.cdiom.backend.service.InventoryService;
+import com.cdiom.backend.service.SysUserService;
+import com.cdiom.backend.util.SystemConfigUtil;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -25,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,13 +39,15 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
-@RequiresPermission({"drug:view", "drug:manage"})
+@RequiresPermission({"inventory:view", "drug:manage"})
 public class InventoryController {
 
     private final InventoryService inventoryService;
     private final ExcelExportService excelExportService;
     private final AuthService authService;
     private final InventoryMapper inventoryMapper;
+    private final SysUserService sysUserService;
+    private final SystemConfigUtil systemConfigUtil;
 
     /**
      * 分页查询库存列表
@@ -62,6 +67,16 @@ public class InventoryController {
                 page, size, keyword, drugId, batchNumber, storageLocation,
                 expiryDateStart, expiryDateEnd, isSpecial);
         return Result.success(inventoryPage);
+    }
+
+    /**
+     * 库存调整等环节选择第二操作人：启用用户列表（不含密码）。
+     * 方法级权限：具备库存查看/调整/调整审批或药品维护之一即可，避免仅缺其中一项时 403。
+     */
+    @GetMapping("/second-operator-candidates")
+    @RequiresPermission({"inventory:view", "inventory:adjust", "inventory:adjust:approve", "drug:manage"})
+    public Result<List<SysUser>> listSecondOperatorCandidates() {
+        return Result.success(sysUserService.listActiveUsersForSecondOperatorPick(1000));
     }
 
     /**
@@ -92,6 +107,18 @@ public class InventoryController {
     public Result<Map<String, Long>> getNearExpiryWarning() {
         Map<String, Long> warning = inventoryService.getNearExpiryWarning();
         return Result.success(warning);
+    }
+
+    /**
+     * 近效期黄/红阈值（天），与 sys_config 运行时一致；供库存列表「效期状态」展示。
+     * 权限与库存列表相同，无需 config:manage。
+     */
+    @GetMapping("/expiry-thresholds")
+    public Result<Map<String, Integer>> getExpiryThresholdsForDisplay() {
+        Map<String, Integer> m = new LinkedHashMap<>();
+        m.put("expiryWarningDays", systemConfigUtil.getExpiryWarningDays());
+        m.put("expiryCriticalDays", systemConfigUtil.getExpiryCriticalDays());
+        return Result.success(m);
     }
 
     /**

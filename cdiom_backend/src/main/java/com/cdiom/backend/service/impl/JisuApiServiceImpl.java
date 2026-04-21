@@ -48,10 +48,10 @@ public class JisuApiServiceImpl implements JisuApiService {
         }
 
         try {
-            // 构建请求URL
+            // 官方接口三项填一项：medicine_id / approval_num / barcode（传 code 会被忽略→报「条码不能都为空」）
             String url = UriComponentsBuilder.fromHttpUrl(Objects.requireNonNull(baseUrl, "baseUrl不能为null"))
                     .queryParam("appkey", Objects.requireNonNull(appKey, "appKey不能为null"))
-                    .queryParam("code", productCode.trim())
+                    .queryParam("barcode", productCode.trim())
                     .build()
                     .toUriString();
 

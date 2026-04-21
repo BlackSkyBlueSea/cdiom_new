@@ -11,6 +11,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Arrays;
@@ -103,6 +104,15 @@ public class GlobalExceptionHandler {
         } else {
             return Result.error(400, message);
         }
+    }
+
+    /**
+     * 上传文件超过 spring.servlet.multipart 配置的大小限制
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<?> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+        log.warn("上传文件超过大小限制: {}", e.getMessage());
+        return Result.error(400, "上传文件过大，单个文件请勿超过系统限制（默认 10MB）。请压缩图片或更换更小的文件后再试。");
     }
 
     /**
