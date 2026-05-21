@@ -4,8 +4,6 @@ import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import Cookies from 'js-cookie'
 import request from '../utils/request'
 import logger from '../utils/logger'
-import { hasPermission, PERMISSIONS } from '../utils/permission'
-import { Navigate } from 'react-router-dom'
 import {
   pageRootStyle,
   tableAreaStyle,
@@ -20,12 +18,6 @@ const getAuthToken = () =>
   sessionStorage.getItem('cdiom_token') || Cookies.get('cdiom_token') || ''
 
 const OperationLog = () => {
-  // 权限检查：只有系统管理员可以查看操作日志
-  if (!hasPermission(PERMISSIONS.LOG_OPERATION_VIEW)) {
-    message.error('您没有权限访问此页面')
-    return <Navigate to="/dashboard" replace />
-  }
-
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({

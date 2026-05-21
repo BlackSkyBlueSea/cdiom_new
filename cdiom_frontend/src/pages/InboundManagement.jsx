@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Table, Button, Space, Input, Select, DatePicker, Tag, Modal, Form, message, AutoComplete, InputNumber, Tooltip, Alert, Switch, Descriptions, Spin } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, CheckCircleOutlined, CloseCircleOutlined, BarcodeOutlined, RollbackOutlined, EyeOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -436,10 +436,20 @@ const InboundManagement = () => {
   }
 
   // 扫描/输入订单编号识别订单（条形码内容为订单编号）
-  const [barcodeOrderNumber, setBarcodeOrderNumber] = useState('')
+  // 使用非受控 + ref：无线/蓝牙扫码枪会在极短时间内连续键入，受控 Input 易出现「只录到前缀、数字被吞」；
+  // 另：中文输入法打开时，数字/连字符常被 IME 拦截，请在扫码前切到英文键盘。
+  const barcodeScanInputRef = useRef(null)
+  const [barcodeScanFieldKey, setBarcodeScanFieldKey] = useState(0)
   const [barcodeLoading, setBarcodeLoading] = useState(false)
-  const handleBarcodeRecognize = async () => {
-    const num = (barcodeOrderNumber || '').trim()
+  const clearBarcodeScanField = () => {
+    setBarcodeScanFieldKey((k) => k + 1)
+  }
+  const readBarcodeScanValue = () => {
+    const el = barcodeScanInputRef.current?.input
+    return (el && typeof el.value === 'string' ? el.value : '').trim()
+  }
+  const handleBarcodeRecognize = async (overrideRaw) => {
+    const num = (typeof overrideRaw === 'string' ? overrideRaw.trim() : readBarcodeScanValue())
     if (!num) {
       message.warning('请输入或扫描订单编号')
       return
@@ -459,7 +469,7 @@ const InboundManagement = () => {
       setOrders(prev => (prev.some(o => o.id === order.id) ? prev : [...prev, order]))
       form.setFieldsValue({ orderId: order.id })
       await handleOrderChange(order.id)
-      setBarcodeOrderNumber('')
+      clearBarcodeScanField()
       message.success('已识别订单：' + order.orderNumber)
     } catch (e) {
       logger.error('根据订单编号查询失败', e)
@@ -1286,7 +1296,7 @@ const InboundManagement = () => {
           setOrderItems([])
           setOrderRemainRows([])
           setOrderRemainLoading(false)
-          setBarcodeOrderNumber('')
+          clearBarcodeScanField()
           setReceiptBatchId(null)
           setReceiptBatchCode('')
           setSplitAcceptanceMode(false)
@@ -1304,21 +1314,33 @@ const InboundManagement = () => {
               <Form.Item label="扫描订单条形码">
                 <Space.Compact style={{ width: '100%' }}>
                   <Input
+                    key={`order-barcode-scan-${barcodeScanFieldKey}`}
+                    ref={barcodeScanInputRef}
                     prefix={<BarcodeOutlined style={{ color: '#999' }} />}
                     placeholder="将扫码枪对准此处扫描，或输入订单编号后回车"
-                    value={barcodeOrderNumber}
-                    onChange={(e) => setBarcodeOrderNumber(e.target.value)}
-                    onPressEnter={(e) => { e.preventDefault(); handleBarcodeRecognize() }}
+                    defaultValue=""
                     allowClear
+                    autoComplete="off"
+                    spellCheck={false}
+                    lang="en"
+                    style={{ imeMode: 'disabled' }}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return
+                      e.preventDefault()
+                      const raw = (e.currentTarget.value || '').trim()
+                      void handleBarcodeRecognize(raw)
+                    }}
                   />
                   <Tooltip title="根据订单编号识别并带出订单信息">
-                    <Button type="primary" loading={barcodeLoading} onClick={handleBarcodeRecognize}>
+                    <Button type="primary" loading={barcodeLoading} onClick={() => void handleBarcodeRecognize()}>
                       识别
                     </Button>
                   </Tooltip>
                 </Space.Compact>
                 <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                  条形码内容为订单编号，扫描后自动带出订单及药品明细
+                  条形码内容为订单编号，扫描后自动带出订单及药品明细。若只能扫出前面字母：请先切换到
+                  <strong>英文输入法</strong>
+                  再扫；仍异常时请用手动输入订单号后点「识别」。
                 </div>
               </Form.Item>
               <Form.Item

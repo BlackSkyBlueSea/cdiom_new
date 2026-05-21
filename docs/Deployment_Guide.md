@@ -66,7 +66,7 @@
 # 方式一：使用完整初始化脚本（推荐）
 mysql -u root -p < cdiom_backend/src/main/resources/db/init_simple.sql
 
-# 创建供应商-药品关联表（第20张表，v1.3.0新增）
+# 创建供应商-药品关联表 supplier_drug（扩展脚本，不在 init_simple 的 20 张基础表内）
 mysql -u root -p < cdiom_backend/src/main/resources/db/create_supplier_drug_relation.sql
 
 # 创建用户权限关联表和细粒度权限（v1.5.0新增）

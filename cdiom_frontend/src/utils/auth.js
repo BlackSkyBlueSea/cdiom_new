@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie'
 
-// 检查是否是多用户登录模式（通过URL参数或sessionStorage标记）
-const isMultiLoginMode = () => {
+// 检查当前标签页是否是多用户登录模式（通过URL参数或sessionStorage标记）
+export const isMultiLoginMode = () => {
   // 检查URL参数（登录页面使用）
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('multiLogin') === 'true') {
@@ -27,18 +27,24 @@ export const getToken = () => {
 // 始终写入 sessionStorage，保证「当前标签页」身份不被其他标签的 Cookie 覆盖（多用户同设备时审批人等信息正确）
 export const setToken = (token, useSessionStorage = false) => {
   sessionStorage.setItem('cdiom_token', token)
-  if (useSessionStorage || isMultiLoginMode()) {
+  if (useSessionStorage) {
     sessionStorage.setItem('cdiom_multi_login', 'true')
     // 多用户模式：仅当前标签，不写 Cookie，避免覆盖其他标签的 Cookie
   } else {
+    // 普通登录：明确清除多用户标记，避免旧标记导致后续登录仍被当作多用户模式
+    sessionStorage.removeItem('cdiom_multi_login')
     Cookies.set('cdiom_token', token, { expires: 8 / 24 }) // 8小时，兼容单用户/刷新
   }
 }
 
 // 移除token
-export const removeToken = () => {
-  Cookies.remove('cdiom_token')
-  Cookies.remove('cdiom_user')
+// 默认在多用户模式下仅清当前标签页（不影响其他标签页共享 Cookie 的登录态）
+export const removeToken = (options = {}) => {
+  const { clearCookie = !isMultiLoginMode() } = options
+  if (clearCookie) {
+    Cookies.remove('cdiom_token')
+    Cookies.remove('cdiom_user')
+  }
   sessionStorage.removeItem('cdiom_token')
   sessionStorage.removeItem('cdiom_user')
   sessionStorage.removeItem('cdiom_multi_login')
@@ -74,8 +80,8 @@ export const getUserInfo = () => {
   return getUser()
 }
 
-// 清除认证信息（别名，用于兼容）
+// 清除认证信息（显式登出/清空登录态：始终清除 Cookie，避免仅清 session 后首页仍从 Cookie 读到用户）
 export const clearAuth = () => {
-  removeToken()
+  removeToken({ clearCookie: true })
 }
 

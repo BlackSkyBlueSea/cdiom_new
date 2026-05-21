@@ -176,7 +176,7 @@
 
 #### 文档完善
 - 完善项目结构描述（补充所有Controller、Model、Config、前端页面）
-- 更新数据库初始化说明（详细说明21张表的创建顺序）
+- 更新数据库初始化说明（表清单与执行顺序；**当前仓库**以 `init_simple.sql` **20** 张基础表 + 扩展 `.sql` 为准，见 [Database_Design.md](./Database_Design.md)）
 - 补充API接口文档（入库管理、出库管理、采购订单管理、供应商管理、库存调整接口）
 - 完善数据库相关注意事项
 
@@ -384,7 +384,7 @@
 - `update_supplier_permissions.sql` - 更新供应商管理权限配置
 
 #### 数据库表变更
-- 新增表：`supplier_drug`（供应商-药品关联表，第20张表）
+- 新增表：`supplier_drug`（供应商-药品关联表，由 `create_supplier_drug_relation.sql` 创建；**当前** `init_simple.sql` 含 20 张基础表且不包含本表，部署时仍须执行该扩展脚本，见 [Database_Design.md](./Database_Design.md)）
 - 修改表：`supplier`（添加remark字段）
 - 修改表：`drug_info`（移除supplier_id和supplier_name字段）
 

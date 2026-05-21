@@ -1,6 +1,7 @@
 import axios from 'axios'
 import Cookies from 'js-cookie'
 import { message } from 'antd'
+import { isMultiLoginMode } from './auth'
 
 // 创建axios实例
 const request = axios.create({
@@ -41,7 +42,11 @@ request.interceptors.request.use(
 
 // 登录过期时清除 token 并跳转首页（不弹错误提示，避免“数据加载失败”等干扰）
 function clearAuthAndRedirect() {
-  Cookies.remove('cdiom_token')
+  // 多用户登录页（新标签）401 时不应清空全局 Cookie，避免误踢其他标签页主账号
+  if (!isMultiLoginMode()) {
+    Cookies.remove('cdiom_token')
+    Cookies.remove('cdiom_user')
+  }
   sessionStorage.removeItem('cdiom_token')
   sessionStorage.removeItem('cdiom_user')
   sessionStorage.removeItem('cdiom_multi_login')

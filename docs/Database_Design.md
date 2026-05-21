@@ -24,40 +24,49 @@
 - **字符集**：utf8mb4
 - **排序规则**：utf8mb4_unicode_ci
 - **存储引擎**：InnoDB
-- **总表数**：21张（包含系统表、权限表、业务表、扩展表）
+- **表数量说明**：**仅执行 `init_simple.sql` 时创建 20 张表**（系统表 6、权限关联表 3、业务表 10、`favorite_drug` 1）。按项目 [README.md](../README.md) 继续执行 `create_supplier_drug_relation.sql`、`add_user_permission_system.sql`、`create_supplier_approval_tables.sql`、`create_price_agreement_tables.sql` 及按需的 `migration_*.sql` 后，表会继续增加；**常见完整部署约 29 张**，最终以实例库 `SHOW TABLES` 为准。
 
 ---
 
 ## 数据库表分类
 
-### 系统表（6张）
-1. `sys_role` - 系统角色表
-2. `sys_user` - 系统用户表
-3. `sys_config` - 系统参数配置表
-4. `sys_notice` - 系统通知公告表
-5. `operation_log` - 操作日志表
-6. `login_log` - 登录日志表
+以下按 **`init_simple.sql`（20 张表）** 与 **常见扩展脚本** 区分，避免与历史文档中「21 张」等笼统表述混淆。
 
-### 权限表（4张）
-7. `sys_user_role` - 用户角色关联表
-8. `sys_permission` - 权限表
-9. `sys_role_permission` - 角色权限关联表
-10. `sys_user_permission` - 用户权限关联表（支持用户直接拥有权限，v1.5.0新增）
+### `init_simple.sql` 内：系统表（6）
+- `sys_role` - 系统角色表  
+- `sys_user` - 系统用户表  
+- `sys_config` - 系统参数配置表  
+- `sys_notice` - 系统通知公告表  
+- `operation_log` - 操作日志表  
+- `login_log` - 登录日志表  
 
-### 业务表（10张）
-11. `supplier` - 供应商表
-12. `drug_info` - 药品信息表
-13. `supplier_drug` - 供应商-药品关联表（支持多对多关系）
-14. `inventory` - 库存表（按批次管理）
-15. `purchase_order` - 采购订单表
-16. `purchase_order_item` - 采购订单明细表
-17. `inbound_record` - 入库记录表
-18. `outbound_apply` - 出库申请表
-19. `outbound_apply_item` - 出库申请明细表
-20. `inventory_adjustment` - 库存调整记录表
+### `init_simple.sql` 内：权限关联表（3）
+- `sys_user_role` - 用户角色关联表  
+- `sys_permission` - 权限表  
+- `sys_role_permission` - 角色权限关联表  
 
-### 扩展表（1张）
-21. `favorite_drug` - 常用药品收藏表（功能待实现）
+### `init_simple.sql` 内：业务表（10）
+- `supplier` - 供应商表  
+- `drug_info` - 药品信息表  
+- `inventory` - 库存表（按批次管理）  
+- `purchase_order` - 采购订单表  
+- `purchase_order_item` - 采购订单明细表  
+- `inbound_receipt_batch` - 采购到货批次头表  
+- `inbound_record` - 入库记录表  
+- `outbound_apply` - 出库申请表  
+- `outbound_apply_item` - 出库申请明细表  
+- `inventory_adjustment` - 库存调整记录表  
+
+### `init_simple.sql` 内：占位表（1）
+- `favorite_drug` - 常用药品收藏表（功能待实现）
+
+### 常见扩展脚本（不在 `init_simple.sql` 中）
+- **`sys_user_permission`**：`add_user_permission_system.sql`（用户直接权限）  
+- **`supplier_drug`**：`create_supplier_drug_relation.sql`  
+- **供应商审核、黑名单、审核日志、价格预警配置等**：`create_supplier_approval_tables.sql`  
+- **价格协议与价格历史**：`create_price_agreement_tables.sql`（`supplier_drug_agreement`、`supplier_drug_price_history` 等）  
+
+旧库升级还可按需执行 `migration_*.sql`、`patch_*.sql` 等，**表名与字段以 `cdiom_backend/src/main/resources/db/` 中实际脚本为准**。
 
 ### 核心表说明
 
@@ -920,8 +929,8 @@ WHERE order_id = ? AND drug_id = ?
 ## 注意事项
 
 ### 数据库相关
-1. **数据库密码**：需要修改 `application.yml` 中的数据库密码为实际密码
-2. **初始化脚本**：推荐使用 `init_simple.sql`，已包含所有21张表的创建语句
+1. **数据库密码**：在 **`application-local.yml`**（或当前激活的 profile 对应文件）中配置数据源用户名与密码；勿将生产密码提交到 Git
+2. **初始化脚本**：推荐使用 `init_simple.sql`，**一次性创建上述 20 张基础表**；扩展表请按 [README.md](../README.md) 与 `db/README.md` 继续执行对应 `.sql`
 3. **字符集**：数据库和表都使用 utf8mb4，支持中文和特殊字符
 4. **外键约束**：所有外键都设置了约束，删除时注意级联关系
 
@@ -938,6 +947,6 @@ WHERE order_id = ? AND drug_id = ?
 
 ---
 
-**文档版本**: v1.1.1  
-**最后更新**: 2026年3月29日
+**文档版本**: v1.2.0  
+**最后更新**: 2026年4月25日
 

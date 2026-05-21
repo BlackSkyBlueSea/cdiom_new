@@ -121,7 +121,7 @@ INSERT INTO sys_role (id, role_name, role_code, description, status) VALUES
 ON DUPLICATE KEY UPDATE role_name=VALUES(role_name), description=VALUES(description);
 
 INSERT INTO sys_user (id, username, phone, password, role_id, status) VALUES
-(1, 'admin', '17728770236', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iwK8pJ5C', 1, 1)
+(1, 'admin', '17728770236', '$2a$10$miCOohBEJc0JYzL7OLFgQOTUQETRofEoR46sXfOmiG7MeBzyblhHm', 1, 1)
 ON DUPLICATE KEY UPDATE username=VALUES(username);
 
 INSERT INTO sys_config (config_name, config_key, config_value, config_type, remark) VALUES

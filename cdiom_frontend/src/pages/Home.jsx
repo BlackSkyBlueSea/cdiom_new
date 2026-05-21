@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Card, Row, Col, Typography, Space, Button, Divider, Dropdown } from 'antd';
 import { CheckCircleOutlined, RocketOutlined, ApiOutlined, SafetyOutlined, UserOutlined, LogoutOutlined, UserSwitchOutlined } from '@ant-design/icons';
 import { getUserInfo, clearAuth } from '../utils/auth';
@@ -13,13 +13,14 @@ const { Title, Paragraph, Text } = Typography;
 
 function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userInfo, setUserInfo] = useState(getUserInfo());
   const [loginModalVisible, setLoginModalVisible] = useState(false);
 
-  // 监听用户信息变化（登录/登出后刷新）
+  // 进入首页时同步登录态（从 /app 退出后仍会挂载本页，须与 storage/Cookie 一致）
   useEffect(() => {
     setUserInfo(getUserInfo());
-  }, []);
+  }, [location.pathname]);
 
   // 组件挂载时允许页面滚动，卸载时恢复
   useEffect(() => {
@@ -133,7 +134,7 @@ function Home() {
       <Header className="home-header">
         <div className="header-content">
           <Title level={3} style={{ margin: 0, color: '#fff' }}>
-            CDIOM 医药管理系统
+            基于React框架的临床药品出入库管理系统
           </Title>
           <Space>
             {userInfo ? (
@@ -155,7 +156,7 @@ function Home() {
         <div className="hero-section">
           <div className="hero-content">
             <Title level={1} className="hero-title">
-              欢迎使用 CDIOM 医药管理系统
+              欢迎使用药品出入库管理系统
             </Title>
             <Paragraph className="hero-description">
               专业的医药库存管理系统，提供完整的药品管理、库存监控、合规追踪等功能
@@ -241,7 +242,7 @@ function Home() {
 
       <Footer className="home-footer" style={{ textAlign: 'center' }}>
         <Text type="secondary">
-          CDIOM 医药管理系统 © 2026 Created by CDIOM Team
+          基于React框架的临床药品出入库管理系统 © 2026 Created by CDIOM Team
         </Text>
       </Footer>
 

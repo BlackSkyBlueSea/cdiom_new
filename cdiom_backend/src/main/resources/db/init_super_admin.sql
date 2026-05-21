@@ -15,7 +15,7 @@ ON DUPLICATE KEY UPDATE `role_name`=VALUES(`role_name`), `description`=VALUES(`d
 -- 默认状态为停用（status=0），需要通过邮箱验证码启用
 -- 邮箱地址必须填写，用于启用/禁用操作的验证
 INSERT INTO `sys_user` (`id`, `username`, `phone`, `email`, `password`, `role_id`, `status`) VALUES
-(2, 'super_admin', '13827679411', 'super_admin@example.com', '$2a$10$eg7i1ScmdK5C37VOaZygqeIFzixxCZbTbyTzDlw38UBj/m2sDMv1O', 6, 0)
+(2, 'super_admin', '13827679411', 'super_admin@example.com', '$2a$10$PYyQVNzrbGajEGa.7XPIzu83vpo6WXZfEDvakWbeaale7ExoBTEIm', 6, 0)
 ON DUPLICATE KEY UPDATE `username`=VALUES(`username`), `role_id`=VALUES(`role_id`), `email`=VALUES(`email`);
 
 -- ============================================
@@ -26,7 +26,7 @@ ON DUPLICATE KEY UPDATE `username`=VALUES(`username`), `role_id`=VALUES(`role_id
 
 -- 更新超级管理员密码
 UPDATE `sys_user` 
-SET `password` = '$2a$10$Auw2d3qwXVL4nPEQYJWEmeNFOc/XLoBX9iAI1S0frvxblfm3.CBYG',
+SET `password` = '$2a$10$PYyQVNzrbGajEGa.7XPIzu83vpo6WXZfEDvakWbeaale7ExoBTEIm',
     `update_time` = NOW()
 WHERE `id` = 2 
   AND `username` = 'super_admin';

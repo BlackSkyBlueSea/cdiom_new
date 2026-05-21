@@ -100,6 +100,10 @@
   - 仓库仪表盘近效期明细接口、`SecurityHeadersFilter`、用户列表按 `permissionId` 筛选
   - 与 [API_Documentation.md](./API_Documentation.md)、[CHANGELOG.md](./CHANGELOG.md) 的对应关系
 
+#### UPDATE_LOG_20260425.md
+- **内容**：`docs/` 全量与当前工作区代码对齐（2026-04-25）
+- **包含**：`Project_Structure` / `Database_Design` / `Function_Modules` / `Code_Completeness_Report` / `Deployment_Guide` / `CHANGELOG` / `README` 索引等修订摘要
+
 ---
 
 ### 🚀 五、部署和运维
@@ -204,6 +208,29 @@
 
 ---
 
+### 八、专项方案、修复记录与杂项（与代码/运维相关）
+
+下列文件与上文「流程分类」交叉引用，按主题集中列出，便于检索：
+
+| 文件 | 主题 |
+|------|------|
+| [SECURITY_CONFIG.md](./SECURITY_CONFIG.md) | 安全配置说明 |
+| [QUICK_FIX_SECURITY.md](./QUICK_FIX_SECURITY.md) | 安全快速修复 |
+| [GIT_ENCODING_SOLUTION.md](./GIT_ENCODING_SOLUTION.md) | Git 中文编码与提交说明 |
+| [Pad_Responsive_Optimization_Guide.md](./Pad_Responsive_Optimization_Guide.md) | Pad 端响应式优化 |
+| [README_EMAIL_FIELD.md](./README_EMAIL_FIELD.md) | 用户邮箱字段与验证 |
+| [README_Approval_System.md](./README_Approval_System.md) | 审批系统说明 |
+| [Drug_Data_Import_Guide.md](./Drug_Data_Import_Guide.md) | 药品数据导入 |
+| [Drug_Data_Retrieval_Troubleshooting_Guide.md](./Drug_Data_Retrieval_Troubleshooting_Guide.md) | 药品数据拉取排查 |
+| [Complete_Price_Management_Solution.md](./Complete_Price_Management_Solution.md) / [Price_Agreement_Management_Solution.md](./Price_Agreement_Management_Solution.md) | 价格与协议管理方案 |
+| [Supplier_Approval_Anti_Corruption_Solution.md](./Supplier_Approval_Anti_Corruption_Solution.md) / [Optimized_Approval_Process_Guide.md](./Optimized_Approval_Process_Guide.md) | 供应商审批与流程优化 |
+| [Order_Number_Concurrency_Fix_Report.md](./Order_Number_Concurrency_Fix_Report.md) / [Circular_Dependency_Fix_Report.md](./Circular_Dependency_Fix_Report.md) / [Form_Parameter_Mapping_Report.md](./Form_Parameter_Mapping_Report.md) | 并发、循环依赖、表单映射等问题修复 |
+| [Login_Lock_Mechanism_Fix_Report.md](./Login_Lock_Mechanism_Fix_Report.md) / [HikariCP_Housekeeper_Thread_Starvation_Fix.md](./HikariCP_Housekeeper_Thread_Starvation_Fix.md) | 登录锁、连接池线程等问题 |
+| [UPDATE_LOG_20260120.md](./UPDATE_LOG_20260120.md) / [UPDATE_LOG_20260328.md](./UPDATE_LOG_20260328.md) / [UPDATE_LOG_20260309_Outbound_Dashboard.md](./UPDATE_LOG_20260309_Outbound_Dashboard.md) / [UPDATE_LOG_20260406.md](./UPDATE_LOG_20260406.md) | 按日期的开发/变更记录 |
+| [20260115_TOMORROW_PLAN.md](./20260115_TOMORROW_PLAN.md) / [20260120-今日任务.md](./20260120-今日任务.md) | 内部计划与任务备忘 |
+
+---
+
 ## 📖 文档使用建议
 
 ### 新开发者入门
@@ -221,7 +248,7 @@
 - 参考 **System_Test_Report.md** 进行测试
 - 参考 **Deployment_Guide.md** 进行系统部署
 - 参考 **CHANGELOG.md** 了解版本变更
-- 近期增量可查阅 **UPDATE_LOG_20260309_Outbound_Dashboard.md**、**UPDATE_LOG_20260328.md**、**UPDATE_LOG_20260406.md**
+- 近期增量可查阅 **UPDATE_LOG_20260309_Outbound_Dashboard.md**、**UPDATE_LOG_20260328.md**、**UPDATE_LOG_20260406.md**、**UPDATE_LOG_20260425.md**
 
 ---
 
@@ -235,9 +262,9 @@
 
 **文档创建时间**：2026年1月13日 10:31:17  
 **最后修改时间**：2026年1月20日  
-**当前更新时间**：2026年4月6日  
-**文档版本**：v1.7.0
+**当前更新时间**：2026年4月25日  
+**文档版本**：v1.7.1
 
 ---
 
-**最后更新**：2026年4月6日
+**最后更新**：2026年4月25日

@@ -52,7 +52,7 @@ const LoginModal = ({ open, onClose, onSuccess, multiLogin = false }) => {
 
   return (
     <Modal
-      title={multiLogin ? "登录其他账号 - CDIOM 医药管理系统" : "登录 CDIOM 医药管理系统"}
+      title={multiLogin ? "登录其他账号 - 基于React框架的临床药品出入库管理系统" : "登录 基于React框架的临床药品出入库管理系统"}
       open={open}
       onCancel={onClose}
       footer={null}

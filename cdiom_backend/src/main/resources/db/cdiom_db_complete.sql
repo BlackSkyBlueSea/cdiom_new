@@ -495,7 +495,7 @@ ON DUPLICATE KEY UPDATE `role_name`=VALUES(`role_name`), `description`=VALUES(`d
 -- 插入系统管理员用户（密码：admin123，BCrypt加密后的值）
 -- 注意：实际使用时需要替换为BCrypt加密后的密码
 INSERT INTO `sys_user` (`id`, `username`, `phone`, `password`, `role_id`, `status`) VALUES
-(1, 'admin', '17728770236', '$2a$10$7WcJvZ.NHjMA8fadvg6qPeGeHnW0nfzZK2uKLIeaYXN2Rm.dunUIO', 1, 1)
+(1, 'admin', '17728770236', '$2a$10$miCOohBEJc0JYzL7OLFgQOTUQETRofEoR46sXfOmiG7MeBzyblhHm', 1, 1)
 ON DUPLICATE KEY UPDATE `username`=VALUES(`username`);
 
 -- 插入系统参数配置

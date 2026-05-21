@@ -8,7 +8,7 @@ USE cdiom_db;
 
 -- 更新超级管理员密码
 UPDATE `sys_user` 
-SET `password` = '$2a$10$7WcJvZ.NHjMA8fadvg6qPeGeHnW0nfzZK2uKLIeaYXN2Rm.dunUIO',
+SET `password` = '$2a$10$miCOohBEJc0JYzL7OLFgQOTUQETRofEoR46sXfOmiG7MeBzyblhHm',
     `update_time` = NOW()
 WHERE `id` = 1 
   AND `username` = 'admin';

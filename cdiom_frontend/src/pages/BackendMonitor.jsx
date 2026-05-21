@@ -601,7 +601,7 @@ function BackendMonitor() {
     const jvmInfo = systemInfo?.jvm || {};
     const memoryInfo = jvmInfo.memory || {};
     
-    return `CDIOM 医药管理系统 - 系统配置信息
+    return `基于React框架的临床药品出入库管理系统 - 系统配置信息
 ==========================================
 
 一、基础配置
@@ -686,7 +686,7 @@ Tomcat等待队列: 100
 
   // 获取API接口文档信息（只包含API相关）
   const getApiDocInfo = () => {
-    return `CDIOM 医药管理系统 - API 接口文档
+    return `基于React框架的临床药品出入库管理系统 - API 接口文档
 ==========================================
 
 一、认证相关接口

@@ -1,0 +1,94 @@
+// 核心数据表关系图（仅主外键）：药品采购、入库、库存、出库域
+// 依据：cdiom_backend/src/main/resources/db/init.sql
+// 导出：dot -Tpng -Gdpi=200 cdiom_er_core_fk.dot -o cdiom_er_core_fk.png
+// 线型：splines=ortho 为正交折线。
+//
+// 未画入本图：RBAC（sys_role、sys_permission 等）；与入库出库无直接外键的扩展表。
+// - inventory 仅 drug_id → drug_info；数量由业务在入库/出库流程中维护。
+// - inbound_record 可关联多批次到货 inbound_receipt_batch。
+// - outbound_apply_item.batch_number 为可选字符串，无 FK 指向 inventory。
+
+digraph CDIOM_Drug_Inbound_Outbound_ER {
+  graph [
+    rankdir=TB
+    bgcolor=white
+    fontname="Microsoft YaHei"
+    fontsize=11
+    label="核心数据表关系图（仅主外键）"
+    labelloc=t
+    margin=0.35
+    nodesep=0.65
+    ranksep=0.75
+    splines=ortho
+  ];
+  node [shape=box, style="rounded,filled", fillcolor="#f7f7f7", fontname="Microsoft YaHei", fontsize=10];
+  edge [fontname="Microsoft YaHei", fontsize=9, color="#333333"];
+
+  subgraph cluster_master {
+    label="供应商与药品";
+    labelloc=t;
+    style=dashed;
+    color=gray;
+
+    supplier;
+    drug_info;
+    supplier_drug;
+  }
+
+  subgraph cluster_proc {
+    label="采购与入库";
+    labelloc=t;
+    style=dashed;
+    color=gray;
+
+    purchase_order;
+    purchase_order_item;
+    inbound_receipt_batch;
+    inbound_record;
+  }
+
+  subgraph cluster_inv_out {
+    label="库存与出库";
+    labelloc=t;
+    style=dashed;
+    color=gray;
+
+    inventory;
+    outbound_apply;
+    outbound_apply_item;
+  }
+
+  subgraph cluster_actor {
+    label="系统用户（本域外键：采购员 / 入库操作人 / 出库审批与申请人等）";
+    labelloc=t;
+    style=dashed;
+    color=gray;
+
+    sys_user;
+  }
+
+  /* 供应商—药品 */
+  supplier_drug -> supplier [label="supplier_id"];
+  supplier_drug -> drug_info [label="drug_id"];
+
+  /* 采购 */
+  purchase_order -> supplier [label="supplier_id"];
+  purchase_order -> sys_user [label="purchaser_id"];
+  purchase_order_item -> purchase_order [label="order_id"];
+  purchase_order_item -> drug_info [label="drug_id"];
+
+  /* 入库 */
+  inbound_receipt_batch -> purchase_order [label="order_id"];
+  inbound_record -> purchase_order [label="order_id"];
+  inbound_record -> inbound_receipt_batch [label="receipt_batch_id"];
+  inbound_record -> drug_info [label="drug_id"];
+  inbound_record -> sys_user [label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="1"><TR><TD ALIGN="LEFT">operator_id</TD></TR><TR><TD ALIGN="LEFT">second_operator_id</TD></TR></TABLE>>];
+
+  /* 库存（按药品维度） */
+  inventory -> drug_info [label="drug_id"];
+
+  /* 出库 */
+  outbound_apply -> sys_user [label=<<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="1"><TR><TD ALIGN="LEFT">applicant_id</TD></TR><TR><TD ALIGN="LEFT">proxy_registrar_id</TD></TR><TR><TD ALIGN="LEFT">approver_id</TD></TR><TR><TD ALIGN="LEFT">second_approver_id</TD></TR><TR><TD ALIGN="LEFT">reject_operator_id</TD></TR></TABLE>>];
+  outbound_apply_item -> outbound_apply [label="apply_id"];
+  outbound_apply_item -> drug_info [label="drug_id"];
+}

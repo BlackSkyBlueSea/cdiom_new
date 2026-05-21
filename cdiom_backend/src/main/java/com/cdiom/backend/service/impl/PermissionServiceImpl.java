@@ -51,14 +51,23 @@ public class PermissionServiceImpl implements PermissionService {
                 return new HashSet<>(List.of("*")); // 通配符表示所有权限
             }
             
-            // 查询用户的所有权限（角色权限 + 用户直接权限）
+            // 查询用户的所有权限（角色权限 + 用户直接权限，或仅自定义清单）
             List<String> permissionCodes = permissionMapper.selectAllPermissionCodesByUserId(userId);
-            if (CollectionUtils.isEmpty(permissionCodes)) {
-                log.debug("用户 {} 没有配置权限，返回空权限集合", userId);
-                return new HashSet<>();
+            Set<String> permissions = new HashSet<>();
+            if (!CollectionUtils.isEmpty(permissionCodes)) {
+                permissions.addAll(permissionCodes);
             }
-            
-            return new HashSet<>(permissionCodes);
+            // 系统管理员（角色 1）且未启用「仅自定义权限」：保证具备日志查看权（与 init_permissions 中角色 1 一致，避免 sys_role_permission 漏配导致无法审计）
+            boolean customized =
+                    user.getPermissionCustomized() != null && user.getPermissionCustomized() == 1;
+            if (user.getRoleId() != null && user.getRoleId() == 1L && !customized) {
+                permissions.add("log:operation:view");
+                permissions.add("log:login:view");
+            }
+            if (permissions.isEmpty()) {
+                log.debug("用户 {} 没有配置权限，返回空权限集合", userId);
+            }
+            return permissions;
         } catch (Exception e) {
             log.error("获取用户权限失败，userId: {}", userId, e);
             return new HashSet<>();

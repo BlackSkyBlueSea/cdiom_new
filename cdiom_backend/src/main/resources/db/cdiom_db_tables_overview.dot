@@ -1,0 +1,140 @@
+// 库表总览（与 init.sql 中全部 CREATE TABLE 一致）
+// 黑灰白风格；cluster margin 控制圆角表格外缘与虚线框间距。
+// ranksep（英寸）是层间「最小」间距；真实缝 = max(ranksep, 排版约束)。ranksep 过小且节点设了 height 时，易与文字高度打架，出现压扁或缝忽大忽小。
+// 勿加 equally，否则短列缝易被均匀拉大。
+// nodesep：同一层上各列圆角框之间的水平间距（列与列之间）。
+// 勿对「不同 cluster」内首节点使用全局 rank=same，否则首格易被画在虚线框外。
+// 导出：dot -Tpng -Gdpi=200 cdiom_db_tables_overview.dot -o cdiom_db_tables_overview.png
+
+digraph CDIOM_DB_Tables_Overview {
+  graph [
+    rankdir=TB
+    bgcolor=white
+    fontname="Microsoft YaHei"
+    fontsize=9
+    fontcolor="#1a1a1a"
+    label="库表总览"
+    labelloc=t
+    nodesep=0.6
+    ranksep=0.032
+    margin=0.18
+    splines=none
+  ];
+  node [
+    shape=box
+    style="rounded,filled"
+    fillcolor="#f0f0f0"
+    color="#1a1a1a"
+    penwidth=0.9
+    fontname="Consolas"
+    fontsize=5
+    fontcolor="#000000"
+    margin="0.06,0.018"
+  ];
+  edge [style=invis, weight=100];
+
+  subgraph cluster_1 {
+    margin=8;
+    label="系统核心";
+    labelloc=t;
+    fontsize=7;
+    fontname="Microsoft YaHei";
+    fontcolor="#000000";
+    style="rounded,dashed";
+    color="#2a2a2a";
+    fillcolor="#d0d0d0";
+
+    sys_role;
+    sys_user;
+    sys_config;
+    sys_notice;
+    operation_log;
+    login_log;
+  }
+
+  subgraph cluster_2 {
+    margin=8;
+    label="权限控制";
+    labelloc=t;
+    fontsize=7;
+    fontname="Microsoft YaHei";
+    fontcolor="#000000";
+    style="rounded,dashed";
+    color="#2a2a2a";
+    fillcolor="#d0d0d0";
+
+    sys_user_role;
+    sys_permission;
+    sys_role_permission;
+    sys_user_permission;
+  }
+
+  subgraph cluster_3 {
+    margin=8;
+    label="供货数据";
+    labelloc=t;
+    fontsize=7;
+    fontname="Microsoft YaHei";
+    fontcolor="#000000";
+    style="rounded,dashed";
+    color="#2a2a2a";
+    fillcolor="#d0d0d0";
+
+    supplier;
+    drug_info;
+    supplier_drug_agreement;
+    supplier_drug;
+    supplier_drug_price_history;
+  }
+
+  subgraph cluster_4 {
+    margin=8;
+    label="仓储业务";
+    labelloc=t;
+    fontsize=7;
+    fontname="Microsoft YaHei";
+    fontcolor="#000000";
+    style="rounded,dashed";
+    color="#2a2a2a";
+    fillcolor="#d0d0d0";
+
+    inventory;
+    purchase_order;
+    purchase_order_item;
+    inbound_receipt_batch;
+    inbound_record;
+    outbound_apply;
+    outbound_apply_item;
+    inventory_adjustment;
+    favorite_drug;
+  }
+
+  subgraph cluster_5 {
+    margin=8;
+    label="准入审批";
+    labelloc=t;
+    fontsize=7;
+    fontname="Microsoft YaHei";
+    fontcolor="#000000";
+    style="rounded,dashed";
+    color="#2a2a2a";
+    fillcolor="#d0d0d0";
+
+    supplier_approval_application;
+    supplier_approval_item;
+    supplier_blacklist;
+    price_warning_config;
+    supplier_approval_log;
+  }
+
+  /* 各分区内部：自上而下竖链 */
+  sys_role -> sys_user -> sys_config -> sys_notice -> operation_log -> login_log;
+  sys_user_role -> sys_permission -> sys_role_permission -> sys_user_permission;
+  supplier -> drug_info -> supplier_drug_agreement -> supplier_drug -> supplier_drug_price_history;
+  inventory -> purchase_order -> purchase_order_item -> inbound_receipt_batch -> inbound_record
+    -> outbound_apply -> outbound_apply_item -> inventory_adjustment -> favorite_drug;
+  supplier_approval_application -> supplier_approval_item -> supplier_blacklist -> price_warning_config
+    -> supplier_approval_log;
+
+  supplier_approval_application [margin="0.15,0.018"];
+}

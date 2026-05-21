@@ -24,8 +24,7 @@ cdiom_new/
 ├── docs/                       # 项目文档目录
 ├── py/                         # Python工具脚本目录
 ├── README.md                   # 项目主文档
-├── 项目进度.md                 # 项目进度文档
-└── 插图位置检查报告.md         # 插图位置检查报告
+└── 项目进度.md                 # 项目进度文档
 ```
 
 ---
@@ -95,7 +94,8 @@ cdiom_backend/
     │   │   ├── IpLocationServiceImpl.java       # IP定位服务实现：登录地点识别
     │   │   ├── YuanyanyaoServiceImpl.java       # 万维易源API服务实现：药品信息查询
     │   │   ├── JisuApiServiceImpl.java          # 极速数据API服务实现：药品信息查询
-    │   │   └── PriceWarningServiceImpl.java     # 价格预警服务实现：价格预警检查
+    │   │   ├── PriceWarningServiceImpl.java     # 价格预警服务实现：价格预警检查
+    │   │   └── InboundSecondConfirmMailNotifier.java # 入库二次确认邮件通知（辅助 Bean）
     │   │
     │   ├── AuthService.java                     # 认证服务接口
     │   ├── SysUserService.java                  # 用户管理服务接口
@@ -123,7 +123,7 @@ cdiom_backend/
     │   ├── YuanyanyaoService.java               # 万维易源API服务接口
     │   ├── JisuApiService.java                  # 极速数据API服务接口
     │   ├── PriceWarningService.java             # 价格预警服务接口
-    │   └── BackendMonitorService.java            # 后端监控服务接口
+    │   └── BackendMonitorService.java            # 后端监控服务（`@Service` 具体类，无单独 *Service 接口）
     │
     ├── mapper/                                  # 数据访问层（MyBatis Mapper接口）
     │   ├── SysUserMapper.java                   # 用户Mapper：用户数据操作
@@ -183,7 +183,11 @@ cdiom_backend/
     │   ├── SupplierDrugAgreement.java           # 供应商药品协议实体：对应supplier_drug_agreement表
     │   ├── SupplierDrugPriceHistory.java        # 供应商药品价格历史实体：对应supplier_drug_price_history表
     │   ├── PriceWarningConfig.java              # 价格预警配置实体：价格预警规则配置
-    │   └── PriceWarningResult.java               # 价格预警结果实体：价格预警检查结果
+    │   ├── PriceWarningResult.java               # 价格预警结果实体：价格预警检查结果
+    │   └── vo/                                  # 非表 VO / 查询结果对象
+    │       ├── InboundSplitResult.java
+    │       ├── OrderInboundRemainingRow.java
+    │       └── SupplierDrugVO.java
     │
     ├── config/                                  # 配置类（Spring配置）
     │   ├── SecurityConfig.java                  # Spring Security配置：安全策略、认证授权配置
@@ -197,11 +201,14 @@ cdiom_backend/
     │   ├── WebSocketConfig.java                 # WebSocket配置：WebSocket连接配置
     │   ├── LogAppenderInitializer.java          # 日志追加器初始化：日志系统初始化
     │   ├── WebSocketLogAppender.java            # WebSocket日志追加器：实时日志推送
+    │   ├── PermissionWebMvcConfig.java          # 权限拦截器 WebMvc 注册
     │   ├── filter/                              # 过滤器目录
     │   │   ├── SecurityHeadersFilter.java       # 安全响应头（如 X-Content-Type-Options 等）
     │   │   └── JwtAuthenticationFilter.java     # JWT认证过滤器：Token验证、用户信息注入（Authorization 优先于 Cookie）
-    │   └── interceptor/                         # 拦截器目录
-    │       └── PermissionInterceptor.java       # 权限拦截器：接口级权限验证
+    │   ├── interceptor/                         # 拦截器目录
+    │   │   └── PermissionInterceptor.java       # 权限拦截器：接口级权限验证
+    │   └── security/                            # Security 辅助
+    │       └── JsonUnauthorizedAuthenticationEntryPoint.java # 未认证 JSON 响应
     │
     ├── common/                                  # 公共类目录
     │   ├── Result.java                          # 统一响应结果类：API响应格式封装
@@ -238,7 +245,7 @@ cdiom_backend/
     └── db/                                      # 数据库脚本目录
         ├── README.md                            # 数据库脚本说明文档：脚本使用指南
         │
-        ├── init_simple.sql                      # 简化初始化脚本（推荐）⭐：基础表结构创建（19张表）
+        ├── init_simple.sql                      # 简化初始化脚本（推荐）⭐：基础表结构创建（当前脚本内 20 张表）
         ├── init.sql                             # 完整初始化脚本（带注释）：完整数据库初始化
         ├── cdiom_db_complete.sql                # 完整数据库脚本：数据库完整结构
         │
@@ -266,7 +273,21 @@ cdiom_backend/
         ├── fix_operation_log_permission.sql     # 修复操作日志权限脚本：操作日志权限修复
         │
         ├── drug_info_insert.sql                 # 药品信息数据导入脚本：药品数据批量导入
-        └── update_admin_password.sql            # 更新管理员密码脚本：管理员密码更新
+        ├── update_admin_password.sql            # 更新管理员密码脚本：管理员密码更新
+        │
+        ├── migration_inbound_receipt_batch.sql  # 历史库补建 inbound_receipt_batch（新环境已含于 init_simple）
+        ├── migration_inbound_disposition.sql    # 入库不合格处置等字段迁移
+        ├── migration_inbound_second_confirm.sql # 入库二次确认相关字段迁移
+        ├── migration_inbound_storage_location.sql
+        ├── migration_outbound_second_approval.sql
+        ├── migration_outbound_proxy_apply.sql
+        ├── patch_outbound_apply_proxy_column_only.sql
+        ├── add_user_permission_customized.sql
+        ├── update_supplier_status_semantic.sql
+        ├── grant_supplier_purchase_view.sql
+        ├── optimize_indexes.sql                 # 索引优化（按需）
+        ├── check_indexes.sql                    # 索引检查（按需）
+        └── （说明：`db/` 目录当前共 **35** 个 `.sql` 文件；上表列常用项，未逐一枚举者以目录为准）
 ```
 
 ---
@@ -296,7 +317,11 @@ cdiom_frontend/
 │   │   ├── PurchaseOrderManagement.jsx          # 采购订单管理页面：订单CRUD、状态流转、条形码
 │   │   ├── SupplierManagement.jsx              # 供应商管理页面：供应商CRUD、审核、关联管理
 │   │   ├── SupplierDashboard.jsx               # 供应商仪表盘页面：供应商专用数据统计
-│   │   └── SupplierOrderManagement.jsx         # 供应商订单管理页面：供应商订单查看、管理
+│   │   ├── SupplierOrderManagement.jsx       # 供应商订单管理页面：供应商订单查看、管理
+│   │   └── SupplierDrugManage.jsx            # 供应商-药品关联管理页（路由 `supplier-drugs`）
+│   │
+│   ├── config/                                 # 前端配置
+│   │   └── appAccessPolicy.js                # 访问策略（与路由/权限配合）
 │   │
 │   ├── components/                             # 公共组件目录
 │   │   ├── Layout.jsx                          # 主布局组件：侧边栏、顶部导航、路由容器
@@ -326,6 +351,8 @@ cdiom_frontend/
 ├── vite.config.js                              # Vite配置文件：构建工具配置、代理配置
 └── package.json                                # 依赖配置文件：项目依赖、脚本命令配置
 ```
+
+> **补充**：`src/pages` 下部分业务页面另有同名样式文件（如 `Home.less`、`Dashboard.css`、`Login.css`、`BackendMonitor.less`），与对应 `.jsx` 同级。
 
 ---
 
@@ -389,7 +416,8 @@ docs/
 │   ├── CHANGELOG.md                            # 版本历史文档：所有版本的完整更新内容，包括功能更新、bug修复等
 │   ├── UPDATE_LOG_20260309_Outbound_Dashboard.md # 出库/审批/仪表盘等变更记录（2026-03-08～09）
 │   ├── UPDATE_LOG_20260328.md                  # 系统参数/JWT/日志保留/布局等变更记录（2026-03-28）
-│   └── UPDATE_LOG_20260406.md                  # 药品/入库批次/仪表盘明细等文档对齐（2026-04-06）
+│   ├── UPDATE_LOG_20260406.md                  # 药品/入库批次/仪表盘明细等文档对齐（2026-04-06）
+│   └── UPDATE_LOG_20260425.md                  # docs 全量与代码对齐（2026-04-25）
 │
 ├── 🚀 部署和运维/
 │   └── Deployment_Guide.md                     # 部署指南：开发环境部署、生产环境部署、Nginx配置等
@@ -409,7 +437,7 @@ docs/
     └── Drug_Data_Retrieval_Troubleshooting_Guide.md # 药品数据获取问题排查指南
 ```
 
-> 📖 **详细说明**：更多文档说明请参考 [docs/README.md](./README.md)
+> 📖 **详细说明**：更多文档说明与 **专项方案 / 修复报告 / 任务备忘** 完整清单请参考 [docs/README.md](./README.md)（含「八、专项方案、修复记录与杂项」表格）。
 
 ---
 
@@ -468,7 +496,7 @@ docs/
 
 #### styles/ - 样式文件
 - **职责**：全局样式、响应式样式
-- **包含**：`pad-responsive.css`（Pad端响应式样式）
+- **包含**：`pad-responsive.css`（Pad端响应式样式）；业务页面级样式见各 `pages/*.css` / `pages/*.less`
 
 ---
 
@@ -478,23 +506,24 @@ docs/
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| Controller | 23 | RESTful API控制器 |
-| Service接口 | 26 | 业务服务接口 |
-| Service实现 | 26 | 业务服务实现 |
+| Controller | 23 | RESTful API控制器（含 `LogWebSocketHandler`） |
+| Service接口 | 26 | 业务服务接口（不含 `BackendMonitorService`，其为具体 `@Service` 类） |
+| Service实现 | 26 | `*ServiceImpl` 等主业务实现类 |
 | Mapper | 27 | 数据访问层接口 |
-| Model | 29 | 实体类（含到货批次等；另有 `model/vo` 下非表 VO） |
-| Config | 11 | 配置类 |
+| Model | 32 | `model` 包内 Java 文件（含表实体与 `model/vo` 下 VO） |
+| Config | 16 | `config` 包内顶层与 `filter`/`interceptor`/`security` 子包中的配置类 |
 | Util | 4 | 工具类 |
-| 数据库脚本 | 24 | SQL脚本文件 |
+| 数据库脚本 | 35 | `db/` 目录下 `.sql` 文件（2026-04 统计） |
 
 ### 前端文件统计
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| 页面组件 | 18 | 业务页面 |
+| 页面组件 | 19 | `src/pages` 下 `.jsx` 业务页面 |
 | 公共组件 | 5 | 可复用组件 |
-| 工具函数 | 4 | 工具函数文件 |
-| 样式文件 | 3 | CSS/Less样式文件 |
+| 工具函数 | 4 | `src/utils` 下 `request.js`、`auth.js`、`permission.js`、`logger.js` |
+| 前端配置 | 1 | `src/config/appAccessPolicy.js`（访问策略，与路由/权限配合） |
+| 样式文件 | 若干 | 全局 `index.css`/`App.css` + `styles/pad-responsive.css` + 页面级 `*.css`/`*.less` |
 
 ---
 
@@ -545,8 +574,8 @@ docs/
 
 ---
 
-**文档版本**: v1.2.0（与代码仓库 `main` 同步，含安全响应头过滤器、到货批次与药品回收站等）  
-**最后更新**: 2026年4月6日
+**文档版本**: v1.3.0（与当前工作区代码对齐：`SupplierDrugManage`、`appAccessPolicy.js`、`config` 子包、扩展 SQL 清单等）  
+**最后更新**: 2026年4月25日
 
 
 

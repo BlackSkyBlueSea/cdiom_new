@@ -43,7 +43,7 @@ const Login = () => {
 
   return (
     <div className="login-container">
-      <Card className="login-card" title={isMultiLogin ? "登录其他账号 - CDIOM 临床药品出入库管理系统" : "CDIOM 临床药品出入库管理系统"}>
+      <Card className="login-card" title={isMultiLogin ? "登录其他账号 - 基于React框架的临床药品出入库管理系统" : "基于React框架的临床药品出入库管理系统"}>
         <Form
           name="login"
           onFinish={onFinish}

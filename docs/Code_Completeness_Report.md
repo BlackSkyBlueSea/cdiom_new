@@ -3,12 +3,12 @@
 ## 文档信息
 
 **文档创建时间**：2026年1月12日 18:32:06  
-**最后修改时间**：2026年3月9日  
-**当前检查时间**：2026年3月9日  
-**文档版本**：v3.0
+**最后修改时间**：2026年4月25日  
+**当前检查时间**：2026年4月25日  
+**文档版本**：v3.1
 
 ## 检查时间
-2026年3月9日（最新更新）
+2026年4月25日（与当前工作区代码、脚本对齐）
 
 ## 一、已实现功能模块检查
 
@@ -21,7 +21,7 @@
 - ✅ Model: `SysUser.java` - 完整
 
 **功能完整性**：
-- ✅ 用户列表查询（分页、关键字搜索、角色筛选、状态筛选）
+- ✅ 用户列表查询（分页、关键字搜索、角色筛选、状态筛选、**`permissionId` 按权限筛选**）
 - ✅ 用户新增（用户名唯一性校验、密码加密）
 - ✅ 用户编辑（用户名唯一性校验、密码可选更新）
 - ✅ 用户删除（逻辑删除）
@@ -406,23 +406,24 @@
 ### ✅ 已实现的前端页面
 
 1. ✅ `Login.jsx` - 登录页面
-2. ✅ `Dashboard.jsx` - 仪表盘页面（系统管理员、仓库管理员、采购专员、医护人员、供应商多种视图）
-3. ✅ `UserManagement.jsx` - 用户管理页面
-4. ✅ `RoleManagement.jsx` - 角色管理页面
-5. ✅ `ConfigManagement.jsx` - 参数配置页面
-6. ✅ `NoticeManagement.jsx` - 通知公告页面
-7. ✅ `OperationLog.jsx` - 操作日志页面
-8. ✅ `LoginLog.jsx` - 登录日志页面
-9. ✅ `DrugManagement.jsx` - 药品信息管理页面
-10. ✅ `InventoryManagement.jsx` - 库存管理页面（列表查询、多条件筛选、近效期预警显示）
-11. ✅ `InboundManagement.jsx` - 入库管理页面
-12. ✅ `OutboundManagement.jsx` - 出库管理页面
-13. ✅ `PurchaseOrderManagement.jsx` - 采购订单管理页面
-14. ✅ `SupplierManagement.jsx` - 供应商管理页面
-15. ✅ `SupplierOrderManagement.jsx` - 供应商订单管理页面
+2. ✅ `Home.jsx` - 系统首页
+3. ✅ `Dashboard.jsx` - 仪表盘页面（系统管理员、仓库管理员、采购专员、医护人员、供应商多种视图）
+4. ✅ `UserManagement.jsx` - 用户管理页面
+5. ✅ `RoleManagement.jsx` - 角色管理页面
+6. ✅ `ConfigManagement.jsx` - 参数配置页面
+7. ✅ `NoticeManagement.jsx` - 通知公告页面
+8. ✅ `OperationLog.jsx` - 操作日志页面
+9. ✅ `LoginLog.jsx` - 登录日志页面
+10. ✅ `DrugManagement.jsx` - 药品信息管理页面
+11. ✅ `InventoryManagement.jsx` - 库存管理页面（列表查询、多条件筛选、近效期预警显示）
+12. ✅ `InboundManagement.jsx` - 入库管理页面
+13. ✅ `OutboundManagement.jsx` - 出库管理页面
+14. ✅ `PurchaseOrderManagement.jsx` - 采购订单管理页面
+15. ✅ `SupplierManagement.jsx` - 供应商管理页面
 16. ✅ `SupplierDashboard.jsx` - 供应商仪表盘页面
-17. ✅ `BackendMonitor.jsx` - 后端监控页面（WebSocket日志流、健康状态监控）
-16. ✅ `SupplierOrderManagement.jsx` - 供应商订单管理页面
+17. ✅ `SupplierOrderManagement.jsx` - 供应商订单管理页面
+18. ✅ `SupplierDrugManage.jsx` - 供应商-药品关联管理页面（路由 `supplier-drugs`）
+19. ✅ `BackendMonitor.jsx` - 后端监控页面（WebSocket日志流、健康状态监控）
 
 ---
 
@@ -430,29 +431,17 @@
 
 ### ✅ 已创建的表（数据库层面）
 
-根据 `init_simple.sql`，以下表已创建：
-1. ✅ `sys_role` - 系统角色表
-2. ✅ `sys_user` - 系统用户表
-3. ✅ `sys_config` - 系统参数配置表
-4. ✅ `sys_notice` - 系统通知公告表
-5. ✅ `operation_log` - 操作日志表
-6. ✅ `login_log` - 登录日志表
-7. ✅ `sys_user_role` - 用户角色关联表
-8. ✅ `sys_permission` - 权限表
-9. ✅ `sys_role_permission` - 角色权限关联表
-10. ✅ `supplier` - 供应商表（**后端代码已实现**）
-11. ✅ `drug_info` - 药品信息表（**后端代码已实现**）
-12. ✅ `supplier_drug` - 供应商-药品关联表（**后端代码已实现**）
-13. ✅ `inventory` - 库存表（**后端代码已实现**）
-14. ✅ `purchase_order` - 采购订单表（**后端代码已实现**）
-15. ✅ `purchase_order_item` - 采购订单明细表（**后端代码已实现**）
-16. ✅ `inbound_record` - 入库记录表（**后端代码已实现**）
-17. ✅ `outbound_apply` - 出库申请表（**后端代码已实现**）
-18. ✅ `outbound_apply_item` - 出库申请明细表（**后端代码已实现**）
-19. ✅ `inventory_adjustment` - 库存调整记录表（**后端代码已实现**）
-20. ✅ `favorite_drug` - 常用药品收藏表（**表已创建，但后端代码未实现**）
+**A. `init_simple.sql`（当前 20 张表，与脚本一致）**  
+1–9：系统表与权限关联表（`sys_role`、`sys_user`、`sys_config`、`sys_notice`、`operation_log`、`login_log`、`sys_user_role`、`sys_permission`、`sys_role_permission`）。  
+10–19：业务表（`supplier`、`drug_info`、`inventory`、`purchase_order`、`purchase_order_item`、`inbound_receipt_batch`、`inbound_record`、`outbound_apply`、`outbound_apply_item`、`inventory_adjustment`），**后端均已实现**。  
+20：`favorite_drug`（**表已建，业务功能未实现**）。
 
-**结论**：数据库表结构已完整创建，核心业务表的后端代码（Model、Mapper、Service、Controller）已全部实现。仅`favorite_drug`表的后端代码未实现（扩展功能）。
+**B. 常见扩展脚本（不在 `init_simple.sql` 内，部署 README 推荐顺序执行）**  
+- `supplier_drug`（`create_supplier_drug_relation.sql`）— **后端已实现**  
+- `sys_user_permission`（`add_user_permission_system.sql`）— **后端已实现**  
+- 供应商审核、价格协议、价格历史等（`create_supplier_approval_tables.sql`、`create_price_agreement_tables.sql` 等）— **后端已实现**（以实际已执行脚本为准）
+
+**结论**：执行 `init_simple.sql` 与推荐扩展脚本后，与代码对应的业务表均可就绪；未实现业务的仅有占位表 `favorite_drug`。详见 [Database_Design.md](./Database_Design.md)。
 
 ---
 
@@ -576,7 +565,7 @@
 
 ---
 
-**报告生成时间**：2026年3月9日  
+**报告生成时间**：2026年4月25日  
 **检查人员**：CDIOM开发团队  
 **系统状态**：核心功能和安全问题已全部解决，系统已具备生产环境部署条件
 
@@ -590,4 +579,5 @@
 | v2.0 | 2026-01-14 16:14:48 | 更新已实现模块状态，添加库存、入库、出库、采购订单、供应商、库存调整等模块的完整检查 |
 | v2.1 | 2026-01-14 16:17:17 | 添加文档时间记录和文件变更历史 |
 | v3.0 | 2026-03-09 | 更新认证模块状态（登录锁定机制已实现），添加数据导出模块、IP定位服务模块，更新完成度统计，添加已完成的优化和安全增强内容 |
+| v3.1 | 2026-04-25 | 与当前代码对齐：前端页面清单（含 `Home`、`SupplierDrugManage`）、`init_simple.sql` 20 表与扩展表区分、用户列表 `permissionId` 筛选等 |
 

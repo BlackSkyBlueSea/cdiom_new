@@ -1,0 +1,305 @@
+// CDIOM ER - white canvas, white entities; dashed subgraph areas use very light gray fill.
+// Note: Graphviz allows at most 5 samehead/sametail groups per node; samehead/sametail were removed to avoid render errors.
+// Export: dot -Tpng -Gdpi=360 cdiom_er_init.dot -o cdiom_er_init.png
+// Cardinality: edge label = small white TABLE on the edge path (not xlabel — xlabel is placed away from nodes and often floats over unrelated whitespace/lines). graph esep spreads parallel edges at hubs.
+// Entity boxes: CELLPADDING=8; long table names use <BR/> on the title row (same identifier, two lines).
+// Layout: ranksep (inches) = vertical gap between ranks (lower → shorter drawing height). Cluster margin l,t,r,b (points): reduce t,b only to shave vertical padding; nodesep = horizontal (leave unchanged to preserve width).
+// IMPORTANT (dot): nodes with NO path to the rest of the graph form a separate *connected component*. Components are laid out apart → huge whitespace (e.g. System vs Master). Fix: one invisible low-weight edge with constraint=false bridges the orphan cluster without forcing rank.
+// Cluster margin (l,t,r,b points): bump left/right on neighbors of tight seams (proc↔appr↔master, inv↔rbac). graph nodesep (inches) widens columns globally a bit.
+
+digraph CDIOM_ER {
+  graph [
+    rankdir=TB
+    size="14,15"
+    bgcolor=white
+    margin=0.28
+    ranksep=0.28
+    nodesep=0.44
+    esep=0.12
+    splines=spline
+    fontsize=35
+    fontname="Arial"
+    fontcolor=black
+    label="CDIOM E-R"
+    labelloc=t
+  ];
+  node [fontname="Arial", fontcolor=black, color=black, margin=0.12];
+  edge [
+    fontname="Arial"
+    fontsize=18
+    fontcolor=black
+    color=black
+    penwidth=0.75
+    arrowsize=0.72
+  ];
+
+  // ----- System -----
+  subgraph cluster_system {
+    label="System";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="20,6,20,6";
+    ranksep=0.18;
+
+    sys_config [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_<BR/>config</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">config_key</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">config_value</FONT></TD></TR></TABLE>>];
+    sys_notice [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_notice</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">notice_title</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR></TABLE>>];
+
+    operation_log [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>operation_log</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">module</FONT></TD></TR></TABLE>>];
+    login_log [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>login_log</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR></TABLE>>];
+
+    gen_log [shape=invtriangle, fixedsize=true, width=0.44, height=0.34, label="", style=filled, fillcolor=white, color=black];
+    gen_txt [shape=plaintext, fontsize=18, fontcolor=black, label="partial generalization (audit logs)"];
+    operation_log -> gen_log [arrowhead=none];
+    login_log -> gen_log [arrowhead=none];
+    gen_log -> gen_txt [style=dashed, arrowhead=none];
+  }
+
+  // ----- RBAC -----
+  subgraph cluster_rbac {
+    label="RBAC";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="44,6,20,6";
+    ranksep=0.22;
+
+    sys_role [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_role</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">role_code</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">role_name</FONT></TD></TR></TABLE>>];
+    sys_user [shape=none, margin=0.14, ordering=out, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_user</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">id (PK)</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">username</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">(M) phone / email</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="4" FACE="Arial"> </FONT></TD></TR></TABLE>>];
+    sys_permission [shape=none, margin=0, ordering=in, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_permission</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">permission_code</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">permission_type</FONT></TD></TR></TABLE>>];
+
+    sys_user_role [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_user_role</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">role_id</FONT></TD></TR></TABLE>>];
+    sys_role_permission [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_role_permission</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">role_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">permission_id</FONT></TD></TR></TABLE>>];
+    sys_user_permission [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="17" FACE="Arial"><B>sys_user_permission</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">permission_id</FONT></TD></TR></TABLE>>];
+
+    r_belongs [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="BelongsTo"];
+    r_urole [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="UserRole"];
+    r_rperm [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="RoleGrants"];
+    r_uperm [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="UserGrants"];
+
+    sys_user -> r_belongs [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(BelongsTo) n</FONT></TD></TR></TABLE>>];
+    r_belongs -> sys_role [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(BelongsTo) 1</FONT></TD></TR></TABLE>>];
+    sys_user -> r_urole [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(UserRole) n</FONT></TD></TR></TABLE>>];
+    r_urole -> sys_user_role;
+    sys_user_role -> sys_role [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(UserRole) n:1</FONT></TD></TR></TABLE>>];
+    sys_role -> r_rperm [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(RoleGrants) 1</FONT></TD></TR></TABLE>>];
+    r_rperm -> sys_role_permission;
+    sys_role_permission -> sys_permission [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(RoleGrants) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_uperm [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(UserGrants) n</FONT></TD></TR></TABLE>>];
+    r_uperm -> sys_user_permission;
+    sys_user_permission -> sys_permission [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(UserGrants) m</FONT></TD></TR></TABLE>>];
+  }
+
+  // ----- Master -----
+  subgraph cluster_master {
+    label="Supplier / drug / agreement";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="36,6,36,6";
+    ranksep=0.12;
+    nodesep=0.36;
+
+    supplier [shape=none, margin=0.38, ordering=out, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>supplier</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">name</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">audit_status</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="4" FACE="Arial"> </FONT></TD></TR></TABLE>>];
+    drug_info [shape=none, margin=0.38, ordering=out, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>drug_info</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">national_code</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">drug_name</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">is_special</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="4" FACE="Arial"> </FONT></TD></TR></TABLE>>];
+
+    supplier_drug [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>supplier_drug</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">unit_price</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">current_agreement_id</FONT></TD></TR></TABLE>>];
+    supplier_drug_agreement [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>supplier_drug_agreement</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">unit_price</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">effective_date</FONT></TD></TR></TABLE>>];
+    supplier_drug_price_history [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="15" FACE="Arial"><B>supplier_drug_price_history</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">price_before</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">price_after</FONT></TD></TR></TABLE>>];
+
+    r_sd [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Listing"];
+    r_ag_s [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="AgreeSup"];
+    r_ag_d [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="AgreeDrug"];
+    r_curr [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="CurrentAgr"];
+    r_ph_s [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="HistSup"];
+    r_ph_d [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="HistDrug"];
+    r_ph_a [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="HistAgr"];
+
+    supplier -> r_sd [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Listing) 1</FONT></TD></TR></TABLE>>];
+    r_sd -> supplier_drug [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Listing) n</FONT></TD></TR></TABLE>>];
+    supplier_drug -> drug_info [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Listing) n:1</FONT></TD></TR></TABLE>>];
+
+    supplier -> r_ag_s [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AgreeSup) 1</FONT></TD></TR></TABLE>>];
+    r_ag_s -> supplier_drug_agreement [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AgreeSup) n</FONT></TD></TR></TABLE>>];
+    drug_info -> r_ag_d [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AgreeDrug) 1</FONT></TD></TR></TABLE>>];
+    r_ag_d -> supplier_drug_agreement [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AgreeDrug) n</FONT></TD></TR></TABLE>>];
+
+    supplier_drug -> r_curr [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(CurrentAgr) n</FONT></TD></TR></TABLE>>];
+    r_curr -> supplier_drug_agreement [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(CurrentAgr) 0..1</FONT></TD></TR></TABLE>>];
+
+    supplier -> r_ph_s [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistSup) 1</FONT></TD></TR></TABLE>>];
+    r_ph_s -> supplier_drug_price_history [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistSup) n</FONT></TD></TR></TABLE>>];
+    drug_info -> r_ph_d [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistDrug) 1</FONT></TD></TR></TABLE>>];
+    r_ph_d -> supplier_drug_price_history [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistDrug) n</FONT></TD></TR></TABLE>>];
+    supplier_drug_agreement -> r_ph_a [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistAgr) 1</FONT></TD></TR></TABLE>>];
+    r_ph_a -> supplier_drug_price_history [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(HistAgr) n</FONT></TD></TR></TABLE>>];
+  }
+
+  // ----- Procurement -----
+  subgraph cluster_procurement {
+    label="Purchase / inbound";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="20,6,36,6";
+    ranksep=0.20;
+
+    purchase_order [shape=none, margin=0.14, ordering=out, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>purchase_order</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">order_number</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">total_amount</FONT></TD></TR><TR><TD><FONT POINT-SIZE="4"> </FONT></TD></TR></TABLE>>];
+    purchase_order_item [shape=none, margin=0, label=<<TABLE BORDER="2" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="17" FACE="Arial"><B>purchase_order<BR/>item</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">WEAK</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">quantity</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">unit_price</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">total_price (derived)</FONT></TD></TR></TABLE>>];
+
+    inbound_receipt_batch [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>inbound_receipt<BR/>batch</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">batch_code</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">order_id</FONT></TD></TR></TABLE>>];
+    inbound_record [shape=none, margin=0.16, ordering=in, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>inbound_record</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">record_number</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">quantity</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR><TR><TD><FONT POINT-SIZE="4"> </FONT></TD></TR></TABLE>>];
+
+    r_po_s [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="FromSup"];
+    r_po_u [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Buyer"];
+    r_pol [shape=diamond, peripheries=2, style=filled, fillcolor=white, color=black, fontsize=18, label="OrderLine"];
+    r_ld [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="LineDrug"];
+    r_bat [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Receipt"];
+    r_ib [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="FromBatch"];
+    r_ip [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="FromPO"];
+    r_id [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="RecvDrug"];
+    r_io [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Operator"];
+
+    supplier -> r_po_s [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromSup) 1</FONT></TD></TR></TABLE>>];
+    r_po_s -> purchase_order [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromSup) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_po_u [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Buyer) 1</FONT></TD></TR></TABLE>>];
+    r_po_u -> purchase_order [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Buyer) n</FONT></TD></TR></TABLE>>];
+
+    purchase_order -> r_pol [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(OrderLine) 1</FONT></TD></TR></TABLE>>];
+    r_pol -> purchase_order_item [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(OrderLine) n</FONT></TD></TR></TABLE>>];
+    purchase_order_item -> r_ld [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LineDrug-PO) n</FONT></TD></TR></TABLE>>];
+    r_ld -> drug_info [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LineDrug-PO) 1</FONT></TD></TR></TABLE>>];
+
+    purchase_order -> r_bat [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Receipt) 1</FONT></TD></TR></TABLE>>];
+    r_bat -> inbound_receipt_batch [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Receipt) n</FONT></TD></TR></TABLE>>];
+
+    inbound_receipt_batch -> r_ib [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromBatch) 1</FONT></TD></TR></TABLE>>];
+    r_ib -> inbound_record [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromBatch) n</FONT></TD></TR></TABLE>>];
+    purchase_order -> r_ip [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromPO) 1</FONT></TD></TR></TABLE>>];
+    r_ip -> inbound_record [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(FromPO) 0..n</FONT></TD></TR></TABLE>>];
+    drug_info -> r_id [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(RecvDrug) 1</FONT></TD></TR></TABLE>>];
+    r_id -> inbound_record [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(RecvDrug) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_io [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Operator) 1</FONT></TD></TR></TABLE>>];
+    r_io -> inbound_record [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Operator) n</FONT></TD></TR></TABLE>>];
+  }
+
+  // ----- Inventory / outbound -----
+  subgraph cluster_inv {
+    label="Inventory / outbound";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="20,6,40,6";
+    ranksep=0.20;
+    nodesep=0.36;
+    esep=0.14;
+
+    inventory [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>inventory</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">batch_number</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">quantity</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">expiry_date</FONT></TD></TR></TABLE>>];
+    outbound_apply [shape=none, margin=0.14, ordering=in, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>outbound_apply</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">apply_number</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR><TR><TD><FONT POINT-SIZE="4"> </FONT></TD></TR></TABLE>>];
+    outbound_apply_item [shape=none, margin=0, label=<<TABLE BORDER="2" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="17" FACE="Arial"><B>outbound_apply_item</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">WEAK</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">quantity</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">actual_quantity</FONT></TD></TR></TABLE>>];
+    inventory_adjustment [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>inventory<BR/>adjustment</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">adjustment_number</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">adjustment_type</FONT></TD></TR></TABLE>>];
+    favorite_drug [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" FACE="Arial"><B>favorite_drug</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">drug_id</FONT></TD></TR></TABLE>>];
+
+    r_stk [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="StockOf"];
+    r_req [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Request"];
+    r_ap1 [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Approve"];
+    r_ap2 [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Approve2"];
+    r_oli [shape=diamond, peripheries=2, style=filled, fillcolor=white, color=black, fontsize=18, label="ApplyLine"];
+    r_od [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="LineDrug"];
+    r_adj [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Adjust"];
+    r_ado [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="AdjBy"];
+    r_fav [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Favorite"];
+
+    drug_info -> r_stk [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(StockOf) 1</FONT></TD></TR></TABLE>>];
+    r_stk -> inventory [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(StockOf) n</FONT></TD></TR></TABLE>>];
+
+    sys_user -> r_req [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Request) 1</FONT></TD></TR></TABLE>>];
+    r_req -> outbound_apply [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Request) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_ap1 [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Approve) 0..1</FONT></TD></TR></TABLE>>];
+    r_ap1 -> outbound_apply [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Approve) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_ap2 [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Approve2) 0..1</FONT></TD></TR></TABLE>>];
+    r_ap2 -> outbound_apply [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Approve2) n</FONT></TD></TR></TABLE>>];
+
+    outbound_apply -> r_oli [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(ApplyLine) 1</FONT></TD></TR></TABLE>>];
+    r_oli -> outbound_apply_item [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(ApplyLine) n</FONT></TD></TR></TABLE>>];
+    outbound_apply_item -> r_od [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LineDrug-OB) n</FONT></TD></TR></TABLE>>];
+    r_od -> drug_info [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LineDrug-OB) 1</FONT></TD></TR></TABLE>>];
+
+    drug_info -> r_adj [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Adjust) 1</FONT></TD></TR></TABLE>>];
+    r_adj -> inventory_adjustment [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Adjust) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_ado [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AdjBy) 1</FONT></TD></TR></TABLE>>];
+    r_ado -> inventory_adjustment [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AdjBy) n</FONT></TD></TR></TABLE>>];
+
+    sys_user -> r_fav [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Favorite) n</FONT></TD></TR></TABLE>>];
+    r_fav -> favorite_drug [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Favorite) m</FONT></TD></TR></TABLE>>];
+    favorite_drug -> drug_info [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Favorite) n:1</FONT></TD></TR></TABLE>>];
+  }
+
+  // ----- Approval -----
+  subgraph cluster_appr {
+    label="Supplier approval";
+    fontsize=26;
+    fontcolor=black;
+    style="rounded,dashed";
+    color=black;
+    fillcolor="#fafafa";
+    margin="36,6,36,6";
+    ranksep=0.20;
+    nodesep=0.36;
+    esep=0.14;
+
+    supplier_approval_application [shape=none, margin=0.14, ordering=in, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="15" FACE="Arial"><B>supplier_approval_application</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">status</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">application_type</FONT></TD></TR><TR><TD><FONT POINT-SIZE="4"> </FONT></TD></TR></TABLE>>];
+    supplier_approval_item [shape=none, margin=0, label=<<TABLE BORDER="2" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="15" FACE="Arial"><B>supplier_approval_item</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">WEAK</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">proposed_price</FONT></TD></TR></TABLE>>];
+    supplier_blacklist [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>supplier_blacklist</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">blacklist_reason</FONT></TD></TR></TABLE>>];
+    price_warning_config [shape=none, margin=0, label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>price_warning_config</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">warning_threshold</FONT></TD></TR></TABLE>>];
+    supplier_approval_log [shape=none, margin=0, label=<<TABLE BORDER="2" CELLBORDER="0" CELLSPACING="3" CELLPADDING="8" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="16" FACE="Arial"><B>supplier_approval_log</B></FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">WEAK</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="18" FACE="Arial">step_name</FONT></TD></TR></TABLE>>];
+
+    r_ts [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="TargetSup"];
+    r_sb [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Submit"];
+    r_sil [shape=diamond, peripheries=2, style=filled, fillcolor=white, color=black, fontsize=18, label="AppLine"];
+    r_spd [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="PropDrug"];
+    r_bl [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="Blacklist"];
+    r_bc [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="BlCreator"];
+    r_pw [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="PriceWarn"];
+    r_sl [shape=diamond, peripheries=2, style=filled, fillcolor=white, color=black, fontsize=18, label="StepLog"];
+    r_lo [shape=diamond, peripheries=1, style=filled, fillcolor=white, color=black, fontsize=18, label="LogBy"];
+
+    supplier -> r_ts [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(TargetSup) 1</FONT></TD></TR></TABLE>>];
+    r_ts -> supplier_approval_application [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(TargetSup) 0..n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_sb [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Submit) 1</FONT></TD></TR></TABLE>>];
+    r_sb -> supplier_approval_application [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Submit) n</FONT></TD></TR></TABLE>>];
+
+    supplier_approval_application -> r_sil [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AppLine) 1</FONT></TD></TR></TABLE>>];
+    r_sil -> supplier_approval_item [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(AppLine) n</FONT></TD></TR></TABLE>>];
+    supplier_approval_item -> r_spd [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(PropDrug) n</FONT></TD></TR></TABLE>>];
+    r_spd -> drug_info [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(PropDrug) 1</FONT></TD></TR></TABLE>>];
+
+    supplier -> r_bl [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Blacklist) 1</FONT></TD></TR></TABLE>>];
+    r_bl -> supplier_blacklist [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(Blacklist) 0..n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_bc [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(BlCreator) 1</FONT></TD></TR></TABLE>>];
+    r_bc -> supplier_blacklist [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(BlCreator) n</FONT></TD></TR></TABLE>>];
+
+    drug_info -> r_pw [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(PriceWarn) 1</FONT></TD></TR></TABLE>>];
+    r_pw -> price_warning_config [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(PriceWarn) 0..n</FONT></TD></TR></TABLE>>];
+
+    supplier_approval_application -> r_sl [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(StepLog) 1</FONT></TD></TR></TABLE>>];
+    r_sl -> supplier_approval_log [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(StepLog) n</FONT></TD></TR></TABLE>>];
+    sys_user -> r_lo [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LogBy) 1</FONT></TD></TR></TABLE>>];
+    r_lo -> supplier_approval_log [label=<<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="white"><TR><TD ALIGN="CENTER"><FONT FACE="Arial" POINT-SIZE="18">(LogBy) n</FONT></TD></TR></TABLE>>];
+  }
+
+  // Bridge: System had no edges to the rest → separate layout component = huge gap. sys_config/sys_notice were also disconnected from the log chain → merge with invis edges.
+  sys_config -> operation_log [style=invis, weight=0];
+  sys_notice -> login_log [style=invis, weight=0];
+  gen_txt -> supplier [style=invis, constraint=false, weight=0];
+}

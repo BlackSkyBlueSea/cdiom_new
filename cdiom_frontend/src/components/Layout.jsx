@@ -38,7 +38,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import request from '../utils/request'
-import { removeToken, getUser, getUserRoleId } from '../utils/auth'
+import { clearAuth, getUser, getUserRoleId } from '../utils/auth'
 import {
   clearPermissionCache,
   fetchUserPermissions,
@@ -143,12 +143,12 @@ const Layout = () => {
   const handleLogout = async () => {
     try {
       await request.post('/auth/logout')
-      removeToken()
+      clearAuth()
       clearPermissionCache()
       message.success('登出成功')
       navigate('/')
     } catch (error) {
-      removeToken()
+      clearAuth()
       clearPermissionCache()
       navigate('/')
     }

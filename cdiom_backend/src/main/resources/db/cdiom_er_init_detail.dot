@@ -1,0 +1,383 @@
+// CDIOM database conceptual ER diagram (from init.sql)
+// Full Chen style (separate attribute ellipses). For compact 1:1 Word layout see cdiom_er_init.dot.
+// Chen-style: entities (box), weak entities (double box), attributes (ellipse),
+// multi-valued (double ellipse), derived (dashed ellipse), relationships (diamond),
+// weak relationships (double diamond), partial / total generalization (invtriangle).
+// Render: dot -Tpng cdiom_er_init.dot -o cdiom_er_init.png
+//         dot -Tsvg cdiom_er_init.dot -o cdiom_er_init.svg
+
+digraph CDIOM_ER {
+  graph [
+    rankdir=TB
+    splines=ortho
+    nodesep=0.45
+    ranksep=0.7
+    fontsize=12
+    fontname="Helvetica"
+    label="CDIOM conceptual ER diagram (init.sql, 29 tables). English labels. Chen notation."
+    labelloc=t
+  ];
+  edge [fontname="Helvetica", fontsize=9];
+
+  // ---------- Legend (notation) ----------
+  subgraph cluster_legend {
+    label="Notation (ER symbols)";
+    style=dashed;
+    color=gray;
+    fontsize=10;
+
+    L_ent   [shape=box, label="Entity"];
+    L_weakE [shape=box, peripheries=2, label="Weak entity"];
+    L_attr  [shape=ellipse, label="Attribute"];
+    L_mv    [shape=ellipse, peripheries=2, label="Multi-valued attr."];
+    L_der   [shape=ellipse, style=dashed, label="Derived attr."];
+    L_rel   [shape=diamond, label="Relationship"];
+    L_wrel  [shape=diamond, peripheries=2, label="Weak rel."];
+    L_genP  [shape=invtriangle, fixedsize=true, width=0.45, height=0.35, label="Partial gen."];
+    L_genT  [shape=invtriangle, peripheries=2, fixedsize=true, width=0.45, height=0.35, label="Total gen."];
+    L_ent -> L_attr [style=invis];
+    L_weakE -> L_mv [style=invis];
+  }
+
+  // ---------- System & audit (generalization) ----------
+  subgraph cluster_system {
+    label="System configuration, notices, and audit logs";
+    style=filled;
+    fillcolor="#f8f8f8";
+
+    sys_config  [shape=box, label="sys_config"];
+    sc_id   [shape=ellipse, label="id (PK)"];
+    sc_key  [shape=ellipse, label="config_key"];
+    sc_val  [shape=ellipse, label="config_value"];
+    sys_config -> sc_id; sys_config -> sc_key; sys_config -> sc_val;
+
+    sys_notice  [shape=box, label="sys_notice"];
+    sn_id   [shape=ellipse, label="id (PK)"];
+    sn_title [shape=ellipse, label="notice_title"];
+    sn_stat [shape=ellipse, label="status"];
+    sys_notice -> sn_id; sys_notice -> sn_title; sys_notice -> sn_stat;
+
+    operation_log [shape=box, label="operation_log"];
+    ol_id [shape=ellipse, label="id (PK)"];
+    ol_uid [shape=ellipse, label="user_id"];
+    ol_mod [shape=ellipse, label="module"];
+    operation_log -> ol_id; operation_log -> ol_uid; operation_log -> ol_mod;
+
+    login_log [shape=box, label="login_log"];
+    ll_id [shape=ellipse, label="id (PK)"];
+    ll_uid [shape=ellipse, label="user_id"];
+    ll_stat [shape=ellipse, label="status"];
+    login_log -> ll_id; login_log -> ll_uid; login_log -> ll_stat;
+
+    gen_log [shape=invtriangle, fixedsize=true, width=0.55, height=0.4, label=""];
+    gen_log_lbl [shape=plaintext, label="Partial generalization (audit trail kinds)"];
+    operation_log -> gen_log [arrowhead=none];
+    login_log -> gen_log [arrowhead=none];
+    gen_log -> gen_log_lbl [style=dashed, arrowhead=none];
+  }
+
+  // ---------- RBAC ----------
+  subgraph cluster_rbac {
+    label="RBAC (roles, users, permissions)";
+    style=filled;
+    fillcolor="#eef6ff";
+
+    sys_role [shape=box, label="sys_role"];
+    sr_id [shape=ellipse, label="id (PK)"];
+    sr_code [shape=ellipse, label="role_code"];
+    sr_name [shape=ellipse, label="role_name"];
+    sys_role -> sr_id; sys_role -> sr_code; sys_role -> sr_name;
+
+    sys_user [shape=box, label="sys_user"];
+    su_id [shape=ellipse, label="id (PK)"];
+    su_name [shape=ellipse, label="username"];
+    su_status [shape=ellipse, label="status"];
+    su_phones [shape=ellipse, peripheries=2, label="contact channels (multi-valued, conceptual)"];
+    sys_user -> su_id; sys_user -> su_name; sys_user -> su_status; sys_user -> su_phones;
+
+    sys_permission [shape=box, label="sys_permission"];
+    sp_id [shape=ellipse, label="id (PK)"];
+    sp_code [shape=ellipse, label="permission_code"];
+    sp_type [shape=ellipse, label="permission_type"];
+    sys_permission -> sp_id; sys_permission -> sp_code; sys_permission -> sp_type;
+
+    rel_user_role [shape=diamond, label="BelongsTo (FK role_id)"];
+    sys_user -> rel_user_role [taillabel="n", labeldistance=2];
+    rel_user_role -> sys_role [headlabel="1", labeldistance=2];
+
+    rel_user_role_mn [shape=diamond, label="UserRole (M:N bridge)"];
+    sys_user_role [shape=box, label="sys_user_role (associative)"];
+    sys_user -> rel_user_role_mn [taillabel="n"];
+    rel_user_role_mn -> sys_user_role [headlabel=" "];
+    sys_user_role -> sys_role [taillabel="n", headlabel="1", labeldistance=2];
+
+    rel_role_perm [shape=diamond, label="RoleGrants"];
+    sys_role_permission [shape=box, label="sys_role_permission"];
+    sys_role -> rel_role_perm [taillabel="1"];
+    rel_role_perm -> sys_role_permission;
+    sys_role_permission -> rel_rp2 [style=invis];
+    rel_rp2 [shape=diamond, style=invis, width=0.01, height=0.01];
+    rel_rp2 -> sys_permission [headlabel="n"];
+
+    rel_user_perm [shape=diamond, label="UserGrants"];
+    sys_user_permission [shape=box, label="sys_user_permission"];
+    sys_user -> rel_user_perm [taillabel="n"];
+    rel_user_perm -> sys_user_permission;
+    sys_user_permission -> rel_up2 [style=invis];
+    rel_up2 [shape=diamond, style=invis, width=0.01, height=0.01];
+    rel_up2 -> sys_permission [headlabel="m"];
+  }
+
+  // ---------- Master data: supplier & drug ----------
+  subgraph cluster_master {
+    label="Supplier, drug master, listing, price agreement";
+    style=filled;
+    fillcolor="#fff8e6";
+
+    supplier [shape=box, label="supplier"];
+    sup_id [shape=ellipse, label="id (PK)"];
+    sup_name [shape=ellipse, label="name"];
+    sup_audit [shape=ellipse, label="audit_status"];
+    supplier -> sup_id; supplier -> sup_name; supplier -> sup_audit;
+
+    drug_info [shape=box, label="drug_info"];
+    di_id [shape=ellipse, label="id (PK)"];
+    di_code [shape=ellipse, label="national_code"];
+    di_name [shape=ellipse, label="drug_name"];
+    di_special [shape=ellipse, label="is_special"];
+    drug_info -> di_id; drug_info -> di_code; drug_info -> di_name; drug_info -> di_special;
+
+    rel_sd [shape=diamond, label="SupplierDrug (listing M:N)"];
+    supplier_drug [shape=box, label="supplier_drug (associative entity)"];
+    supplier -> rel_sd [taillabel="1"];
+    rel_sd -> supplier_drug [headlabel="n"];
+    supplier_drug -> rel_sd2 [style=invis];
+    rel_sd2 [shape=diamond, style=invis, width=0.01, height=0.01];
+    rel_sd2 -> drug_info [headlabel="n"];
+
+    sda_id [shape=ellipse, label="id (PK)"];
+    sda_price [shape=ellipse, label="unit_price"];
+    sda_dates [shape=ellipse, label="effective_date"];
+    supplier_drug_agreement [shape=box, label="supplier_drug_agreement"];
+    supplier_drug_agreement -> sda_id;
+    supplier_drug_agreement -> sda_price;
+    supplier_drug_agreement -> sda_dates;
+
+    rel_agree_sup [shape=diamond, label="AgreementOf"];
+    supplier -> rel_agree_sup [taillabel="1"];
+    rel_agree_sup -> supplier_drug_agreement [headlabel="n"];
+    rel_agree_drug [shape=diamond, label="ForDrug"];
+    drug_info -> rel_agree_drug [taillabel="1"];
+    rel_agree_drug -> supplier_drug_agreement [headlabel="n"];
+
+    rel_curr_agr [shape=diamond, label="CurrentAgreement"];
+    supplier_drug -> rel_curr_agr [taillabel="n"];
+    rel_curr_agr -> supplier_drug_agreement [headlabel="0..1"];
+
+    supplier_drug_price_history [shape=box, label="supplier_drug_price_history"];
+    sdph_id [shape=ellipse, label="id (PK)"];
+    sdph_before [shape=ellipse, label="price_before"];
+    sdph_after [shape=ellipse, label="price_after"];
+    supplier_drug_price_history -> sdph_id;
+    supplier_drug_price_history -> sdph_before;
+    supplier_drug_price_history -> sdph_after;
+
+    rel_ph_sup [shape=diamond, label="HistForSupplier"];
+    supplier -> rel_ph_sup [taillabel="1"];
+    rel_ph_sup -> supplier_drug_price_history [headlabel="n"];
+    rel_ph_drug [shape=diamond, label="HistForDrug"];
+    drug_info -> rel_ph_drug [taillabel="1"];
+    rel_ph_drug -> supplier_drug_price_history [headlabel="n"];
+    rel_hist_agr [shape=diamond, label="UnderAgreement"];
+    supplier_drug_agreement -> rel_hist_agr [taillabel="1"];
+    rel_hist_agr -> supplier_drug_price_history [headlabel="n"];
+  }
+
+  // ---------- Procurement & inbound ----------
+  subgraph cluster_procurement {
+    label="Purchase orders, receipt batches, inbound records";
+    style=filled;
+    fillcolor="#f0fff0";
+
+    purchase_order [shape=box, label="purchase_order"];
+    po_num [shape=ellipse, label="order_number"];
+    po_stat [shape=ellipse, label="status"];
+    po_amt [shape=ellipse, label="total_amount"];
+    purchase_order -> po_num; purchase_order -> po_stat; purchase_order -> po_amt;
+
+    rel_po_sup [shape=diamond, label="OrderedFrom"];
+    supplier -> rel_po_sup [taillabel="1"];
+    rel_po_sup -> purchase_order [headlabel="n"];
+
+    rel_po_buyer [shape=diamond, label="PurchasedBy"];
+    sys_user -> rel_po_buyer [taillabel="1"];
+    rel_po_buyer -> purchase_order [headlabel="n"];
+
+    rel_contains [shape=diamond, peripheries=2, label="OrderLine (weak rel.)"];
+    purchase_order_item [shape=box, peripheries=2, label="purchase_order_item (weak entity)"];
+    purchase_order -> rel_contains [taillabel="1"];
+    rel_contains -> purchase_order_item [headlabel="n"];
+    poi_qty [shape=ellipse, label="quantity"];
+    poi_up [shape=ellipse, label="unit_price"];
+    poi_tot [shape=ellipse, style=dashed, label="total_price (derived)"];
+    purchase_order_item -> poi_qty;
+    purchase_order_item -> poi_up;
+    purchase_order_item -> poi_tot;
+    rel_line_drug [shape=diamond, label="LineDrug"];
+    purchase_order_item -> rel_line_drug [taillabel="n"];
+    rel_line_drug -> drug_info [headlabel="1"];
+
+    inbound_receipt_batch [shape=box, label="inbound_receipt_batch"];
+    irb_code [shape=ellipse, label="batch_code"];
+    irb_order [shape=ellipse, label="order_id"];
+    inbound_receipt_batch -> irb_code; inbound_receipt_batch -> irb_order;
+
+    rel_batch_order [shape=diamond, label="ReceiptForOrder"];
+    purchase_order -> rel_batch_order [taillabel="1"];
+    rel_batch_order -> inbound_receipt_batch [headlabel="n"];
+
+    inbound_record [shape=box, label="inbound_record"];
+    inb_num [shape=ellipse, label="record_number"];
+    inb_qty [shape=ellipse, label="quantity"];
+    inb_stat [shape=ellipse, label="status"];
+    inbound_record -> inb_num; inbound_record -> inb_qty; inbound_record -> inb_stat;
+
+    rel_inb_batch [shape=diamond, label="FromBatch"];
+    inbound_receipt_batch -> rel_inb_batch [taillabel="1"];
+    rel_inb_batch -> inbound_record [headlabel="n"];
+    rel_inb_po [shape=diamond, label="FromPO"];
+    purchase_order -> rel_inb_po [taillabel="1"];
+    rel_inb_po -> inbound_record [headlabel="0..n"];
+    rel_inb_drug [shape=diamond, label="ReceivesDrug"];
+    drug_info -> rel_inb_drug [taillabel="1"];
+    rel_inb_drug -> inbound_record [headlabel="n"];
+    rel_inb_op [shape=diamond, label="RecordedBy"];
+    sys_user -> rel_inb_op [taillabel="1"];
+    rel_inb_op -> inbound_record [headlabel="n"];
+  }
+
+  // ---------- Inventory & outbound ----------
+  subgraph cluster_inv_out {
+    label="Inventory, outbound application, adjustment, favorites";
+    style=filled;
+    fillcolor="#fff0f5";
+
+    inventory [shape=box, label="inventory"];
+    inv_batch [shape=ellipse, label="batch_number"];
+    inv_qty [shape=ellipse, label="quantity"];
+    inv_exp [shape=ellipse, label="expiry_date"];
+    inventory -> inv_batch; inventory -> inv_qty; inventory -> inv_exp;
+
+    rel_inv_drug [shape=diamond, label="StockOf"];
+    drug_info -> rel_inv_drug [taillabel="1"];
+    rel_inv_drug -> inventory [headlabel="n"];
+
+    outbound_apply [shape=box, label="outbound_apply"];
+    oa_num [shape=ellipse, label="apply_number"];
+    oa_stat [shape=ellipse, label="status"];
+    outbound_apply -> oa_num; outbound_apply -> oa_stat;
+
+    rel_oa_app [shape=diamond, label="RequestedBy"];
+    sys_user -> rel_oa_app [taillabel="1"];
+    rel_oa_app -> outbound_apply [headlabel="n"];
+    rel_oa_appr [shape=diamond, label="ApprovedBy"];
+    sys_user -> rel_oa_appr [taillabel="0..1"];
+    rel_oa_appr -> outbound_apply [headlabel="n"];
+    rel_oa_sec [shape=diamond, label="SecondApproval"];
+    sys_user -> rel_oa_sec [taillabel="0..1"];
+    rel_oa_sec -> outbound_apply [headlabel="n"];
+
+    rel_oai [shape=diamond, peripheries=2, label="ApplyLines (weak rel.)"];
+    outbound_apply_item [shape=box, peripheries=2, label="outbound_apply_item (weak entity)"];
+    outbound_apply -> rel_oai [taillabel="1"];
+    rel_oai -> outbound_apply_item [headlabel="n"];
+    oai_qty [shape=ellipse, label="quantity"];
+    oai_act [shape=ellipse, label="actual_quantity"];
+    outbound_apply_item -> oai_qty; outbound_apply_item -> oai_act;
+    rel_oai_drug [shape=diamond, label="LineDrug"];
+    outbound_apply_item -> rel_oai_drug [taillabel="n"];
+    rel_oai_drug -> drug_info [headlabel="1"];
+
+    inventory_adjustment [shape=box, label="inventory_adjustment"];
+    ia_num [shape=ellipse, label="adjustment_number"];
+    ia_type [shape=ellipse, label="adjustment_type"];
+    inventory_adjustment -> ia_num; inventory_adjustment -> ia_type;
+    rel_adj_drug [shape=diamond, label="AdjustsBatch"];
+    drug_info -> rel_adj_drug [taillabel="1"];
+    rel_adj_drug -> inventory_adjustment [headlabel="n"];
+    rel_adj_op [shape=diamond, label="AdjustedBy"];
+    sys_user -> rel_adj_op [taillabel="1"];
+    rel_adj_op -> inventory_adjustment [headlabel="n"];
+
+    favorite_drug [shape=box, label="favorite_drug"];
+    rel_fav [shape=diamond, label="Favorites"];
+    sys_user -> rel_fav [taillabel="n"];
+    rel_fav -> favorite_drug;
+    favorite_drug -> rel_fav2 [style=invis];
+    rel_fav2 [shape=diamond, style=invis, width=0.01, height=0.01];
+    rel_fav2 -> drug_info [headlabel="m"];
+  }
+
+  // ---------- Supplier approval extension ----------
+  subgraph cluster_approval {
+    label="Supplier onboarding approval, blacklist, price warning, approval log";
+    style=filled;
+    fillcolor="#f5f0ff";
+
+    supplier_approval_application [shape=box, label="supplier_approval_application"];
+    saa_id [shape=ellipse, label="id (PK)"];
+    saa_stat [shape=ellipse, label="status"];
+    saa_type [shape=ellipse, label="application_type"];
+    supplier_approval_application -> saa_id;
+    supplier_approval_application -> saa_stat;
+    supplier_approval_application -> saa_type;
+
+    rel_app_sup [shape=diamond, label="TargetsSupplier"];
+    supplier -> rel_app_sup [taillabel="1"];
+    rel_app_sup -> supplier_approval_application [headlabel="0..n"];
+    rel_app_sub [shape=diamond, label="SubmittedBy"];
+    sys_user -> rel_app_sub [taillabel="1"];
+    rel_app_sub -> supplier_approval_application [headlabel="n"];
+
+    rel_sai [shape=diamond, peripheries=2, label="ApplicationLines (weak rel.)"];
+    supplier_approval_item [shape=box, peripheries=2, label="supplier_approval_item (weak entity)"];
+    supplier_approval_application -> rel_sai [taillabel="1"];
+    rel_sai -> supplier_approval_item [headlabel="n"];
+    sai_price [shape=ellipse, label="proposed_price"];
+    supplier_approval_item -> sai_price;
+    rel_sai_drug [shape=diamond, label="ProposesDrug"];
+    supplier_approval_item -> rel_sai_drug [taillabel="n"];
+    rel_sai_drug -> drug_info [headlabel="1"];
+
+    supplier_blacklist [shape=box, label="supplier_blacklist"];
+    sb_reason [shape=ellipse, label="blacklist_reason"];
+    supplier_blacklist -> sb_reason;
+    rel_bl_sup [shape=diamond, label="Blacklists"];
+    supplier -> rel_bl_sup [taillabel="1"];
+    rel_bl_sup -> supplier_blacklist [headlabel="0..n"];
+    rel_bl_creator [shape=diamond, label="CreatedBy"];
+    sys_user -> rel_bl_creator [taillabel="1"];
+    rel_bl_creator -> supplier_blacklist [headlabel="n"];
+
+    price_warning_config [shape=box, label="price_warning_config"];
+    pwc_thr [shape=ellipse, label="warning_threshold"];
+    price_warning_config -> pwc_thr;
+    rel_pwc_drug [shape=diamond, label="WarnsOnDrug"];
+    drug_info -> rel_pwc_drug [taillabel="1"];
+    rel_pwc_drug -> price_warning_config [headlabel="0..n"];
+
+    rel_sal [shape=diamond, peripheries=2, label="StepLog (weak rel.)"];
+    supplier_approval_log [shape=box, peripheries=2, label="supplier_approval_log (weak entity)"];
+    supplier_approval_application -> rel_sal [taillabel="1"];
+    rel_sal -> supplier_approval_log [headlabel="n"];
+    sal_step [shape=ellipse, label="step_name"];
+    supplier_approval_log -> sal_step;
+    rel_sal_op [shape=diamond, label="LoggedBy"];
+    sys_user -> rel_sal_op [taillabel="1"];
+    rel_sal_op -> supplier_approval_log [headlabel="n"];
+  }
+
+  // ---------- Cross-cluster layout hints ----------
+  { rank=same; sys_user; supplier; drug_info; }
+  { rank=same; purchase_order; inventory; outbound_apply; }
+}
